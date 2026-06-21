@@ -104,6 +104,7 @@ export class World {
     this.data = new Uint8Array(SX * SY * SZ);
     this.meshes = new Array(CXN * CZN).fill(null);
     this.dirty = new Set();
+    this.placed = new Set();  // packed indices of blocks the *player* placed
     this.spawn = [SX / 2 + 0.5, 12, SZ / 2 + 0.5];
   }
 
@@ -323,13 +324,14 @@ export class World {
 
   // --- Save / load (raw bytes, base64 into localStorage) ---
   serialize() {
-    return { v: 1, w: bytesToBase64(this.data) };
+    return { v: 1, w: bytesToBase64(this.data), p: [...this.placed] };
   }
   loadFrom(obj) {
     if (!obj || obj.v !== 1 || !obj.w) return false;
     const bytes = base64ToBytes(obj.w);
     if (bytes.length !== this.data.length) return false;
     this.data.set(bytes);
+    this.placed = new Set(obj.p || []);
     return true;
   }
 }

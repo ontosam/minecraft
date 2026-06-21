@@ -5,10 +5,13 @@ and feels like Minecraft, but it's calmer and built to be easy to navigate:
 
 - 🧒 You see **your character** from behind; the camera follows on its own, so
   you always know where you are.
-- 🌞 Always daytime — **no monsters, nothing scary, and you can't "die."**
+- 🌞 Always daytime — **nothing scary and you can't "die."**
 - 🧱 **Build & dig** by tapping where you want — ~30 kinds of blocks
   (grass, stone, wood, gold, diamond, glass, a pumpkin, colours, and more).
 - 🐷 **Cute animals** to walk up to and **pet** (they can follow you).
+- 🛡️ **Protect your house** from a *friendly* creeper: it wanders up and nibbles
+  a block with a little "uh-oh" — **tap it and it poofs harmlessly**, and your
+  blocks always come back. Earns ⭐ for defending. (It never hurts your kid.)
 - ⭐ **Goals** that earn stars and get a little harder over time, so there's
   always a next thing to do.
 - 💾 **Auto-saves** on the device and picks up right where he left off.
@@ -36,6 +39,8 @@ real app (and so progress is saved durably).
   pick the tool (the active one has a gold ring) and also act right in front.
 - **Pick a block:** tap the **block button** (top-left) to open the picker.
 - **Pet an animal:** walk up and tap **Pet** 🐾.
+- **Bonk a creeper:** if a green creeper strolls up to nibble your blocks, **tap
+  it** — it poofs harmlessly and your blocks pop back (and you earn a ⭐).
 - **Jump:** the **Jump** button (he also auto-hops small steps). **Goals:** ⭐.
   **Go home:** 🏠.
 
@@ -59,6 +64,7 @@ node scripts/make-icons.mjs # regenerate the PWA icons
 ```
 
 ## 🗺️ What's next
-A friendly **"protect your house" creeper** (slow, never hurts him — real stakes
-without the scary part), **giants**, **villagers with quests**, more goal
-challenges, and a graphics/atmosphere pass. Details and rationale in CLAUDE.md.
+The friendly **"protect your house" creeper** is now in (see above). Next up:
+**giants** (big friendly creatures to find and pet), **villagers with quests**,
+more goal challenges, and a graphics/atmosphere pass. Details and rationale in
+CLAUDE.md.

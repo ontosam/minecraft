@@ -6,6 +6,7 @@ import { initGL, makeWorldProgram, makeAtlasTexture, GLMesh, blockPreview, cubeM
 import { World, BLOCKS, CATEGORIES, B, SX, SY, SZ } from './world.js';
 import { Player } from './player.js';
 import { Animals } from './animals.js';
+import { Creepers } from './creepers.js';
 import { Controls } from './input.js';
 import { Sound } from './audio.js';
 import { Character } from './character.js';
@@ -24,7 +25,7 @@ function showError(msg) {
 window.addEventListener('error', (e) => showError(e.message || e.error || 'Unknown error'));
 window.addEventListener('unhandledrejection', (e) => showError(e.reason && e.reason.message || e.reason || 'Promise error'));
 
-let gl, worldProg, atlas, world, player, animals, controls, sound, character, goals;
+let gl, worldProg, atlas, world, player, animals, creepers, controls, sound, character, goals;
 let glowCube, buildFrame;
 let identity, proj, view, pv, scratch4, scratch4m;
 let selected = B.GRASS;
@@ -139,6 +140,7 @@ function doBuild(hit) {
   if (x < 0 || x >= SX || y < 0 || y >= SY || z < 0 || z >= SZ) return;
   if (world.get(x, y, z) !== B.AIR || overlapsPlayer(x, y, z)) { sound.play('deny'); return; }
   world.set(x, y, z, selected);
+  world.placed.add(world.idx(x, y, z)); // remember it's the player's, so creepers find the house
   sound.play('place'); saveDirty = true; actionAnim = 1;
   goals.onBuild(selected);
 }
@@ -149,6 +151,7 @@ function doDig(hit) {
   const id = world.get(x, y, z);
   if (id === B.AIR || (BLOCKS[id] && BLOCKS[id].indestructible)) { sound.play('deny'); return; }
   world.set(x, y, z, B.AIR);
+  world.placed.delete(world.idx(x, y, z));
   sound.play('dig'); saveDirty = true; actionAnim = 1;
   goals.onDig();
 }
@@ -167,24 +170,35 @@ function setTool(t) {
   if (bd) bd.classList.toggle('active', t === 'dig');
 }
 
-// --- Floating hearts ---
-function spawnHearts(worldPos) {
+// --- Floating particles (hearts when petting, puffs when bonking a creeper) ---
+function spawnParticles(worldPos, text, cls, n, spread) {
   if (!pv) return;
   mat4.transformPoint(scratch4, pv, worldPos[0], worldPos[1], worldPos[2]);
   if (scratch4[3] <= 0) return;
   const sx = (scratch4[0] / scratch4[3] * 0.5 + 0.5) * canvas.clientWidth;
   const sy = (1 - (scratch4[1] / scratch4[3] * 0.5 + 0.5)) * canvas.clientHeight;
   const layer = document.getElementById('hearts');
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < n; i++) {
     const h = document.createElement('div');
-    h.className = 'heart';
-    h.textContent = '💗';
-    h.style.left = (sx + (Math.random() - 0.5) * 40) + 'px';
-    h.style.top = (sy + (Math.random() - 0.5) * 20) + 'px';
-    h.style.animationDelay = (i * 0.08) + 's';
+    h.className = cls;
+    h.textContent = text;
+    h.style.left = (sx + (Math.random() - 0.5) * spread) + 'px';
+    h.style.top = (sy + (Math.random() - 0.5) * spread * 0.5) + 'px';
+    h.style.animationDelay = (i * 0.06) + 's';
     h.addEventListener('animationend', () => h.remove());
     layer.appendChild(h);
   }
+}
+function spawnHearts(worldPos) { spawnParticles(worldPos, '💗', 'heart', 4, 40); }
+function spawnPuffs(worldPos) { spawnParticles(worldPos, '💨', 'puff', 6, 60); }
+
+// Tap a creeper to defend: it poofs harmlessly, your blocks pop back, +a star.
+function doDefend(cr) {
+  const head = creepers.defend(cr);
+  sound.play('poof');
+  spawnPuffs(head);
+  goals.onDefend();
+  saveDirty = true;
 }
 
 // --- UI wiring ---
@@ -328,6 +342,7 @@ function frame(now) {
   if (dm > 0.0005 && dm < 2) goals.onMove(dm);
   prevX = player.pos[0]; prevZ = player.pos[2];
   animals.update(dt, player);
+  creepers.update(dt, player, goals.stars);
   world.flushDirty(2);
 
   resize();
@@ -338,7 +353,13 @@ function frame(now) {
   const aspect = canvas.width / Math.max(1, canvas.height);
   mat4.perspective(proj, 1.05, aspect, 0.08, 120);
   computeCamera();
-  if (controls.tapPending) { controls.tapPending = false; doAction(rayHitAt(controls.tapX, controls.tapY)); }
+  if (controls.tapPending) {
+    controls.tapPending = false;
+    const dir = screenRay(controls.tapX, controls.tapY);
+    const cr = creepers.pickRay(camPos, dir);
+    if (cr) doDefend(cr);
+    else doAction(world.raycast(camPos, dir, CAM_DIST + 8));
+  }
   mat4.multiply(pv, proj, view);
 
   gl.useProgram(worldProg.program);
@@ -356,6 +377,7 @@ function frame(now) {
   world.draw(worldProg);
   character.draw(worldProg, player.pos[0], player.pos[1], player.pos[2], player.yaw, player.walkPhase, player.moveAmt, actionAnim);
   animals.draw(worldProg);
+  creepers.draw(worldProg);
 
   // Build/Dig guides: a translucent "ghost" of the block that will be placed,
   // and a bold outline around the block that would be dug.
@@ -409,6 +431,11 @@ function init() {
   world = new World(gl);
   player = new Player(world);
   animals = new Animals(gl, world);
+  creepers = new Creepers(gl, world);
+  creepers.onEvent = (type, pos) => {
+    if (type === 'uhoh') sound.play('uhoh');
+    else if (type === 'chip') saveDirty = true;
+  };
   character = new Character(gl);
   controls = new Controls(canvas);
   sound = new Sound();
@@ -445,12 +472,13 @@ function init() {
 
   // Lightweight debug handle (handy for support and automated demos).
   window.__ezra = {
-    world, player, animals,
+    world, player, animals, creepers,
     cam: () => ({ yaw: camYaw, pitch: camPitch, pos: camPos.slice(), dir: camDir.slice() }),
     target: () => targetCells(),
     rayHit: (x, y) => rayHitAt(x, y),
     sel: () => selected,
     goals,
+    spawnCreeper: () => creepers.spawnNow(player),
   };
 
   last = performance.now();

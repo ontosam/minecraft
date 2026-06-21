@@ -16,6 +16,18 @@ wandering animals you can pet, a **goals/progression** system with stars, and
 **auto-save/resume**. All verified by headless tests; the dad has been playing
 it on laptop + iPad and loves it.
 
+## Status (session 2)
+Shipped roadmap #1: **friendly "protect your house" creepers** (`js/creepers.js`).
+They stroll in toward blocks *you placed*, give a gentle "uh-oh" wobble while
+nibbling, slowly chip a block — but **chipped blocks always come back** (auto-
+rebuild after ~6s, or instantly when you defend). **Tap a creeper → harmless
+poof** + a ⭐. New goals **"Protect your house!"** and **"Block hero"**. Paced:
+none appear until you've placed ≥3 blocks; rare/slow at first, ramps gently with
+stars. Verified headless (spawn→seek→nibble→chip→rebuild, tap-to-poof, normal
+build/dig unaffected). On dev branch `claude/gracious-clarke-12zvcy`, **awaiting
+the dad's review before mirroring to `main`** (deploy). Tuning candidates:
+creeper green vs. grass (could pop more), nibble/rebuild timings, pacing.
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files
@@ -54,9 +66,10 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
 - `js/world.js` — voxels (`SX=64,SY=32,SZ=64`), `B` ids, `BLOCKS` defs,
   `CATEGORIES`/`PALETTE`, terrain gen (gentle hills + pond + trees), **chunk
   mesher** (16×16 columns, face culling + baked ambient occlusion), `raycast`
-  (DDA), save/load (base64 of the byte array). Chunk meshes use **Uint16**
-  indices with a guard (`base+24 > 0xffff` breaks) so extreme builds can't
-  overflow.
+  (DDA), save/load (base64 of the byte array + `placed`: a Set of packed indices
+  of **player-placed** blocks, so creepers target your house not nature). Chunk
+  meshes use **Uint16** indices with a guard (`base+24 > 0xffff` breaks) so
+  extreme builds can't overflow.
 - `js/player.js` — third-person physics: **camera-relative** movement, character
   faces travel (but **backpedals** when moving toward the camera), gravity, AABB
   collision, auto-jump, walk-phase, `movingForward` flag (camera trails only
@@ -64,18 +77,28 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
 - `js/character.js` — blocky kid (legs/arms/body/head, eyes+hair); walk-swing +
   **action chop + forward body-lean** when building/digging (`act` param).
 - `js/animals.js` — pig/sheep/cow/chick/cat; wander AI; `petNearest` → follower.
+- `js/creepers.js` — friendly creepers (built like animals). `Creepers` manages a
+  list + a `rebuilds` queue. Per-creeper state `seek`→`nibble`→`poof`; targets
+  nearest `world.placed` block via `findTarget` (`unkey` inverts `world.idx`);
+  `chip` removes a block and queues an auto-rebuild; `pickRay`(origin,dir) =
+  ray/sphere test for tap-to-defend; `defend` poofs + rebuilds all chipped now.
+  `onEvent('uhoh'|'chip', pos)` callback drives sound/save. Spawn paced by
+  `world.placed.size≥3`, count/interval scale with stars. `spawnNow` is a debug
+  helper (exposed as `__ezra.spawnCreeper()`).
 - `js/input.js` — unified pointer+keyboard. Touch: left half = floating
   joystick, right half = drag-look. Mouse: drag-look + hover; WASD/arrows + Space.
   **Tap detection**: quick tap (no drag, <300ms) sets `tapPending` + `tapX/tapY`;
   `aim{active,x,y}` tracks the finger/cursor for the live indicator.
-- `js/audio.js` — tiny WebAudio synth (place/dig/jump/pet/deny). No audio files.
-- `js/goals.js` — `GOAL_DEFS` + `Goals` (counters, stars, localStorage). Saves on
-  every completion; throttled otherwise.
+- `js/audio.js` — tiny WebAudio synth (place/dig/jump/pet/deny/uhoh/poof). No files.
+- `js/goals.js` — `GOAL_DEFS` + `Goals` (counters incl. `defend`, stars,
+  localStorage). Saves on every completion; throttled otherwise.
 - `js/main.js` — the glue: GL/program/atlas setup; **camera** (`camYaw/camPitch`,
   `CAM_DIST=7`, `cameraFollow`, collision pull-in, `screenRay`/`rayHitAt`);
-  render loop; build/dig (`doBuild/doDig(hit)`, `doAction`, `lastTool`,
-  tap→`rayHitAt(tapX,tapY)`); indicators (`buildFrame` cyan outline / `glowCube`
-  additive glow); UI wiring (picker, goals, buttons); hearts; autosave; SW reg.
+  render loop; build/dig (`doBuild/doDig(hit)`, `doAction`, `lastTool`); **tap
+  routing**: a tap first tries `creepers.pickRay` (→`doDefend`, poof + ⭐),
+  else `doAction`; indicators (`buildFrame` cyan outline / `glowCube` additive
+  glow); UI wiring (picker, goals, buttons); hearts + `spawnPuffs` (creeper
+  poof); autosave; SW reg.
 - `scripts/serve.mjs`, `scripts/make-icons.mjs`, `sw.js` (offline, network-first,
   https only), `manifest.webmanifest`, `icons/`.
 
@@ -114,14 +137,13 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
   users to **Add to Home Screen** for durable progress.
 
 ## Roadmap / backlog (priority order)
-1. **Friendly creepers (greenlit, do next).** Spec agreed with the dad:
-   blocky creepers wander toward the player's builds and **slowly nibble a block
-   now and then**; they **never touch or harm the character** (no death ever).
-   He **defends by tapping them** (they *poof* harmlessly). New goal
-   **"Protect your house!"**, stars for defending; chipped blocks are just
-   rebuilt. **Paced**: one slow creeper occasionally, ramping gently with stars.
-   Gentle "uh-oh" wobble/sound for tension, nothing more. This is the key
-   engagement/"stakes" feature.
+1. ~~**Friendly creepers.**~~ ✅ **DONE (session 2)** — see Status above and
+   `js/creepers.js`. Built to the agreed spec (wander to your builds, slow
+   nibble, never harm the kid, tap to poof, "Protect your house!" goal, chipped
+   blocks rebuilt, paced + ramps with stars, "uh-oh" wobble/sound). Pending the
+   dad's playtest + deploy to `main`. Possible follow-ups if he wants more: a
+   tiny telegraph "!" above a nibbling creeper, distinct creeper color so it
+   pops against grass, sound-on/off toggle.
 2. **Giants** — big friendly creatures to find/pet (extend `animals.js`).
 3. **Villagers** — friendly quest-givers (problem-solving; supports "an hour
    without skipping a beat").

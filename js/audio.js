@@ -41,6 +41,13 @@ export class Sound {
         this.blip(880, 0.12, 'sine', 0.14, 990);
         setTimeout(() => this.blip(1320, 0.16, 'sine', 0.13), 90);
         break;
+      case 'uhoh': // gentle, sing-song "uh-oh" — playful tension, not scary
+        this.blip(523, 0.16, 'sine', 0.10, 494);
+        setTimeout(() => this.blip(392, 0.20, 'sine', 0.10, 370), 150);
+        break;
+      case 'poof': // soft harmless puff
+        this.blip(620, 0.16, 'triangle', 0.12, 180);
+        break;
     }
   }
 }

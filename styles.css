@@ -433,6 +433,31 @@ body {
   }
 }
 
+/* Harmless "poof" puffs when a creeper is bonked */
+.puff {
+  position: absolute;
+  font-size: 30px;
+  transform: translate(-50%, -50%);
+  animation: poofOut 0.7s ease-out forwards;
+}
+
+@keyframes poofOut {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(.4);
+  }
+
+  25% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -80px) scale(1.7);
+  }
+}
+
 /* Hint toast */
 #toast {
   position: absolute;

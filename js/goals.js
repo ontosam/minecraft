@@ -7,8 +7,10 @@ export const GOAL_DEFS = [
   { id: 'builder', icon: '🧱', title: 'Builder', desc: 'Place 12 blocks', metric: 'place', target: 12 },
   { id: 'rainbow', icon: '🌈', title: 'Mix it up', desc: 'Build with 4 different blocks', metric: 'variety', target: 4 },
   { id: 'digger', icon: '⛏️', title: 'Digger', desc: 'Dig 8 blocks', metric: 'dig', target: 8 },
+  { id: 'defend', icon: '🛡️', title: 'Protect your house!', desc: 'Bonk a creeper to save your blocks', metric: 'defend', target: 1 },
   { id: 'pets', icon: '💞', title: 'Best friends', desc: 'Pet 5 animals', metric: 'pet', target: 5 },
   { id: 'architect', icon: '🏠', title: 'Architect', desc: 'Place 30 blocks', metric: 'place', target: 30 },
+  { id: 'guard', icon: '🦸', title: 'Block hero', desc: 'Bonk 5 creepers', metric: 'defend', target: 5 },
   { id: 'explorer2', icon: '🗺️', title: 'Adventurer', desc: 'Walk a long way (250)', metric: 'dist', target: 250 },
 ];
 
@@ -16,7 +18,7 @@ const KEY = 'ezrablocks.goals.v1';
 
 export class Goals {
   constructor() {
-    this.counts = { dist: 0, pet: 0, place: 0, dig: 0 };
+    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0 };
     this.usedTypes = new Set();
     this.done = {};
     this.stars = 0;
@@ -45,6 +47,7 @@ export class Goals {
   onPet() { this.counts.pet++; this.check(); this.save(); }
   onBuild(id) { this.counts.place++; this.usedTypes.add(id); this.check(); this.save(); }
   onDig() { this.counts.dig++; this.check(); this.save(); }
+  onDefend() { this.counts.defend++; this.check(); this.save(); }
 
   maybeSave() { if (Date.now() - this._lastSave > 1500) this.save(); }
   save() {
