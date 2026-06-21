@@ -6,6 +6,8 @@ import { GLMesh, getUV, TILE } from './gfx.js';
 export const SX = 64, SY = 32, SZ = 64;   // world size in blocks
 export const CHUNK = 16;                   // chunk footprint (CHUNK x CHUNK x SY)
 const CXN = SX / CHUNK, CZN = SZ / CHUNK;  // chunks per axis
+// The beach lagoon (overworld): centre, radius, and water surface height.
+const BEACH = { x: 18, z: 44, r: 10, waterY: 4 };
 
 // Block ids
 export const B = {
@@ -34,7 +36,7 @@ export const BLOCKS = {
   [B.LOG]: { tiles: { top: TILE.LOG_TOP, side: TILE.LOG_SIDE, bottom: TILE.LOG_TOP }, tint: W, ui: '#9c7142' },
   [B.LEAVES]: { tiles: { top: TILE.LEAVES, side: TILE.LEAVES, bottom: TILE.LEAVES }, tint: W, ui: '#4f9a3a' },
   [B.PLANKS]: { tiles: { top: TILE.PLANKS, side: TILE.PLANKS, bottom: TILE.PLANKS }, tint: W, ui: '#c99a5b' },
-  [B.WATER]: { tiles: { top: TILE.WATER, side: TILE.WATER, bottom: TILE.WATER }, tint: W, ui: '#3a86d6' },
+  [B.WATER]: { tiles: { top: TILE.WATER, side: TILE.WATER, bottom: TILE.WATER }, tint: W, ui: '#3a86d6', passable: true },
   [B.BEDROCK]: { tiles: { top: TILE.BEDROCK, side: TILE.BEDROCK, bottom: TILE.BEDROCK }, tint: W, ui: '#4a4a52', indestructible: true },
   [B.BRICK]: { tiles: { top: TILE.BRICK, side: TILE.BRICK, bottom: TILE.BRICK }, tint: W, ui: '#b05a44' },
   [B.GLASS]: { tiles: { top: TILE.GLASS, side: TILE.GLASS, bottom: TILE.GLASS }, tint: W, ui: '#bfe6f2' },
@@ -73,6 +75,7 @@ export const BLOCKS = {
 // Build blocks grouped into categories for the pop-up picker.
 export const CATEGORIES = [
   { name: 'Nature', blocks: [B.GRASS, B.DIRT, B.SAND, B.GRAVEL, B.SNOW, B.LOG, B.BIRCH_LOG, B.LEAVES] },
+  { name: 'Water 🪣', blocks: [B.WATER] },
   { name: 'Stone', blocks: [B.STONE, B.COBBLE, B.STONE_BRICK, B.BRICK, B.OBSIDIAN, B.GLOWSTONE] },
   { name: 'Wood', blocks: [B.PLANKS, B.BIRCH_PLANKS, B.DARK_PLANKS, B.BOOKSHELF] },
   { name: 'Shiny', blocks: [B.GOLD, B.DIAMOND, B.ICE, B.GLASS] },
@@ -169,41 +172,34 @@ export class World {
 
   generate() {
     const rand = mulberry32(1337);
-    const pondX = 16, pondZ = 44, pondR = 6, waterY = 4;
+    // Gentle rolling hills of grass.
     for (let x = 0; x < SX; x++) {
       for (let z = 0; z < SZ; z++) {
         let h = 6 + 1.6 * Math.sin(x * 0.18) + 1.6 * Math.cos(z * 0.16)
           + 1.3 * Math.sin((x + z) * 0.09);
-        h = Math.round(h);
-        const dPond = Math.hypot(x - pondX, z - pondZ);
-        const nearPond = dPond < pondR;
-        if (nearPond) h = Math.min(h, waterY - 1 + Math.round((dPond / pondR) * 2));
-        h = Math.max(3, Math.min(13, h));
-
+        h = Math.max(3, Math.min(13, Math.round(h)));
         for (let y = 0; y <= h; y++) {
           let id;
           if (y === 0) id = B.BEDROCK;
-          else if (y === h) id = nearPond && h <= waterY ? B.SAND : B.GRASS;
+          else if (y === h) id = B.GRASS;
           else if (y >= h - 2) id = B.DIRT;
           else id = B.STONE;
           this.data[this.idx(x, y, z)] = id;
         }
-        // Fill the pond bowl with water up to waterY; ring it with sand.
-        if (dPond < pondR + 1.5) {
-          for (let y = h + 1; y <= waterY; y++) this.data[this.idx(x, y, z)] = B.WATER;
-          if (this.data[this.idx(x, h, z)] === B.GRASS && dPond < pondR + 1) this.data[this.idx(x, h, z)] = B.SAND;
-        }
       }
     }
 
-    // Scatter friendly little trees on grass, away from the pond.
+    // A big sandy beach lagoon to fly over and splash into.
+    this.carveBeach();
+
+    // Scatter friendly little trees on grass, away from the beach.
     let trees = 0;
     for (let attempt = 0; attempt < 400 && trees < 16; attempt++) {
       const x = 4 + Math.floor(rand() * (SX - 8));
       const z = 4 + Math.floor(rand() * (SZ - 8));
       const h = this.heightAt(x, z);
       if (this.data[this.idx(x, h, z)] !== B.GRASS) continue;
-      if (Math.hypot(x - pondX, z - pondZ) < pondR + 3) continue;
+      if (Math.hypot(x - BEACH.x, z - BEACH.z) < BEACH.r + 3) continue;
       this.placeTree(x, h + 1, z, rand);
       trees++;
     }
@@ -226,6 +222,41 @@ export class World {
     // Spawn on solid ground in the middle.
     const sh = this.heightAt(Math.floor(this.spawn[0]), Math.floor(this.spawn[2]));
     this.spawn[1] = sh + 2;
+  }
+
+  // Carve a gentle sandy lagoon: a bowl of water rimmed by a sand beach. Used
+  // both for fresh worlds and (safely) to add a beach to older saved worlds.
+  carveBeach() {
+    const { x: bx, z: bz, r: br, waterY } = BEACH;
+    const x0 = Math.max(1, bx - br - 3), x1 = Math.min(SX - 2, bx + br + 3);
+    const z0 = Math.max(1, bz - br - 3), z1 = Math.min(SZ - 2, bz + br + 3);
+    for (let x = x0; x <= x1; x++) {
+      for (let z = z0; z <= z1; z++) {
+        const d = Math.hypot(x - bx, z - bz);
+        if (d >= br + 2.5) continue;
+        const top = this.heightAt(x, z);
+        const floor = Math.max(1, Math.min(top, (waterY - 3) + Math.round((d / br) * 3)));
+        for (let y = floor + 1; y < SY; y++) {
+          if (this.data[this.idx(x, y, z)] !== B.AIR) this.data[this.idx(x, y, z)] = B.AIR;
+        }
+        this.data[this.idx(x, floor, z)] = B.SAND;        // sandy bottom + beach
+        for (let y = floor + 1; y <= waterY; y++) this.data[this.idx(x, y, z)] = B.WATER;
+        this.markDirty(x, z);
+      }
+    }
+  }
+
+  // Add the beach to a loaded world only if the player hasn't built in that
+  // spot — so we never disturb anything Ezra made.
+  carveBeachIfClear() {
+    const { x: bx, z: bz, r: br } = BEACH;
+    for (const key of this.placed) {
+      const col = key % (SX * SZ);
+      const px = col % SX, pz = Math.floor(col / SX);
+      if (Math.hypot(px - bx, pz - bz) < br + 3) return false;
+    }
+    this.carveBeach();
+    return true;
   }
 
   placeTree(x, y, z, rand) {

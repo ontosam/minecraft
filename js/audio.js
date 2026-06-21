@@ -60,6 +60,13 @@ export class Sound {
         setTimeout(() => this.blip(1047, 0.12, 'triangle', 0.13, 1568), 80);
         setTimeout(() => this.blip(1319, 0.16, 'sine', 0.12), 170);
         break;
+      case 'fly': // soft upward whoosh when flight is toggled on
+        this.blip(360, 0.20, 'sine', 0.10, 760);
+        break;
+      case 'splash': // gentle watery plip for a soft landing
+        this.blip(900, 0.09, 'sine', 0.10, 320);
+        setTimeout(() => this.blip(520, 0.13, 'sine', 0.09, 220), 55);
+        break;
     }
   }
 }

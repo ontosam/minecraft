@@ -79,6 +79,7 @@ function loadGame() {
     }
     if (obj.v === 3 && obj.over) {                 // new two-dimension save
       if (!overworld.loadFrom(obj.over)) return false;
+      overworld.carveBeachIfClear();                 // add the beach to older worlds (only if untouched)
       if (!obj.nether || !nether.loadFrom(obj.nether)) nether.generateNether();
       refreshSpawn(overworld); refreshSpawn(nether); ensurePortals();
       overPos = obj.overPos || overworld.spawn.slice();
@@ -90,6 +91,7 @@ function loadGame() {
       return true;
     }
     if (obj.world && overworld.loadFrom(obj.world)) { // old overworld-only save
+      overworld.carveBeachIfClear();
       nether.generateNether();
       refreshSpawn(overworld); refreshSpawn(nether); ensurePortals();
       if (obj.player) { player.pos = obj.player.pos.slice(); player.yaw = obj.player.yaw || 0; }
@@ -221,7 +223,8 @@ function doBuild(hit) {
   if (x < 0 || x >= SX || y < 0 || y >= SY || z < 0 || z >= SZ) return;
   if (world.get(x, y, z) !== B.AIR || overlapsPlayer(x, y, z)) { sound.play('deny'); return; }
   world.set(x, y, z, selected);
-  world.placed.add(world.idx(x, y, z)); // remember it's the player's, so creepers find the house
+  // Water is for fun pools, not "your house" — keep creepers off it.
+  if (selected !== B.WATER) world.placed.add(world.idx(x, y, z));
   sound.play('place'); saveDirty = true; actionAnim = 1; minimapDirty = true;
   goals.onBuild(selected);
 }
@@ -280,6 +283,7 @@ function spawnParticles(worldPos, text, cls, n, spread) {
 function spawnHearts(worldPos) { spawnParticles(worldPos, '💗', 'heart', 4, 40); }
 function spawnPuffs(worldPos) { spawnParticles(worldPos, '💨', 'puff', 6, 60); }
 function spawnSparkles(worldPos) { spawnParticles(worldPos, '✨', 'puff', 7, 56); }
+function spawnSplash(worldPos) { spawnParticles([worldPos[0], worldPos[1] + 0.3, worldPos[2]], '💦', 'puff', 7, 60); }
 
 // Tap a creeper to defend: it poofs harmlessly, your blocks pop back, +a star.
 function doDefend(cr) {
@@ -400,6 +404,11 @@ function updateViewButton() {
   const b = document.getElementById('btn-view');
   if (b) b.textContent = zoomIndex < ZOOM_LEVELS.length - 1 ? '🔍' : '🗺️';
 }
+// While flying, the Jump button reads "Up" (hold to rise, let go to float down).
+function updateJumpLabel() {
+  const b = document.querySelector('#btn-jump b');
+  if (b) b.textContent = (player && player.flying) ? 'Up' : 'Jump';
+}
 
 function wireUI() {
   buildPicker();
@@ -418,6 +427,16 @@ function wireUI() {
   jb.addEventListener('pointerup', setJump(false));
   jb.addEventListener('pointerleave', setJump(false));
   jb.addEventListener('pointercancel', setJump(false));
+
+  const flyBtn = document.getElementById('btn-fly');
+  flyBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); sound.resume();
+    player.flying = !player.flying;
+    flyBtn.classList.toggle('on', player.flying);
+    updateJumpLabel();
+    sound.play('fly');
+    if (player.flying) goals.bump('fly');
+  });
 
   document.getElementById('btn-home').addEventListener('pointerdown', (e) => { e.preventDefault(); player.goHome(); });
   document.getElementById('btn-view').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); cycleZoom(); });
@@ -593,6 +612,7 @@ function init() {
   sound = new Sound();
   goals = new Goals();
   goals.onComplete = (g) => { showGoalToast(g); refreshGoalsButton(); maybeUnlockNether(false); };
+  player.onSplash = (pos) => { sound.play('splash'); spawnSplash(pos); goals.bump('splash'); saveDirty = true; };
 
   if (!loadGame()) {
     overworld.generate();

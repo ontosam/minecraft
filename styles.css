@@ -102,6 +102,11 @@ body {
   box-shadow: 0 1px 0 rgba(0, 0, 0, .18);
 }
 
+/* A "mini" toggle that's currently on (e.g. Fly) gets a gold ring. */
+.mini.on {
+  box-shadow: 0 0 0 4px #ffd23f, 0 3px 0 rgba(0, 0, 0, .18);
+}
+
 /* Current-block button + pop-up picker */
 #btn-blocks {
   pointer-events: auto;
