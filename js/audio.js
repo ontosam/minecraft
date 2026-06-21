@@ -67,6 +67,9 @@ export class Sound {
         this.blip(900, 0.09, 'sine', 0.10, 320);
         setTimeout(() => this.blip(520, 0.13, 'sine', 0.09, 220), 55);
         break;
+      case 'door': // soft wooden click when a door opens/closes
+        this.blip(280, 0.09, 'square', 0.07, 230);
+        break;
     }
   }
 }

@@ -19,6 +19,7 @@ export const B = {
   BIRCH_LOG: 27, BIRCH_PLANKS: 28, DARK_PLANKS: 29, GOLD: 30,
   DIAMOND: 31, BOOKSHELF: 32, GLOWSTONE: 33, PUMPKIN: 34, OBSIDIAN: 35,
   NETHERRACK: 36, PORTAL: 37, LAVA: 38,
+  DOOR: 39, DOOR_OPEN: 40, TNT: 41,
 };
 
 const W = [1, 1, 1]; // white tint for textured blocks
@@ -70,12 +71,15 @@ export const BLOCKS = {
   // The portal swirl: you walk *through* it (passable) and it can't be dug, so
   // the gateway can't be accidentally destroyed and leave anyone stuck.
   [B.PORTAL]: { tiles: { top: TILE.NETHER_PORTAL, side: TILE.NETHER_PORTAL, bottom: TILE.NETHER_PORTAL }, tint: W, ui: '#9959d9', indestructible: true, passable: true },
+  [B.DOOR]: nat(TILE.DOOR, '#8a5a2a'),
+  [B.DOOR_OPEN]: { tiles: { top: TILE.DOOR_OPEN, side: TILE.DOOR_OPEN, bottom: TILE.DOOR_OPEN }, tint: W, ui: '#5e3c1c', passable: true },
 };
 
 // Build blocks grouped into categories for the pop-up picker.
 export const CATEGORIES = [
   { name: 'Nature', blocks: [B.GRASS, B.DIRT, B.SAND, B.GRAVEL, B.SNOW, B.LOG, B.BIRCH_LOG, B.LEAVES] },
   { name: 'Water 🪣', blocks: [B.WATER] },
+  { name: 'House 🏠', blocks: [B.DOOR, B.GLASS, B.PLANKS, B.BRICK] },
   { name: 'Stone', blocks: [B.STONE, B.COBBLE, B.STONE_BRICK, B.BRICK, B.OBSIDIAN, B.GLOWSTONE] },
   { name: 'Wood', blocks: [B.PLANKS, B.BIRCH_PLANKS, B.DARK_PLANKS, B.BOOKSHELF] },
   { name: 'Shiny', blocks: [B.GOLD, B.DIAMOND, B.ICE, B.GLASS] },

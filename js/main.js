@@ -249,6 +249,7 @@ function overlapsPlayer(x, y, z) {
 
 function doBuild(hit) {
   if (!hit) return;
+  if (selected === B.DOOR) { placeDoor(hit); return; }
   const [x, y, z] = hit.place;
   if (x < 0 || x >= SX || y < 0 || y >= SY || z < 0 || z >= SZ) return;
   if (world.get(x, y, z) !== B.AIR || overlapsPlayer(x, y, z)) { sound.play('deny'); return; }
@@ -264,6 +265,7 @@ function doDig(hit) {
   const [x, y, z] = hit.block;
   const id = world.get(x, y, z);
   if (id === B.AIR || (BLOCKS[id] && BLOCKS[id].indestructible)) { sound.play('deny'); return; }
+  if (isDoor(id)) { removeDoor(x, y, z); return; }
   const key = world.idx(x, y, z);
   const wasPlaced = world.placed.has(key);
   world.set(x, y, z, B.AIR);
@@ -274,6 +276,32 @@ function doDig(hit) {
   if (!wasPlaced && (id === B.GOLD || id === B.DIAMOND)) {
     goals.bump('treasure'); sound.play('treasure'); spawnSparkles([x + 0.5, y + 0.6, z + 0.5]);
   }
+}
+
+// --- Doors: a 2-tall openable door for house-building ---
+function isDoor(id) { return id === B.DOOR || id === B.DOOR_OPEN; }
+function doorBase(x, y, z) { return isDoor(world.get(x, y - 1, z)) ? y - 1 : y; }
+function placeDoor(hit) {
+  const [x, y, z] = hit.place;
+  if (x < 0 || x >= SX || y < 0 || y + 1 >= SY || z < 0 || z >= SZ) { sound.play('deny'); return; }
+  if (world.get(x, y, z) !== B.AIR || world.get(x, y + 1, z) !== B.AIR ||
+    overlapsPlayer(x, y, z) || overlapsPlayer(x, y + 1, z)) { sound.play('deny'); return; }
+  world.set(x, y, z, B.DOOR); world.set(x, y + 1, z, B.DOOR);
+  world.placed.add(world.idx(x, y, z)); world.placed.add(world.idx(x, y + 1, z));
+  sound.play('door'); saveDirty = true; actionAnim = 1; minimapDirty = true;
+  goals.onBuild(B.DOOR);
+}
+function toggleDoor(x, y, z) {
+  const by = doorBase(x, y, z);
+  const nb = world.get(x, by, z) === B.DOOR_OPEN ? B.DOOR : B.DOOR_OPEN;
+  world.set(x, by, z, nb);
+  if (isDoor(world.get(x, by + 1, z))) world.set(x, by + 1, z, nb);
+  sound.play('door'); saveDirty = true;
+}
+function removeDoor(x, y, z) {
+  const by = doorBase(x, y, z);
+  for (const yy of [by, by + 1]) if (isDoor(world.get(x, yy, z))) { world.set(x, yy, z, B.AIR); world.placed.delete(world.idx(x, yy, z)); }
+  sound.play('dig'); saveDirty = true; actionAnim = 1; minimapDirty = true; goals.onDig();
 }
 
 function doPet() {
@@ -618,7 +646,11 @@ function frame(now) {
     const dir = screenRay(controls.tapX, controls.tapY);
     const cr = m.creepers ? m.creepers.pickRay(camPos, dir) : null;
     if (cr) doDefend(cr);
-    else doAction(world.raycast(camPos, dir, REACH));
+    else {
+      const hit = world.raycast(camPos, dir, REACH);
+      if (hit && isDoor(world.get(hit.block[0], hit.block[1], hit.block[2]))) toggleDoor(hit.block[0], hit.block[1], hit.block[2]);
+      else doAction(hit);
+    }
   }
   mat4.multiply(pv, proj, view);
 

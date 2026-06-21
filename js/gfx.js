@@ -13,6 +13,7 @@ export const TILE = {
   DARK_PLANKS: 20, GOLD: 21, DIAMOND: 22, BOOKSHELF: 23,
   GLOWSTONE: 24, PUMPKIN_SIDE: 25, PUMPKIN_TOP: 26, OBSIDIAN: 27,
   BIRCH_LOG: 28, NETHERRACK: 29, NETHER_PORTAL: 30, LAVA: 31,
+  DOOR: 32, DOOR_OPEN: 33, TNT_SIDE: 34, TNT_TOP: 35,
 };
 
 export function initGL(canvas) {
@@ -272,6 +273,30 @@ function buildAtlasCanvas() {
 
   p = at(TILE.LAVA); noise(ctx, p[0], p[1], 0xe8702a, 0.16, 63);
   { const r = rng(631); for (let i = 0; i < 9; i++) { ctx.fillStyle = shade(0xffd45a, 1); ctx.fillRect(p[0] + Math.floor(r() * 14), p[1] + Math.floor(r() * 14), 2, 1); } }
+
+  // --- Door (House kit) ---
+  // Closed: a wooden door with two panels and a brass knob.
+  p = at(TILE.DOOR); noise(ctx, p[0], p[1], 0x8a5a2a, 0.10, 70);
+  ctx.fillStyle = shade(0x5e3c1c, 1);
+  ctx.fillRect(p[0], p[1], T, 1); ctx.fillRect(p[0], p[1] + T - 1, T, 1);
+  ctx.fillRect(p[0], p[1], 1, T); ctx.fillRect(p[0] + T - 1, p[1], 1, T);
+  for (const oy of [2, 9]) { ctx.fillRect(p[0] + 3, p[1] + oy, T - 7, 1); ctx.fillRect(p[0] + 3, p[1] + oy + 4, T - 7, 1); ctx.fillRect(p[0] + 3, p[1] + oy, 1, 5); ctx.fillRect(p[0] + T - 5, p[1] + oy, 1, 5); }
+  ctx.fillStyle = shade(0xf2c63a, 1); ctx.fillRect(p[0] + T - 6, p[1] + 8, 2, 2);
+  // Open: the leaf swung aside, with a dark doorway you can see through.
+  p = at(TILE.DOOR_OPEN); noise(ctx, p[0], p[1], 0x8a5a2a, 0.10, 71);
+  ctx.fillStyle = shade(0x241a12, 1); ctx.fillRect(p[0] + 4, p[1] + 1, T - 5, T - 2);
+  ctx.fillStyle = shade(0x5e3c1c, 1);
+  ctx.fillRect(p[0], p[1], 4, 1); ctx.fillRect(p[0], p[1] + T - 1, 4, 1); ctx.fillRect(p[0] + 3, p[1], 1, T);
+  ctx.fillRect(p[0] + T - 1, p[1], 1, T); ctx.fillRect(p[0], p[1], T, 1); ctx.fillRect(p[0], p[1] + T - 1, T, 1);
+
+  // --- TNT (used by TNT World / the explosive block) ---
+  p = at(TILE.TNT_SIDE); noise(ctx, p[0], p[1], 0xc0392b, 0.10, 72);
+  ctx.fillStyle = shade(0xf2e6c0, 1); ctx.fillRect(p[0], p[1] + 6, T, 4);
+  ctx.fillStyle = shade(0x3a2a12, 1);
+  ctx.fillRect(p[0] + 2, p[1] + 7, 3, 2); ctx.fillRect(p[0] + 7, p[1] + 7, 2, 2); ctx.fillRect(p[0] + 11, p[1] + 7, 3, 2);
+  p = at(TILE.TNT_TOP); noise(ctx, p[0], p[1], 0xc0392b, 0.10, 73);
+  ctx.fillStyle = shade(0x7a2018, 1); for (let i = 0; i < T; i += 4) ctx.fillRect(p[0] + i, p[1], 1, T);
+  ctx.fillStyle = shade(0x3a2a12, 1); ctx.fillRect(p[0] + 7, p[1] + 7, 2, 2);
 
   return c;
 }
