@@ -37,6 +37,7 @@ export class Player {
     this._wasInWater = false;
     this.onSplash = null;  // (pos) => void — fired the moment you enter water
     this.onLava = null;    // () => void — fired while standing in/over hot lava
+    this.onBounce = null;  // (pos) => void — fired when you spring off a slime block
   }
 
   goHome() {
@@ -128,11 +129,18 @@ export class Player {
 
     // Y axis
     let ny = this.pos[1] + this.vel[1] * dt;
+    const landingVy = this.vel[1];
     this.onGround = false;
     if (this.boxHits(this.pos[0], ny, this.pos[2])) {
-      if (this.vel[1] <= 0) { ny = Math.floor(ny) + 1; this.onGround = true; }
-      else { ny = Math.ceil(ny + HEIGHT) - HEIGHT - EPS; }
-      this.vel[1] = 0;
+      if (this.vel[1] <= 0) {
+        const supportY = Math.floor(ny);
+        ny = supportY + 1;
+        // Bouncy slime: spring back up instead of stopping (decays to a rest).
+        if (landingVy < -3.5 && this.world.get(Math.floor(this.pos[0]), supportY, Math.floor(this.pos[2])) === B.SLIME) {
+          this.vel[1] = Math.min(13, -landingVy * 0.85);
+          if (this.onBounce) this.onBounce([this.pos[0], ny, this.pos[2]]);
+        } else { this.vel[1] = 0; this.onGround = true; }
+      } else { ny = Math.ceil(ny + HEIGHT) - HEIGHT - EPS; this.vel[1] = 0; }
     }
     this.pos[1] = ny;
 

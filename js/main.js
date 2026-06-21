@@ -1097,6 +1097,7 @@ function init() {
 
   player.onSplash = (pos) => { sound.play('splash'); spawnSplash(pos); goals.bump('splash'); saveDirty = true; };
   player.onLava = () => hurt(1);
+  player.onBounce = (pos) => { sound.play('boing'); spawnParticles(pos, '✨', 'puff', 2, 22); goals.bump('bounce'); };
   maybeUnlockNether(true);                       // open now if a returning player already qualifies
 
   camYaw = player.yaw;

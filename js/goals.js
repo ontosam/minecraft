@@ -10,6 +10,7 @@ export const GOAL_DEFS = [
   { id: 'treasure', icon: '💎', title: 'Treasure hunter', desc: 'Dig up hidden gold or diamond', metric: 'treasure', target: 1 },
   { id: 'fly', icon: '🕊️', title: 'Take off!', desc: 'Tap Fly and soar up high', metric: 'fly', target: 1 },
   { id: 'splash', icon: '💦', title: 'Big splash!', desc: 'Make a soft landing in water', metric: 'splash', target: 1 },
+  { id: 'bounce', icon: '🟢', title: 'Boing!', desc: 'Bounce on a slime block', metric: 'bounce', target: 1 },
   { id: 'defend', icon: '🛡️', title: 'Protect your house!', desc: 'Bonk a creeper to save your blocks', metric: 'defend', target: 1 },
   { id: 'pets', icon: '💞', title: 'Best friends', desc: 'Pet 5 animals', metric: 'pet', target: 5 },
   { id: 'architect', icon: '🏠', title: 'Architect', desc: 'Place 30 blocks', metric: 'place', target: 30 },
@@ -40,7 +41,7 @@ const KEY = 'ezrablocks.goals.v1';
 
 export class Goals {
   constructor() {
-    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0, bought: 0, spider: 0, lamp: 0, monster: 0, lever: 0 };
+    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0, bought: 0, spider: 0, lamp: 0, monster: 0, lever: 0, bounce: 0 };
     this.usedTypes = new Set();
     this.done = {};
     this.stars = 0;

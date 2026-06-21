@@ -20,7 +20,7 @@ export const B = {
   DIAMOND: 31, BOOKSHELF: 32, GLOWSTONE: 33, PUMPKIN: 34, OBSIDIAN: 35,
   NETHERRACK: 36, PORTAL: 37, LAVA: 38,
   DOOR: 39, DOOR_OPEN: 40, TNT: 41, RAINBOW: 42,
-  LEVER: 43, LEVER_ON: 44, REDSTONE: 45, REDLAMP: 46, REDLAMP_ON: 47,
+  LEVER: 43, LEVER_ON: 44, REDSTONE: 45, REDLAMP: 46, REDLAMP_ON: 47, SLIME: 48,
 };
 
 const W = [1, 1, 1]; // white tint for textured blocks
@@ -81,6 +81,7 @@ export const BLOCKS = {
   [B.REDSTONE]: nat(TILE.REDSTONE, '#a8362c'),
   [B.REDLAMP]: nat(TILE.REDLAMP, '#7a6038'),
   [B.REDLAMP_ON]: nat(TILE.REDLAMP_ON, '#f2c24a'),
+  [B.SLIME]: nat(TILE.SLIME, '#6fcf6a'),
 };
 
 // Build blocks grouped into categories for the pop-up picker.
@@ -94,7 +95,7 @@ export const CATEGORIES = [
   { name: 'Stone', blocks: [B.STONE, B.COBBLE, B.STONE_BRICK, B.BRICK, B.OBSIDIAN, B.GLOWSTONE] },
   { name: 'Wood', blocks: [B.PLANKS, B.BIRCH_PLANKS, B.DARK_PLANKS, B.BOOKSHELF] },
   { name: 'Shiny', blocks: [B.GOLD, B.DIAMOND, B.ICE, B.GLASS] },
-  { name: 'Fun', blocks: [B.PUMPKIN] },
+  { name: 'Fun', blocks: [B.PUMPKIN, B.SLIME] },
   // Shown in the picker only after it's bought in the 💎 shop.
   { name: 'Special ✨', blocks: [B.RAINBOW], locked: 'rainbow' },
   { name: 'Nether', blocks: [B.NETHERRACK, B.LAVA] },

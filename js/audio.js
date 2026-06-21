@@ -86,6 +86,9 @@ export class Sound {
       case 'hiss': // soft, short spider skitter/hiss (gentle, not creepy)
         this.blip(640, 0.10, 'sawtooth', 0.05, 880);
         break;
+      case 'boing': // springy bounce off a slime block
+        this.blip(300, 0.18, 'sine', 0.14, 720);
+        break;
     }
   }
 }
