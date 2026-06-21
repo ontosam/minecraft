@@ -86,6 +86,35 @@ scalable" design). Two increments:
    the "treasure" goals trivial there; flint can make many portals (no limit);
    ant-world ants are small — could enlarge.
 
+## Status (session 5)
+Ezra's next four wishes (dad picked **"real-er challenge"** for the night tier).
+All shipped + deployed to `main`:
+1. **🏠 House kit** — a 2-tall **openable door** (`B.DOOR`/`B.DOOR_OPEN`, procedural
+   tiles): place as a unit (`placeDoor`), **tap to open/close** (`toggleDoor`, both
+   halves), dig removes both (`removeDoor`). New **"House 🏠"** picker tab (door +
+   glass "window" + planks + brick). `door` sound.
+2. **💥 TNT** — `B.TNT` (new "Boom 💥" tab). **Tap a TNT block to light it**
+   (`lightTNT` → a `fuses` list); after a short fuse it detonates (`detonate` →
+   `World.explode(cx,cy,cz,r)` carves a crater; bedrock/portal survive). Caught TNT
+   **chain-reacts**; explosions add camera **`shake`**, a harmless **knockback**, 💥
+   particles + a `boom` sound. New **TNT World** (`generateTnt`, in the flint menu).
+   Ant World kept as a bonus. Goal: *Demolition!*.
+3. **🌙 Night + ❤️ hearts + 🧟 zombies (real-er).** `btn-night` toggles night; an
+   eased `nightAmt` blends sky→`NIGHT_SKY` and drives a new world-shader uniform
+   **`uDayLight`** (dims everything). `js/zombies.js` `Zombies` (built like creepers
+   but they **chase + attack**): spawn at night in the overworld, bonk a **heart**
+   off on a cooldown (`onEvent('hit')`→`hurt`), take **two taps** to defeat
+   (`pickRay`/`bonk`), fade at dawn. **Hearts HUD** (`#hearts-bar`, `MAX_HEARTS=6`),
+   red `#hurt-flash`, brief `invuln`, slow regen when safe. **Out of hearts → a
+   gentle knock-out**: wake at home, full hearts, night cleared — **never lose
+   builds or stars**. **Lava now hurts** (`player.onLava` → bounce out + a heart).
+   Goals: *Brave at night*, *Zombie bonker*. Sounds: `hurt`, `groan`.
+   All verified: Node logic (door, explosion+chain, zombie chase/attack/defeat,
+   fly/water) + headless browser (boot, house, TNT detonation, **night→zombie
+   hit→bonk→lava→knockout**, save/resume) with screenshots.
+   Tuning candidates: night dim is gentle (`uDayLight≈0.4`) — could go darker;
+   zombies cap at 4; lava damage is also active in the Nether.
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files
@@ -152,6 +181,9 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
   drift AI, ease to a hover height over the ground, `petNearest`, and an
   `onMeet(species,pos)` callback the first time the player comes close (drives the
   "meet a ghast/blaze" goals). Spawned via `populate(SX,SZ)`.
+- `js/zombies.js` — night-time `Zombies` (built like creepers, but they **chase +
+  attack**): spawn around the player at night, bonk a heart on a cooldown
+  (`onEvent('hit')`), take two `bonk`s to defeat (`pickRay`), fade out by day.
 - `js/creepers.js` — friendly creepers (built like animals). `Creepers` manages a
   list + a `rebuilds` queue. Per-creeper state `seek`→`nibble`→`poof`; targets
   nearest `world.placed` block via `findTarget` (`unkey` inverts `world.idx`);

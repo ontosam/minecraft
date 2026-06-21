@@ -34,6 +34,7 @@ export class Player {
     this.inWater = false;  // currently standing/swimming in water
     this._wasInWater = false;
     this.onSplash = null;  // (pos) => void — fired the moment you enter water
+    this.onLava = null;    // () => void — fired while standing in/over hot lava
   }
 
   goHome() {
@@ -149,6 +150,13 @@ export class Player {
     // Walk animation + eased "moving" amount.
     this.walkPhase += dt * 9 * (this.moving ? 1 : 0);
     this.moveAmt += ((this.moving ? 1 : 0) - this.moveAmt) * Math.min(1, dt * 10);
+
+    // Lava is hot! Bounce off it and let the game dock a heart (rate-limited).
+    if (this.world.get(Math.floor(this.pos[0]), Math.floor(this.pos[1] - 0.05), Math.floor(this.pos[2])) === B.LAVA ||
+      this.world.get(Math.floor(this.pos[0]), Math.floor(this.pos[1] + 0.2), Math.floor(this.pos[2])) === B.LAVA) {
+      this.vel[1] = 6; this.onGround = false;
+      if (this.onLava) this.onLava();
+    }
 
     this._wasInWater = this.inWater;
     if (this.pos[1] < -4) this.goHome();

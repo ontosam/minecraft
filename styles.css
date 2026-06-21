@@ -229,6 +229,30 @@ body {
   color: #2fb24a;
 }
 
+/* Hearts (health) — top centre */
+#hearts-bar {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 22px;
+  letter-spacing: 1px;
+  line-height: 1;
+  pointer-events: none;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .5);
+  white-space: nowrap;
+}
+
+/* Red flash when hurt (set per-frame from JS) */
+#hurt-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, rgba(200, 0, 0, 0) 45%, rgba(200, 0, 0, .65) 100%);
+  z-index: 20;
+}
+
 /* Goal-complete toast */
 #goaltoast {
   position: absolute;

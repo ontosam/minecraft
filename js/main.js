@@ -10,6 +10,7 @@ import { Player } from './player.js';
 import { Animals } from './animals.js';
 import { Creepers } from './creepers.js';
 import { NetherMobs } from './nethermobs.js';
+import { Zombies } from './zombies.js';
 import { Controls } from './input.js';
 import { Sound } from './audio.js';
 import { Character } from './character.js';
@@ -17,6 +18,16 @@ import { Goals, GOAL_DEFS } from './goals.js';
 
 const SAVE_KEY = 'ezrablocks.save.v2';
 const NETHER_STARS = 4;                   // stars needed to open the Nether portal
+const MAX_HEARTS = 6;
+const NIGHT_SKY = [0.05, 0.07, 0.15];     // dark, starry-feeling night
+
+let hearts = MAX_HEARTS;
+let night = false;                        // night-time toggle (zombies come out)
+let nightAmt = 0;                         // eased 0..1 for the day↔night look
+let invuln = 0;                           // brief mercy window after taking damage
+let hurtFlash = 0;                        // red screen flash timer
+let regenT = 0, sinceHurt = 99;           // gentle heart regen when safe
+let hurtEl = null;                        // cached red-flash overlay
 
 function showError(msg) {
   const el = document.getElementById('error-overlay');
@@ -73,6 +84,12 @@ function makeMobs(kind, w) {
       m.nethermobs.onMeet = (species, pos) => { sound.play('coo'); spawnHearts(pos); goals.bump(species); };
     } else if (t === 'ants') {
       m.ants = new Animals(gl, w, ['ant']);
+    } else if (t === 'zombies') {
+      m.zombies = new Zombies(gl, w);
+      m.zombies.onEvent = (type, pos) => {
+        if (type === 'hit') hurt(1);
+        else if (type === 'groan') sound.play('groan');
+      };
     }
   }
   return m;
@@ -88,12 +105,14 @@ function updateMobs(m, dt) {
   if (m.creepers) m.creepers.update(dt, player, goals.stars);
   if (m.nethermobs) m.nethermobs.update(dt, player, SX, SZ);
   if (m.ants) m.ants.update(dt, player);
+  if (m.zombies) m.zombies.update(dt, player, night && dimension === 'over');
 }
 function drawMobs(m) {
   if (m.animals) m.animals.draw(worldProg);
   if (m.creepers) m.creepers.draw(worldProg);
   if (m.nethermobs) m.nethermobs.draw(worldProg);
   if (m.ants) m.ants.draw(worldProg);
+  if (m.zombies) m.zombies.draw(worldProg);
 }
 
 // --- Worlds: created on first visit, then cached ---
@@ -394,6 +413,42 @@ function doDefend(cr) {
   saveDirty = true;
 }
 
+// Tap a zombie to bonk it (two bonks defeats it → a harmless poof).
+function doBonkZombie(z) {
+  const zb = mobs().zombies;
+  if (!zb) return;
+  const defeated = zb.bonk(z);
+  sound.play('poof');
+  spawnPuffs([z.pos[0], z.pos[1] + 1.0, z.pos[2]]);
+  if (defeated) goals.bump('zombie');
+}
+
+// --- Hearts: getting hurt, a gentle knock-out, slow regen ---
+function updateHearts() {
+  const el = document.getElementById('hearts-bar');
+  if (el) el.textContent = '❤️'.repeat(hearts) + '🤍'.repeat(MAX_HEARTS - hearts);
+}
+function hurt(n) {
+  if (invuln > 0 || hearts <= 0) return;
+  hearts = Math.max(0, hearts - n);
+  invuln = 0.7; hurtFlash = 0.55; sinceHurt = 0; regenT = 0;
+  sound.play('hurt');
+  updateHearts();
+  if (hearts <= 0) knockout();
+}
+function knockout() {
+  showToast('💤 Oof! You got sleepy — back home, safe and sound.', 3400);
+  night = false; updateNightButton();
+  const zb = worlds.over && worlds.over.mobs.zombies; if (zb) zb.list.length = 0;
+  if (dimension !== 'over') setDimension('over');
+  player.goHome(); player.vel = [0, 0, 0];
+  hearts = MAX_HEARTS; invuln = 1.6; updateHearts();
+}
+function updateNightButton() {
+  const b = document.getElementById('btn-night');
+  if (b) { b.textContent = night ? '☀️' : '🌙'; b.classList.toggle('on', night); }
+}
+
 // --- UI wiring ---
 function blockIcon(id, size) {
   const cv = blockPreview(BLOCKS[id].tiles.side, size);
@@ -561,6 +616,12 @@ function wireUI() {
   document.getElementById('portalmenu-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closePortalMenu(); });
   document.getElementById('portalmenu').addEventListener('pointerdown', (e) => { if (e.target.id === 'portalmenu') closePortalMenu(); });
 
+  document.getElementById('btn-night').addEventListener('pointerdown', (e) => {
+    e.preventDefault(); sound.resume();
+    night = !night; updateNightButton();
+    if (night) goals.bump('night');
+  });
+
   document.getElementById('btn-home').addEventListener('pointerdown', (e) => { e.preventDefault(); player.goHome(); });
   document.getElementById('btn-view').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); cycleZoom(); });
   updateViewButton();
@@ -640,6 +701,13 @@ function frame(now) {
   last = now;
   actionAnim = Math.max(0, actionAnim - dt * 3);
   shake = Math.max(0, shake - dt * 2.2);
+  invuln = Math.max(0, invuln - dt);
+  hurtFlash = Math.max(0, hurtFlash - dt);
+  sinceHurt += dt;
+  if (hearts > 0 && hearts < MAX_HEARTS && sinceHurt > 5) { regenT += dt; if (regenT >= 3) { regenT = 0; hearts++; updateHearts(); } }
+  const nightTarget = (night && dimension === 'over') ? 1 : 0;
+  nightAmt += (nightTarget - nightAmt) * Math.min(1, dt * 1.5);
+  if (hurtEl) hurtEl.style.opacity = (hurtFlash * 0.9).toFixed(3);
 
   controls.frame();
   applyLook();
@@ -680,7 +748,9 @@ function frame(now) {
 
   resize();
   gl.viewport(0, 0, canvas.width, canvas.height);
-  gl.clearColor(sky[0], sky[1], sky[2], 1);
+  const rsky = [sky[0] + (NIGHT_SKY[0] - sky[0]) * nightAmt, sky[1] + (NIGHT_SKY[1] - sky[1]) * nightAmt, sky[2] + (NIGHT_SKY[2] - sky[2]) * nightAmt];
+  const dayLight = 1 - 0.6 * nightAmt;
+  gl.clearColor(rsky[0], rsky[1], rsky[2], 1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
   const aspect = canvas.width / Math.max(1, canvas.height);
@@ -691,7 +761,9 @@ function frame(now) {
     controls.tapPending = false;
     const dir = screenRay(controls.tapX, controls.tapY);
     const cr = m.creepers ? m.creepers.pickRay(camPos, dir) : null;
+    const zb = (!cr && m.zombies) ? m.zombies.pickRay(camPos, dir) : null;
     if (cr) doDefend(cr);
+    else if (zb) doBonkZombie(zb);
     else {
       const hit = world.raycast(camPos, dir, REACH);
       const bid = hit ? world.get(hit.block[0], hit.block[1], hit.block[2]) : 0;
@@ -707,10 +779,11 @@ function frame(now) {
   gl.uniformMatrix4fv(worldProg.u.uProj, false, proj);
   gl.uniformMatrix4fv(worldProg.u.uView, false, view);
   gl.uniformMatrix4fv(worldProg.u.uModel, false, identity);
-  gl.uniform3f(worldProg.u.uFogColor, sky[0], sky[1], sky[2]);
+  gl.uniform3f(worldProg.u.uFogColor, rsky[0], rsky[1], rsky[2]);
   gl.uniform1f(worldProg.u.uFogNear, kind.fog[0]);
   gl.uniform1f(worldProg.u.uFogFar, kind.fog[1]);
   gl.uniform1f(worldProg.u.uAlpha, 1);
+  gl.uniform1f(worldProg.u.uDayLight, dayLight);
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, atlas);
   gl.uniform1i(worldProg.u.uTex, 0);
@@ -825,12 +898,16 @@ function init() {
   if (!loadGame()) freshStart();
 
   player.onSplash = (pos) => { sound.play('splash'); spawnSplash(pos); goals.bump('splash'); saveDirty = true; };
+  player.onLava = () => hurt(1);
   maybeUnlockNether(true);                       // open now if a returning player already qualifies
 
   camYaw = player.yaw;
   prevX = player.pos[0]; prevZ = player.pos[2];
   initMinimap();
   wireUI();
+  hurtEl = document.getElementById('hurt-flash');
+  updateHearts();
+  updateNightButton();
 
   // Resume audio on first interaction.
   const firstTouch = () => {
@@ -858,12 +935,15 @@ function init() {
     get creepers() { return mobs().creepers; },
     get nethermobs() { return mobs().nethermobs; },
     get ants() { return mobs().ants; },
+    get zombies() { return mobs().zombies; },
     cam: () => ({ yaw: camYaw, pitch: camPitch, pos: camPos.slice(), dir: camDir.slice() }),
     target: () => targetCells(),
     rayHit: (x, y) => rayHitAt(x, y),
     sel: () => selected,
     dim: () => dimension,
     portalOpen: () => portalUnlocked,
+    hearts: () => hearts,
+    night: () => night,
     travelTo: (k) => travelTo(k),
     lightPortal: (k) => lightPortal(k),
     enterPortal: () => travelTo(dimension === 'over' ? 'nether' : 'over'),

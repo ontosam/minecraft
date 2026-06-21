@@ -77,6 +77,12 @@ export class Sound {
         this.blip(110, 0.42, 'sawtooth', 0.22, 40);
         this.blip(70, 0.5, 'square', 0.18, 30);
         break;
+      case 'hurt': // a quick "ow" when something gets you
+        this.blip(330, 0.14, 'square', 0.12, 170);
+        break;
+      case 'groan': // low, slow zombie groan (more silly than scary)
+        this.blip(150, 0.32, 'sawtooth', 0.07, 105);
+        break;
     }
   }
 }

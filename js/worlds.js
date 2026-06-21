@@ -15,7 +15,7 @@ export const WORLD_KINDS = {
     name: 'Home', emoji: '🏡',
     sky: [0.62, 0.82, 0.96], fog: [38, 78],
     gen: 'generate', ground: B.DIRT,
-    mobs: ['animals', 'creepers'],
+    mobs: ['animals', 'creepers', 'zombies'],
     home: true,                 // where flint & steel sends you with "Home"
   },
   nether: {

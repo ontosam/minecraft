@@ -83,10 +83,10 @@ varying float vLight;
 varying float vDist;
 uniform sampler2D uTex;
 uniform vec3 uFogColor;
-uniform float uFogNear, uFogFar, uAlpha;
+uniform float uFogNear, uFogFar, uAlpha, uDayLight;
 void main() {
   vec4 tex = texture2D(uTex, vUV);
-  vec3 c = tex.rgb * vColor * vLight;
+  vec3 c = tex.rgb * vColor * vLight * uDayLight;
   float fog = clamp((vDist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
   c = mix(c, uFogColor, fog);
   gl_FragColor = vec4(c, uAlpha);
@@ -106,7 +106,7 @@ void main() { gl_FragColor = uColor; }`;
 export function makeWorldProgram(gl) {
   return makeProgram(gl, WORLD_VS, WORLD_FS,
     ['aPos', 'aUV', 'aColor', 'aLight'],
-    ['uProj', 'uView', 'uModel', 'uTex', 'uFogColor', 'uFogNear', 'uFogFar', 'uAlpha']);
+    ['uProj', 'uView', 'uModel', 'uTex', 'uFogColor', 'uFogNear', 'uFogFar', 'uAlpha', 'uDayLight']);
 }
 
 export function makeLineProgram(gl) {
