@@ -62,7 +62,7 @@ export class Character {
       { m: this.leg, mount: [-0.1, 0.7, 0], dir: 1, swing: true },
       { m: this.leg, mount: [0.1, 0.7, 0], dir: -1, swing: true },
       { m: this.arm, mount: [-0.26, 1.2, 0], dir: -1, swing: true },
-      { m: this.arm, mount: [0.26, 1.2, 0], dir: 1, swing: true },
+      { m: this.arm, mount: [0.26, 1.2, 0], dir: 1, swing: true, action: true },
       { m: this.body, mount: [0, 0.7, 0], dir: 0, swing: false },
       { m: this.head, mount: [0, 1.25, 0], dir: 0, swing: false },
     ];
@@ -70,11 +70,17 @@ export class Character {
     this._L = mat4.create(); this._M = mat4.create();
   }
 
-  draw(prog, x, y, z, yaw, phase, amt) {
+  draw(prog, x, y, z, yaw, phase, amt, act) {
     const gl = this.gl;
     mat4.model(this._P, x, y, z, yaw, 1, 1, 1);
+    if (act > 0) { // lean the whole body forward so the action reads from behind
+      mat4.rotateX(this._R, -0.32 * Math.sin(act * Math.PI));
+      mat4.multiply(this._P, this._P, this._R);
+    }
+    const chop = act > 0 ? -1.8 * Math.sin(act * Math.PI) : 0; // forward arm swing
     for (const p of this.parts) {
-      const swing = p.swing ? Math.sin(phase) * 0.5 * amt * p.dir : 0;
+      let swing = p.swing ? Math.sin(phase) * 0.5 * amt * p.dir : 0;
+      if (p.action && act > 0) swing = chop;
       mat4.translate(this._T, p.mount[0], p.mount[1], p.mount[2]);
       mat4.rotateX(this._R, swing);
       mat4.multiply(this._L, this._T, this._R);

@@ -359,6 +359,10 @@ body {
   background: #f2a65a;
 }
 
+.act.active {
+  box-shadow: 0 0 0 4px #ffd23f, 0 5px 0 rgba(0, 0, 0, .22);
+}
+
 .act.jump {
   width: 72px;
   height: 72px;

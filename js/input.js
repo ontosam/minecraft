@@ -15,6 +15,10 @@ export class Controls {
     this.movePtr = null; this.moveOrigin = [0, 0];
     this.lookPtr = null; this.lookLast = [0, 0];
     this.keys = { fwd: false, back: false, left: false, right: false };
+    // Quick-tap detection (tap to build/dig; drag to move/look).
+    this.tapPending = false;
+    this.moveT = 0; this.moveDragged = false;
+    this.lookStart = [0, 0]; this.lookT = 0; this.lookDragged = false;
 
     this.base = document.getElementById('stick-base');
     this.knob = document.getElementById('stick-knob');
@@ -30,19 +34,22 @@ export class Controls {
 
   onDown(e) {
     e.preventDefault();
+    const now = performance.now();
     // A mouse (laptop) drags anywhere to look; movement is via the keyboard.
     if (e.pointerType === 'mouse') {
-      if (this.lookPtr === null) { this.lookPtr = e.pointerId; this.lookLast = [e.clientX, e.clientY]; }
+      if (this.lookPtr === null) {
+        this.lookPtr = e.pointerId; this.lookLast = [e.clientX, e.clientY];
+        this.lookStart = [e.clientX, e.clientY]; this.lookT = now; this.lookDragged = false;
+      }
       return;
     }
     const leftSide = e.clientX < window.innerWidth / 2;
     if (leftSide && this.movePtr === null) {
-      this.movePtr = e.pointerId;
-      this.moveOrigin = [e.clientX, e.clientY];
-      this.showStick(e.clientX, e.clientY, e.clientX, e.clientY);
+      this.movePtr = e.pointerId; this.moveOrigin = [e.clientX, e.clientY];
+      this.moveT = now; this.moveDragged = false;
     } else if (!leftSide && this.lookPtr === null) {
-      this.lookPtr = e.pointerId;
-      this.lookLast = [e.clientX, e.clientY];
+      this.lookPtr = e.pointerId; this.lookLast = [e.clientX, e.clientY];
+      this.lookStart = [e.clientX, e.clientY]; this.lookT = now; this.lookDragged = false;
     }
   }
 
@@ -51,6 +58,7 @@ export class Controls {
       e.preventDefault();
       let dx = e.clientX - this.moveOrigin[0];
       let dy = e.clientY - this.moveOrigin[1];
+      if (Math.hypot(dx, dy) > 8) this.moveDragged = true;
       const len = Math.hypot(dx, dy);
       if (len > STICK_R) { dx = dx / len * STICK_R; dy = dy / len * STICK_R; }
       const dead = 0.16;
@@ -61,9 +69,10 @@ export class Controls {
         mx *= s; my *= s;
       }
       this.moveX = mx; this.moveY = my;
-      this.showStick(this.moveOrigin[0], this.moveOrigin[1], this.moveOrigin[0] + dx, this.moveOrigin[1] + dy);
+      if (this.moveDragged) this.showStick(this.moveOrigin[0], this.moveOrigin[1], this.moveOrigin[0] + dx, this.moveOrigin[1] + dy);
     } else if (e.pointerId === this.lookPtr) {
       e.preventDefault();
+      if (Math.hypot(e.clientX - this.lookStart[0], e.clientY - this.lookStart[1]) > 8) this.lookDragged = true;
       this.lookDX += e.clientX - this.lookLast[0];
       this.lookDY += e.clientY - this.lookLast[1];
       this.lookLast = [e.clientX, e.clientY];
@@ -71,10 +80,13 @@ export class Controls {
   }
 
   onUp(e) {
+    const now = performance.now();
     if (e.pointerId === this.movePtr) {
+      if (!this.moveDragged && now - this.moveT < 300) this.tapPending = true;
       this.movePtr = null; this.moveX = 0; this.moveY = 0;
       this.hideStick();
     } else if (e.pointerId === this.lookPtr) {
+      if (!this.lookDragged && now - this.lookT < 300) this.tapPending = true;
       this.lookPtr = null;
     }
   }

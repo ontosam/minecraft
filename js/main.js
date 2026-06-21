@@ -2,7 +2,7 @@
 // controls, UI, rendering, and autosave together.
 
 import { mat4 } from './math.js';
-import { initGL, makeWorldProgram, makeAtlasTexture, GLMesh, blockPreview, cubeMesh, frameMesh } from './gfx.js';
+import { initGL, makeWorldProgram, makeAtlasTexture, GLMesh, blockPreview, cubeMesh } from './gfx.js';
 import { World, BLOCKS, CATEGORIES, B, SX, SY, SZ } from './world.js';
 import { Player } from './player.js';
 import { Animals } from './animals.js';
@@ -25,9 +25,10 @@ window.addEventListener('error', (e) => showError(e.message || e.error || 'Unkno
 window.addEventListener('unhandledrejection', (e) => showError(e.reason && e.reason.message || e.reason || 'Promise error'));
 
 let gl, worldProg, atlas, world, player, animals, controls, sound, character, goals;
-let highlightFrame, ghostMesh = null, ghostFor = -1;
+let glowCube, ghostMesh = null, ghostFor = -1;
 let identity, proj, view, pv, scratch4, scratch4m;
 let selected = B.GRASS;
+let lastTool = 'build', actionAnim = 0;
 let saveDirty = false, lastSave = 0;
 let prevX = 0, prevZ = 0, goalToastTimer = 0;
 const canvas = document.getElementById('game');
@@ -126,7 +127,7 @@ function doBuild() {
   if (x < 0 || x >= SX || y < 0 || y >= SY || z < 0 || z >= SZ) return;
   if (world.get(x, y, z) !== B.AIR || overlapsPlayer(x, y, z)) { sound.play('deny'); return; }
   world.set(x, y, z, selected);
-  sound.play('place'); saveDirty = true;
+  sound.play('place'); saveDirty = true; actionAnim = 1;
   goals.onBuild(selected);
 }
 
@@ -137,13 +138,22 @@ function doDig() {
   const id = world.get(x, y, z);
   if (id === B.AIR || (BLOCKS[id] && BLOCKS[id].indestructible)) { sound.play('deny'); return; }
   world.set(x, y, z, B.AIR);
-  sound.play('dig'); saveDirty = true;
+  sound.play('dig'); saveDirty = true; actionAnim = 1;
   goals.onDig();
 }
 
 function doPet() {
   const p = animals.petNearest(player);
   if (p) { sound.play('pet'); spawnHearts(p); goals.onPet(); }
+}
+
+// The Build/Dig buttons pick the "tool"; a quick tap on the world repeats it.
+function doAction() { if (lastTool === 'dig') doDig(); else doBuild(); }
+function setTool(t) {
+  lastTool = t;
+  const bb = document.getElementById('btn-build'), bd = document.getElementById('btn-dig');
+  if (bb) bb.classList.toggle('active', t === 'build');
+  if (bd) bd.classList.toggle('active', t === 'dig');
 }
 
 // --- Floating hearts ---
@@ -265,9 +275,10 @@ function wireUI() {
   document.getElementById('btn-blocks').addEventListener('pointerdown', (e) => { e.preventDefault(); openPicker(); });
   document.getElementById('picker-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closePicker(); });
   document.getElementById('picker').addEventListener('pointerdown', (e) => { if (e.target.id === 'picker') closePicker(); });
-  holdButton('btn-build', doBuild, false);
-  holdButton('btn-dig', doDig, false);
+  holdButton('btn-build', () => { setTool('build'); doBuild(); }, false);
+  holdButton('btn-dig', () => { setTool('dig'); doDig(); }, false);
   holdButton('btn-pet', doPet, false);
+  setTool('build');
 
   const jb = document.getElementById('btn-jump');
   const setJump = (v) => (e) => { e.preventDefault(); controls.jump = v; if (v) sound.resume(); };
@@ -295,6 +306,7 @@ let last = 0;
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000 || 0);
   last = now;
+  actionAnim = Math.max(0, actionAnim - dt * 3);
 
   controls.frame();
   applyLook();
@@ -315,6 +327,7 @@ function frame(now) {
   const aspect = canvas.width / Math.max(1, canvas.height);
   mat4.perspective(proj, 1.05, aspect, 0.08, 120);
   computeCamera();
+  if (controls.tapPending) { controls.tapPending = false; doAction(); }
   mat4.multiply(pv, proj, view);
 
   gl.useProgram(worldProg.program);
@@ -330,7 +343,7 @@ function frame(now) {
   gl.uniform1i(worldProg.u.uTex, 0);
 
   world.draw(worldProg);
-  character.draw(worldProg, player.pos[0], player.pos[1], player.pos[2], player.yaw, player.walkPhase, player.moveAmt);
+  character.draw(worldProg, player.pos[0], player.pos[1], player.pos[2], player.yaw, player.walkPhase, player.moveAmt, actionAnim);
   animals.draw(worldProg);
 
   // Build/Dig guides: a translucent "ghost" of the block that will be placed,
@@ -338,30 +351,37 @@ function frame(now) {
   const hit = targetCells();
   if (hit) {
     gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.disable(gl.DEPTH_TEST); // draw guides on top so the character never hides them
 
-    const [qx, qy, qz] = hit.place;
-    if (qx >= 0 && qx < SX && qy >= 0 && qy < SY && qz >= 0 && qz < SZ &&
-      world.get(qx, qy, qz) === B.AIR && !overlapsPlayer(qx, qy, qz)) {
-      if (ghostFor !== selected) {
-        if (ghostMesh) ghostMesh.dispose();
-        ghostMesh = cubeMesh(gl, BLOCKS[selected].tiles, BLOCKS[selected].tint, false);
-        ghostFor = selected;
+    if (lastTool === 'build') {
+      // translucent ghost of the block that will be placed
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      const [qx, qy, qz] = hit.place;
+      if (qx >= 0 && qx < SX && qy >= 0 && qy < SY && qz >= 0 && qz < SZ &&
+        world.get(qx, qy, qz) === B.AIR && !overlapsPlayer(qx, qy, qz)) {
+        if (ghostFor !== selected) {
+          if (ghostMesh) ghostMesh.dispose();
+          ghostMesh = cubeMesh(gl, BLOCKS[selected].tiles, BLOCKS[selected].tint, false);
+          ghostFor = selected;
+        }
+        mat4.model(scratch4m, qx, qy, qz, 0, 1, 1, 1);
+        gl.uniformMatrix4fv(worldProg.u.uModel, false, scratch4m);
+        gl.uniform1f(worldProg.u.uAlpha, 0.6);
+        ghostMesh.draw(worldProg);
       }
-      mat4.model(scratch4m, qx, qy, qz, 0, 1, 1, 1);
+    } else {
+      // additive pulsing glow so the block being dug visibly lights up
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+      const pulse = 0.22 + 0.16 * (0.5 + 0.5 * Math.sin(now * 0.006));
+      mat4.model(scratch4m, hit.block[0] - 0.02, hit.block[1] - 0.02, hit.block[2] - 0.02, 0, 1.04, 1.04, 1.04);
       gl.uniformMatrix4fv(worldProg.u.uModel, false, scratch4m);
-      gl.uniform1f(worldProg.u.uAlpha, 0.55);
-      ghostMesh.draw(worldProg);
+      gl.uniform1f(worldProg.u.uAlpha, pulse);
+      glowCube.draw(worldProg);
     }
-
-    mat4.model(scratch4m, hit.block[0] - 0.012, hit.block[1] - 0.012, hit.block[2] - 0.012, 0, 1.024, 1.024, 1.024);
-    gl.uniformMatrix4fv(worldProg.u.uModel, false, scratch4m);
-    gl.uniform1f(worldProg.u.uAlpha, 1.0);
-    highlightFrame.draw(worldProg);
 
     gl.enable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.uniform1f(worldProg.u.uAlpha, 1.0);
   }
 
@@ -394,14 +414,12 @@ function init() {
   prevX = player.pos[0]; prevZ = player.pos[2];
   world.rebuildAll();
   animals.spawn(10);
-  highlightFrame = frameMesh(gl);
+  glowCube = cubeMesh(gl, BLOCKS[B.WHITE].tiles, [1, 1, 1], true);
   wireUI();
 
   // Resume audio + hide the hint on first interaction.
   const firstTouch = () => {
     sound.resume();
-    const t = document.getElementById('toast');
-    if (t) t.classList.add('hide');
     window.removeEventListener('pointerdown', firstTouch);
   };
   window.addEventListener('pointerdown', firstTouch);
