@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>Ezra's Blocks</title>
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#9ed0f5" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Ezra's Blocks" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- Floating walk stick (left thumb) -->
+  <div id="stick-base"></div>
+  <div id="stick-knob"></div>
+
+  <!-- Heads-up UI -->
+  <div id="ui">
+    <div id="crosshair"></div>
+
+    <div id="topbar">
+      <button id="btn-home" class="mini" title="Go home">🏠</button>
+      <button id="btn-sound" class="mini" title="Sound on/off">🔊</button>
+      <button id="btn-new" class="mini" title="New world">✨</button>
+    </div>
+
+    <div id="palette"></div>
+
+    <div id="actions">
+      <button id="btn-pet" class="act pet"><span>🐾</span><b>Pet</b></button>
+      <button id="btn-jump" class="act jump"><span>⬆️</span><b>Jump</b></button>
+      <button id="btn-dig" class="act dig"><span>⛏️</span><b>Dig</b></button>
+      <button id="btn-build" class="act build"><span>🧱</span><b>Build</b></button>
+    </div>
+
+    <div id="toast">Drag the <b>left</b> side to walk · Drag the <b>right</b> side to look · Tap
+      <b>Build</b> &amp; <b>Dig</b></div>
+  </div>
+
+  <div id="hearts"></div>
+
+  <div id="error-overlay">
+    <div class="box">
+      <h2>Oops — something went wrong 😟</h2>
+      <p>Please take a screenshot of this and send it so it can be fixed:</p>
+      <pre class="msg"></pre>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+
+</html>

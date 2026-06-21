@@ -1,0 +1,16 @@
+{
+  "name": "Ezra's Blocks",
+  "short_name": "Ezra's Blocks",
+  "description": "A gentle, friendly block-building world with cute animals — made for little builders.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#9ed0f5",
+  "theme_color": "#9ed0f5",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
