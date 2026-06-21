@@ -16,6 +16,7 @@ export class Player {
     this.yaw = 0;          // facing (the way the character walks)
     this.onGround = false;
     this.moving = false;
+    this.movingForward = false; // moving away from the camera (so it should trail)
     this.walkPhase = 0;    // drives the limb-swing animation
     this.moveAmt = 0;      // 0..1 eased "how much we're moving"
   }
@@ -49,9 +50,15 @@ export class Player {
     this.vel[0] = wx * SPEED;
     this.vel[2] = wz * SPEED;
 
-    // Turn the character to face the direction of travel.
+    // How forward-facing is the movement (relative to the camera)?
+    const mag = Math.hypot(wx, wz);
+    const cosF = mag > 0.001 ? (wx * fwd[0] + wz * fwd[2]) / mag : 0;
+    this.movingForward = this.moving && cosF > 0.25;
+
+    // Turn the character to face travel — but when backing up, keep facing
+    // away from the camera (a natural backpedal) instead of spinning around.
     if (this.moving) {
-      const target = Math.atan2(-wx, -wz);
+      const target = cosF < -0.25 ? camYaw : Math.atan2(-wx, -wz);
       let d = target - this.yaw;
       while (d > Math.PI) d -= Math.PI * 2;
       while (d < -Math.PI) d += Math.PI * 2;

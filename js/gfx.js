@@ -382,10 +382,12 @@ export function cubeMesh(gl, tiles, tint, flat) {
   return finishMesh(gl, A);
 }
 
-// A thick wireframe (12 beams) used to outline the block being dug.
-export function frameMesh(gl) {
+// A wireframe (12 beams); thickness and colour configurable. Used as a light
+// outline indicator for where a block will be placed.
+export function frameMesh(gl, t, tint) {
   const A = { pos: [], uv: [], col: [], light: [], idx: [] };
-  const t = 0.055, tint = [0.05, 0.05, 0.08], N = TILE.NEUTRAL;
+  t = t || 0.055; tint = tint || [0.05, 0.05, 0.08];
+  const N = TILE.NEUTRAL;
   const beam = (x0, y0, z0, x1, y1, z1) => pushBox(A, x0, y0, z0, x1, y1, z1, N, N, N, tint, true);
   for (const Y of [0, 1]) for (const Z of [0, 1]) beam(0, Y - t, Z - t, 1, Y + t, Z + t);
   for (const X of [0, 1]) for (const Z of [0, 1]) beam(X - t, 0, Z - t, X + t, 1, Z + t);

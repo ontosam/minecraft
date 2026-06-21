@@ -15,8 +15,9 @@ export class Controls {
     this.movePtr = null; this.moveOrigin = [0, 0];
     this.lookPtr = null; this.lookLast = [0, 0];
     this.keys = { fwd: false, back: false, left: false, right: false };
-    // Quick-tap detection (tap to build/dig; drag to move/look).
-    this.tapPending = false;
+    // Quick-tap detection (tap to build/dig where you touch; drag to move/look).
+    this.tapPending = false; this.tapX = 0; this.tapY = 0;
+    this.aim = { active: false, x: 0, y: 0 }; // where to show the build/dig indicator
     this.moveT = 0; this.moveDragged = false;
     this.lookStart = [0, 0]; this.lookT = 0; this.lookDragged = false;
 
@@ -32,9 +33,12 @@ export class Controls {
     window.addEventListener('keyup', (e) => this.onKey(e, false));
   }
 
+  aimAt(x, y) { this.aim.active = true; this.aim.x = x; this.aim.y = y; }
+
   onDown(e) {
     e.preventDefault();
     const now = performance.now();
+    this.aimAt(e.clientX, e.clientY); // pressing previews where you'll build/dig
     // A mouse (laptop) drags anywhere to look; movement is via the keyboard.
     if (e.pointerType === 'mouse') {
       if (this.lookPtr === null) {
@@ -69,25 +73,32 @@ export class Controls {
         mx *= s; my *= s;
       }
       this.moveX = mx; this.moveY = my;
-      if (this.moveDragged) this.showStick(this.moveOrigin[0], this.moveOrigin[1], this.moveOrigin[0] + dx, this.moveOrigin[1] + dy);
+      if (this.moveDragged) { this.aim.active = false; this.showStick(this.moveOrigin[0], this.moveOrigin[1], this.moveOrigin[0] + dx, this.moveOrigin[1] + dy); }
+      else this.aimAt(e.clientX, e.clientY);
     } else if (e.pointerId === this.lookPtr) {
       e.preventDefault();
-      if (Math.hypot(e.clientX - this.lookStart[0], e.clientY - this.lookStart[1]) > 8) this.lookDragged = true;
+      if (Math.hypot(e.clientX - this.lookStart[0], e.clientY - this.lookStart[1]) > 8) { this.lookDragged = true; this.aim.active = false; }
+      else this.aimAt(e.clientX, e.clientY);
       this.lookDX += e.clientX - this.lookLast[0];
       this.lookDY += e.clientY - this.lookLast[1];
       this.lookLast = [e.clientX, e.clientY];
+    } else if (e.pointerType === 'mouse') {
+      this.aimAt(e.clientX, e.clientY); // hover preview on a laptop
     }
   }
 
   onUp(e) {
     const now = performance.now();
+    const tap = (x, y) => { this.tapPending = true; this.tapX = x; this.tapY = y; };
     if (e.pointerId === this.movePtr) {
-      if (!this.moveDragged && now - this.moveT < 300) this.tapPending = true;
-      this.movePtr = null; this.moveX = 0; this.moveY = 0;
-      this.hideStick();
+      if (!this.moveDragged && now - this.moveT < 300) tap(e.clientX, e.clientY);
+      this.movePtr = null; this.moveX = 0; this.moveY = 0; this.hideStick();
+      this.aim.active = false;
     } else if (e.pointerId === this.lookPtr) {
-      if (!this.lookDragged && now - this.lookT < 300) this.tapPending = true;
+      if (!this.lookDragged && now - this.lookT < 300) tap(e.clientX, e.clientY);
       this.lookPtr = null;
+      if (e.pointerType === 'mouse') this.aimAt(e.clientX, e.clientY); // keep hovering
+      else this.aim.active = false;
     }
   }
 

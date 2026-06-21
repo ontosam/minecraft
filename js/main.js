@@ -2,7 +2,7 @@
 // controls, UI, rendering, and autosave together.
 
 import { mat4 } from './math.js';
-import { initGL, makeWorldProgram, makeAtlasTexture, GLMesh, blockPreview, cubeMesh } from './gfx.js';
+import { initGL, makeWorldProgram, makeAtlasTexture, GLMesh, blockPreview, cubeMesh, frameMesh } from './gfx.js';
 import { World, BLOCKS, CATEGORIES, B, SX, SY, SZ } from './world.js';
 import { Player } from './player.js';
 import { Animals } from './animals.js';
@@ -25,7 +25,7 @@ window.addEventListener('error', (e) => showError(e.message || e.error || 'Unkno
 window.addEventListener('unhandledrejection', (e) => showError(e.reason && e.reason.message || e.reason || 'Promise error'));
 
 let gl, worldProg, atlas, world, player, animals, controls, sound, character, goals;
-let glowCube, ghostMesh = null, ghostFor = -1;
+let glowCube, buildFrame;
 let identity, proj, view, pv, scratch4, scratch4m;
 let selected = B.GRASS;
 let lastTool = 'build', actionAnim = 0;
@@ -78,9 +78,9 @@ function applyLook() {
 }
 
 function cameraFollow(dt) {
-  // Ease the camera around behind the character while walking (unless the
-  // player is actively dragging to look around).
-  if (controls.lookPtr === null && player.moving) {
+  // Ease the camera behind the character only while moving forward (so backing
+  // up doesn't whip the camera around). Skipped while dragging to look.
+  if (controls.lookPtr === null && player.movingForward) {
     let d = player.yaw - camYaw;
     while (d > Math.PI) d -= Math.PI * 2;
     while (d < -Math.PI) d += Math.PI * 2;
@@ -108,10 +108,23 @@ function computeCamera() {
   mat4.lookAt(view, camPos, camTarget, [0, 1, 0]);
 }
 
-// --- Build / dig actions (aim from the camera through the screen centre) ---
-function targetCells() {
-  return world.raycast(camPos, camDir, CAM_DIST + 6);
+// --- Aiming: cast a ray from the camera through a screen point ---
+function screenRay(sx, sy) {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  const ndcx = (sx / w) * 2 - 1, ndcy = 1 - (sy / h) * 2;
+  const tanH = Math.tan(1.05 / 2), aspect = w / h;
+  const f = camDir;
+  let rx = -f[2], rz = f[0];
+  const rl = Math.hypot(rx, rz) || 1; rx /= rl; rz /= rl;          // right (y=0)
+  const ux = -rz * f[1], uy = rz * f[0] - rx * f[2], uz = rx * f[1]; // up = right × f
+  let dx = rx * (ndcx * tanH * aspect) + ux * (ndcy * tanH) + f[0];
+  let dy = uy * (ndcy * tanH) + f[1];
+  let dz = rz * (ndcx * tanH * aspect) + uz * (ndcy * tanH) + f[2];
+  const dl = Math.hypot(dx, dy, dz) || 1;
+  return [dx / dl, dy / dl, dz / dl];
 }
+function rayHitAt(sx, sy) { return world.raycast(camPos, screenRay(sx, sy), CAM_DIST + 8); }
+function targetCells() { return rayHitAt(canvas.clientWidth / 2, canvas.clientHeight / 2); }
 
 function overlapsPlayer(x, y, z) {
   const px0 = Math.floor(player.pos[0] - 0.28), px1 = Math.floor(player.pos[0] + 0.28);
@@ -120,8 +133,7 @@ function overlapsPlayer(x, y, z) {
   return x >= px0 && x <= px1 && y >= py0 && y <= py1 && z >= pz0 && z <= pz1;
 }
 
-function doBuild() {
-  const hit = targetCells();
+function doBuild(hit) {
   if (!hit) return;
   const [x, y, z] = hit.place;
   if (x < 0 || x >= SX || y < 0 || y >= SY || z < 0 || z >= SZ) return;
@@ -131,8 +143,7 @@ function doBuild() {
   goals.onBuild(selected);
 }
 
-function doDig() {
-  const hit = targetCells();
+function doDig(hit) {
   if (!hit) return;
   const [x, y, z] = hit.block;
   const id = world.get(x, y, z);
@@ -147,8 +158,8 @@ function doPet() {
   if (p) { sound.play('pet'); spawnHearts(p); goals.onPet(); }
 }
 
-// The Build/Dig buttons pick the "tool"; a quick tap on the world repeats it.
-function doAction() { if (lastTool === 'dig') doDig(); else doBuild(); }
+// The Build/Dig buttons pick the "tool"; a quick tap on the world acts there.
+function doAction(hit) { if (lastTool === 'dig') doDig(hit); else doBuild(hit); }
 function setTool(t) {
   lastTool = t;
   const bb = document.getElementById('btn-build'), bd = document.getElementById('btn-dig');
@@ -275,8 +286,8 @@ function wireUI() {
   document.getElementById('btn-blocks').addEventListener('pointerdown', (e) => { e.preventDefault(); openPicker(); });
   document.getElementById('picker-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closePicker(); });
   document.getElementById('picker').addEventListener('pointerdown', (e) => { if (e.target.id === 'picker') closePicker(); });
-  holdButton('btn-build', () => { setTool('build'); doBuild(); }, false);
-  holdButton('btn-dig', () => { setTool('dig'); doDig(); }, false);
+  holdButton('btn-build', () => { setTool('build'); doBuild(targetCells()); }, false);
+  holdButton('btn-dig', () => { setTool('dig'); doDig(targetCells()); }, false);
   holdButton('btn-pet', doPet, false);
   setTool('build');
 
@@ -327,7 +338,7 @@ function frame(now) {
   const aspect = canvas.width / Math.max(1, canvas.height);
   mat4.perspective(proj, 1.05, aspect, 0.08, 120);
   computeCamera();
-  if (controls.tapPending) { controls.tapPending = false; doAction(); }
+  if (controls.tapPending) { controls.tapPending = false; doAction(rayHitAt(controls.tapX, controls.tapY)); }
   mat4.multiply(pv, proj, view);
 
   gl.useProgram(worldProg.program);
@@ -348,29 +359,25 @@ function frame(now) {
 
   // Build/Dig guides: a translucent "ghost" of the block that will be placed,
   // and a bold outline around the block that would be dug.
-  const hit = targetCells();
+  // Indicator at the spot under the finger/cursor (or screen centre at rest):
+  // a light outline where a block will go (build) or a glow on it (dig).
+  const ax = controls.aim.active ? controls.aim.x : canvas.clientWidth / 2;
+  const ay = controls.aim.active ? controls.aim.y : canvas.clientHeight / 2;
+  const hit = rayHitAt(ax, ay);
   if (hit) {
     gl.enable(gl.BLEND);
-    gl.disable(gl.DEPTH_TEST); // draw guides on top so the character never hides them
-
+    gl.disable(gl.DEPTH_TEST); // draw on top so the character never hides it
     if (lastTool === 'build') {
-      // translucent ghost of the block that will be placed
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       const [qx, qy, qz] = hit.place;
       if (qx >= 0 && qx < SX && qy >= 0 && qy < SY && qz >= 0 && qz < SZ &&
         world.get(qx, qy, qz) === B.AIR && !overlapsPlayer(qx, qy, qz)) {
-        if (ghostFor !== selected) {
-          if (ghostMesh) ghostMesh.dispose();
-          ghostMesh = cubeMesh(gl, BLOCKS[selected].tiles, BLOCKS[selected].tint, false);
-          ghostFor = selected;
-        }
-        mat4.model(scratch4m, qx, qy, qz, 0, 1, 1, 1);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        mat4.model(scratch4m, qx - 0.01, qy - 0.01, qz - 0.01, 0, 1.02, 1.02, 1.02);
         gl.uniformMatrix4fv(worldProg.u.uModel, false, scratch4m);
-        gl.uniform1f(worldProg.u.uAlpha, 0.6);
-        ghostMesh.draw(worldProg);
+        gl.uniform1f(worldProg.u.uAlpha, 0.9);
+        buildFrame.draw(worldProg);
       }
     } else {
-      // additive pulsing glow so the block being dug visibly lights up
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
       const pulse = 0.22 + 0.16 * (0.5 + 0.5 * Math.sin(now * 0.006));
       mat4.model(scratch4m, hit.block[0] - 0.02, hit.block[1] - 0.02, hit.block[2] - 0.02, 0, 1.04, 1.04, 1.04);
@@ -378,7 +385,6 @@ function frame(now) {
       gl.uniform1f(worldProg.u.uAlpha, pulse);
       glowCube.draw(worldProg);
     }
-
     gl.enable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -415,6 +421,7 @@ function init() {
   world.rebuildAll();
   animals.spawn(10);
   glowCube = cubeMesh(gl, BLOCKS[B.WHITE].tiles, [1, 1, 1], true);
+  buildFrame = frameMesh(gl, 0.028, [0.5, 0.95, 1.0]);
   wireUI();
 
   // Resume audio + hide the hint on first interaction.
@@ -441,6 +448,7 @@ function init() {
     world, player, animals,
     cam: () => ({ yaw: camYaw, pitch: camPitch, pos: camPos.slice(), dir: camDir.slice() }),
     target: () => targetCells(),
+    rayHit: (x, y) => rayHitAt(x, y),
     sel: () => selected,
     goals,
   };
