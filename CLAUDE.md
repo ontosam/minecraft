@@ -221,6 +221,35 @@ to `main`. Now **33 goals**, **10 shop items**, **49 block ids**.
    at once (weak but many — could cap lower if it feels busy); slime+sword could
    later combine (sword "knockback").
 
+## Status (session 9)
+Dad gave full creative freedom ("give you the torch… pen is yours, I love your
+creativity"). Shipped two delightful, beloved-game-inspired features on
+**`claude/gifted-gates-h9dzy2`**, mirrored to `main`. Now **36 goals**,
+**11 shop items**.
+1. **🐴 Rideable Pony (the headline).** New `🐴 Ride-On Pony` shop item (16💎).
+   Once owned, a horse spawns at home (re-spawned each load via `ensurePony`) and
+   **follows you like the pet cat**. A new **🐴 topbar button** (revealed when
+   owned) hops you on/off. Riding **snaps the pony to you** (always comes when
+   called), boosts speed/jump (`player.mountSpeed=1.7`, `mountJump=1.18`), and the
+   kid is drawn **sitting astride it** (new `character.draw(..., seated)` pose:
+   legs forward, hands on reins; rider raised +0.62). Dismount sets it down beside
+   you. Travelling worlds / knockout auto-dismounts (pony stays home). New `horse`
+   mesh in animals.js (shop-only, so it stays special); `Animals.update` skips a
+   `ridden` pony. 'Giddy up!' goal, `neigh` sound, `__ezra.toggleRide()/riding()`.
+2. **🎣 Fishing (cozy loop).** New **🎣 topbar button**: near any water it casts a
+   projected **bobber** (`#bobber`), and after a short wait you reel in a 🐟 (+1💎),
+   sometimes 💎 treasure (+2), or a silly 🥾 boot. Tapping again reels in early;
+   travel/knockout reels in safely. Pairs with the beach lagoon. New goals
+   'Gone fishing!' + 'Master angler' (12). `__ezra.castLine()/fishing()`.
+   Verified headless: pony buy→spawn→mount(1.7×)→dismount→travel auto-dismount and
+   **persists across reload**; fishing does nothing on dry land, casts at water,
+   the bite pays out + ticks the goal; all 8 topbar buttons fit (right edge 548<
+   1024); full world-hop + build-everything save/reload regression stays green,
+   zero errors. Tuning candidates: pony's neck/head is hidden from directly behind
+   (fine from the side); fishing is free (no rod to buy) — could gate it later;
+   topbar is now 8 minis + block (fits tablet/laptop; a tools sub-menu later if it
+   ever feels busy on small phones).
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files
