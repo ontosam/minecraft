@@ -135,6 +135,7 @@ function registerDim(key, w) {
   populateMobs(m);
   ensurePortalsFor(key);
   w.rebuildAll();
+  w.updateRedstone();                    // light any saved lamps wired to on-levers
   if (!positions[key]) positions[key] = w.spawn.slice();
   return worlds[key];
 }
@@ -323,6 +324,7 @@ function doBuild(hit) {
   if (selected !== B.WATER) world.placed.add(world.idx(x, y, z));
   sound.play('place'); saveDirty = true; actionAnim = 1; minimapDirty = true;
   goals.onBuild(selected);
+  if (isRedstone(selected)) world.updateRedstone();   // a new wire/lamp may light up
 }
 
 function doDig(hit) {
@@ -338,12 +340,25 @@ function doDig(hit) {
   world.placed.delete(key);
   sound.play('dig'); saveDirty = true; actionAnim = 1; minimapDirty = true;
   goals.onDig();
+  if (isRedstone(id)) world.updateRedstone();   // removing wire can switch lamps off
   // Buried treasure! Natural gold/diamond the player dug up (not their own block).
   if (!wasPlaced && (id === B.GOLD || id === B.DIAMOND)) {
     goals.bump('treasure'); sound.play('treasure'); spawnSparkles([x + 0.5, y + 0.6, z + 0.5]);
     if (id === B.DIAMOND) { goals.bump('diamond'); goals.addGems(2); } else goals.addGems(1);
     updateGems();
   }
+}
+
+// --- Redstone: a lever powers wire, which lights up lamps ---
+function isRedstone(id) { return id === B.LEVER || id === B.LEVER_ON || id === B.REDSTONE || id === B.REDLAMP || id === B.REDLAMP_ON; }
+function toggleLever(x, y, z) {
+  const id = world.get(x, y, z);
+  world.set(x, y, z, id === B.LEVER_ON ? B.LEVER : B.LEVER_ON);
+  sound.play('door');                       // a satisfying click
+  const lit = world.updateRedstone();
+  saveDirty = true; minimapDirty = true;
+  goals.bump('lever');
+  if (lit > 0) goals.bump('lamp');
 }
 
 // --- Doors: a 2-tall openable door for house-building ---
@@ -940,6 +955,7 @@ function frame(now) {
       const hit = world.raycast(camPos, dir, REACH);
       const bid = hit ? world.get(hit.block[0], hit.block[1], hit.block[2]) : 0;
       if (hit && isDoor(bid)) toggleDoor(hit.block[0], hit.block[1], hit.block[2]);
+      else if (hit && (bid === B.LEVER || bid === B.LEVER_ON)) toggleLever(hit.block[0], hit.block[1], hit.block[2]);
       else if (hit && bid === B.TNT) lightTNT(hit.block[0], hit.block[1], hit.block[2]);
       else doAction(hit);
     }
@@ -1142,6 +1158,7 @@ function init() {
     goals,
     spawnCreeper: () => { const c = mobs().creepers; if (c) c.spawnNow(player); },
     lightTNT: (x, y, z) => lightTNT(x, y, z),
+    toggleLever: (x, y, z) => toggleLever(x, y, z),
   };
 
   last = performance.now();

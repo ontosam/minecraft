@@ -14,7 +14,7 @@ export const TILE = {
   GLOWSTONE: 24, PUMPKIN_SIDE: 25, PUMPKIN_TOP: 26, OBSIDIAN: 27,
   BIRCH_LOG: 28, NETHERRACK: 29, NETHER_PORTAL: 30, LAVA: 31,
   DOOR: 32, DOOR_OPEN: 33, TNT_SIDE: 34, TNT_TOP: 35,
-  RAINBOW: 36,
+  RAINBOW: 36, LEVER: 37, LEVER_ON: 38, REDSTONE: 39, REDLAMP: 40, REDLAMP_ON: 41,
 };
 
 export function initGL(canvas) {
@@ -309,6 +309,28 @@ function buildAtlasCanvas() {
     }
     for (let i = 0; i < 7; i++) { ctx.fillStyle = shade(0xffffff, 1); ctx.fillRect(p[0] + Math.floor(r() * T), p[1] + Math.floor(r() * T), 1, 1); }
   }
+
+  // --- Redstone kit (lever / wire / lamp) ---
+  // Lever OFF: stone block, handle leaning right with a pale knob.
+  p = at(TILE.LEVER); noise(ctx, p[0], p[1], 0x8f8f97, 0.16, 90);
+  ctx.fillStyle = shade(0x55555c, 1); ctx.fillRect(p[0] + 3, p[1] + 11, 10, 3);   // base plate
+  ctx.fillStyle = shade(0x6b4a2a, 1); ctx.fillRect(p[0] + 9, p[1] + 4, 2, 8);      // handle
+  ctx.fillStyle = shade(0xd0d0d6, 1); ctx.fillRect(p[0] + 8, p[1] + 3, 4, 3);      // pale knob (off)
+  // Lever ON: handle leaning left with a bright red knob (powered).
+  p = at(TILE.LEVER_ON); noise(ctx, p[0], p[1], 0x8f8f97, 0.16, 91);
+  ctx.fillStyle = shade(0x55555c, 1); ctx.fillRect(p[0] + 3, p[1] + 11, 10, 3);
+  ctx.fillStyle = shade(0x6b4a2a, 1); ctx.fillRect(p[0] + 5, p[1] + 4, 2, 8);
+  ctx.fillStyle = shade(0xff3b30, 1); ctx.fillRect(p[0] + 4, p[1] + 3, 4, 3);      // red knob (on)
+  // Redstone wire: dark block with a red dust cross.
+  p = at(TILE.REDSTONE); noise(ctx, p[0], p[1], 0x2a2a30, 0.18, 92);
+  ctx.fillStyle = shade(0xc0392b, 1); ctx.fillRect(p[0] + 7, p[1] + 1, 2, 14); ctx.fillRect(p[0] + 1, p[1] + 7, 14, 2);
+  { const r = rng(920); for (let i = 0; i < 5; i++) { ctx.fillStyle = shade(0xe8625a, 1); ctx.fillRect(p[0] + Math.floor(r() * T), p[1] + Math.floor(r() * T), 1, 1); } }
+  // Redstone lamp OFF: warm brown block with a dim grid.
+  p = at(TILE.REDLAMP); noise(ctx, p[0], p[1], 0x7a6038, 0.12, 93);
+  ctx.fillStyle = shade(0x4a3a20, 1); for (let i = 0; i < T; i += 5) { ctx.fillRect(p[0] + i, p[1], 1, T); ctx.fillRect(p[0], p[1] + i, T, 1); }
+  // Redstone lamp ON: bright glowing orange-yellow.
+  p = at(TILE.REDLAMP_ON); noise(ctx, p[0], p[1], 0xf2b53a, 0.12, 94);
+  { const r = rng(940); for (let i = 0; i < 10; i++) { ctx.fillStyle = shade(0xfff0b0, 1); ctx.fillRect(p[0] + Math.floor(r() * 14), p[1] + Math.floor(r() * 14), 2, 2); } }
 
   return c;
 }

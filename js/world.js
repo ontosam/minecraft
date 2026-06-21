@@ -20,6 +20,7 @@ export const B = {
   DIAMOND: 31, BOOKSHELF: 32, GLOWSTONE: 33, PUMPKIN: 34, OBSIDIAN: 35,
   NETHERRACK: 36, PORTAL: 37, LAVA: 38,
   DOOR: 39, DOOR_OPEN: 40, TNT: 41, RAINBOW: 42,
+  LEVER: 43, LEVER_ON: 44, REDSTONE: 45, REDLAMP: 46, REDLAMP_ON: 47,
 };
 
 const W = [1, 1, 1]; // white tint for textured blocks
@@ -75,6 +76,11 @@ export const BLOCKS = {
   [B.DOOR_OPEN]: { tiles: { top: TILE.DOOR_OPEN, side: TILE.DOOR_OPEN, bottom: TILE.DOOR_OPEN }, tint: W, ui: '#5e3c1c', passable: true },
   [B.TNT]: nat3(TILE.TNT_TOP, TILE.TNT_SIDE, TILE.TNT_TOP, '#c0392b'),
   [B.RAINBOW]: nat(TILE.RAINBOW, '#ff66cc'),
+  [B.LEVER]: nat(TILE.LEVER, '#8a8a90'),
+  [B.LEVER_ON]: nat(TILE.LEVER_ON, '#b8544c'),
+  [B.REDSTONE]: nat(TILE.REDSTONE, '#a8362c'),
+  [B.REDLAMP]: nat(TILE.REDLAMP, '#7a6038'),
+  [B.REDLAMP_ON]: nat(TILE.REDLAMP_ON, '#f2c24a'),
 };
 
 // Build blocks grouped into categories for the pop-up picker.
@@ -83,6 +89,8 @@ export const CATEGORIES = [
   { name: 'Water 🪣', blocks: [B.WATER] },
   { name: 'House 🏠', blocks: [B.DOOR, B.GLASS, B.PLANKS, B.BRICK] },
   { name: 'Boom 💥', blocks: [B.TNT] },
+  // Tap a lever → it powers redstone wire → wired-up lamps light up.
+  { name: 'Redstone ⚙️', blocks: [B.LEVER, B.REDSTONE, B.REDLAMP] },
   { name: 'Stone', blocks: [B.STONE, B.COBBLE, B.STONE_BRICK, B.BRICK, B.OBSIDIAN, B.GLOWSTONE] },
   { name: 'Wood', blocks: [B.PLANKS, B.BIRCH_PLANKS, B.DARK_PLANKS, B.BOOKSHELF] },
   { name: 'Shiny', blocks: [B.GOLD, B.DIAMOND, B.ICE, B.GLASS] },
@@ -551,6 +559,44 @@ export class World {
       if (z === oz && x >= ox && x <= ox + 3 && y >= oy && y <= oy + 4) return true;
     }
     return false;
+  }
+
+  // Redstone! Flip a lever (LEVER_ON) → power spreads through REDSTONE wire to
+  // any touching lamp, which lights up (REDLAMP → REDLAMP_ON). Recomputed from
+  // scratch whenever a lever/wire/lamp changes. Returns how many lamps are lit.
+  updateRedstone() {
+    const leverOn = [], lamps = [];
+    for (let i = 0; i < this.data.length; i++) {
+      const id = this.data[i];
+      if (id === B.LEVER_ON) leverOn.push(i);
+      else if (id === B.REDLAMP || id === B.REDLAMP_ON) lamps.push(i);
+    }
+    if (!lamps.length) return 0;                 // nothing to light → done fast
+    // Flood power through connected redstone wire (6-neighbour).
+    const powered = new Set(), q = [];
+    const N = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+    const xyz = (i) => [i % SX, Math.floor(i / (SX * SZ)), Math.floor(i / SX) % SZ];
+    const feedWire = (x, y, z) => {
+      if (this.get(x, y, z) !== B.REDSTONE) return;
+      const k = this.idx(x, y, z);
+      if (!powered.has(k)) { powered.add(k); q.push([x, y, z]); }
+    };
+    for (const li of leverOn) { const [x, y, z] = xyz(li); for (const [dx, dy, dz] of N) feedWire(x + dx, y + dy, z + dz); }
+    while (q.length) { const [x, y, z] = q.pop(); for (const [dx, dy, dz] of N) feedWire(x + dx, y + dy, z + dz); }
+    // A lamp lights if it touches an on-lever or a powered wire.
+    let lit = 0;
+    for (const li of lamps) {
+      const [x, y, z] = xyz(li);
+      let on = false;
+      for (const [dx, dy, dz] of N) {
+        const nx = x + dx, ny = y + dy, nz = z + dz, nid = this.get(nx, ny, nz);
+        if (nid === B.LEVER_ON || (nid === B.REDSTONE && powered.has(this.idx(nx, ny, nz)))) { on = true; break; }
+      }
+      const want = on ? B.REDLAMP_ON : B.REDLAMP;
+      if (this.data[li] !== want) this.set(x, y, z, want);
+      if (on) lit++;
+    }
+    return lit;
   }
 
   markAllDirty() { for (let i = 0; i < this.meshes.length; i++) this.dirty.add(i); }

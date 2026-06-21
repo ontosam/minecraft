@@ -26,6 +26,8 @@ export const GOAL_DEFS = [
   { id: 'builder2', icon: '🏗️', title: 'Master builder', desc: 'Place 75 blocks', metric: 'place', target: 75 },
   { id: 'decorator', icon: '🎨', title: 'Decorator', desc: 'Build with 8 different blocks', metric: 'variety', target: 8 },
   { id: 'doormaker', icon: '🚪', title: 'Door maker', desc: 'Build a door for your house', metric: 'doors', target: 1 },
+  { id: 'lever', icon: '🎚️', title: 'Lever flipper', desc: 'Place and flip a lever', metric: 'lever', target: 1 },
+  { id: 'lamp', icon: '💡', title: 'Light it up!', desc: 'Power up a redstone lamp', metric: 'lamp', target: 1 },
   { id: 'meetghast', icon: '👻', title: 'Meet a ghast', desc: 'Find a friendly ghast', metric: 'ghast', target: 1 },
   { id: 'meetblaze', icon: '🔥', title: 'Meet a blaze', desc: 'Find a friendly blaze', metric: 'blaze', target: 1 },
   { id: 'explorer2', icon: '🗺️', title: 'Adventurer', desc: 'Walk a long way (250)', metric: 'dist', target: 250 },
@@ -38,7 +40,7 @@ const KEY = 'ezrablocks.goals.v1';
 
 export class Goals {
   constructor() {
-    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0, bought: 0, spider: 0, lamp: 0, monster: 0 };
+    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0, bought: 0, spider: 0, lamp: 0, monster: 0, lever: 0 };
     this.usedTypes = new Set();
     this.done = {};
     this.stars = 0;
