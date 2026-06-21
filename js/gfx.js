@@ -14,6 +14,7 @@ export const TILE = {
   GLOWSTONE: 24, PUMPKIN_SIDE: 25, PUMPKIN_TOP: 26, OBSIDIAN: 27,
   BIRCH_LOG: 28, NETHERRACK: 29, NETHER_PORTAL: 30, LAVA: 31,
   DOOR: 32, DOOR_OPEN: 33, TNT_SIDE: 34, TNT_TOP: 35,
+  RAINBOW: 36,
 };
 
 export function initGL(canvas) {
@@ -297,6 +298,17 @@ function buildAtlasCanvas() {
   p = at(TILE.TNT_TOP); noise(ctx, p[0], p[1], 0xc0392b, 0.10, 73);
   ctx.fillStyle = shade(0x7a2018, 1); for (let i = 0; i < T; i += 4) ctx.fillRect(p[0] + i, p[1], 1, T);
   ctx.fillStyle = shade(0x3a2a12, 1); ctx.fillRect(p[0] + 7, p[1] + 7, 2, 2);
+
+  // --- Rainbow block (a sparkly shop reward) ---
+  // Bright horizontal stripes of the rainbow, with a few twinkling sparkles.
+  p = at(TILE.RAINBOW);
+  { const bands = [0xe23b3b, 0xf08a2a, 0xf2d234, 0x4fbf4f, 0x3a86d6, 0x9959d9]; const r = rng(800);
+    for (let y = 0; y < T; y++) {
+      const col = bands[Math.min(bands.length - 1, Math.floor(y / T * bands.length))];
+      for (let x = 0; x < T; x++) { ctx.fillStyle = shade(col, 0.9 + r() * 0.2); ctx.fillRect(p[0] + x, p[1] + y, 1, 1); }
+    }
+    for (let i = 0; i < 7; i++) { ctx.fillStyle = shade(0xffffff, 1); ctx.fillRect(p[0] + Math.floor(r() * T), p[1] + Math.floor(r() * T), 1, 1); }
+  }
 
   return c;
 }

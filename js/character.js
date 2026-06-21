@@ -44,6 +44,24 @@ function mesh(gl, build) {
 
 const SKIN = [0.97, 0.80, 0.67], SHIRT = [0.30, 0.62, 0.88], PANTS = [0.33, 0.36, 0.55];
 const SHOE = [0.25, 0.22, 0.24], HAIR = [0.34, 0.22, 0.13], EYE = [0.16, 0.13, 0.12];
+const GOLD = [0.98, 0.82, 0.20], GEM = [0.88, 0.20, 0.32];
+
+// A little golden crown (shop reward) that sits on top of the head. Built with
+// its base centred on the local origin so it can be parked on the head mount.
+function buildCrown(A) {
+  // A square band ring around the head.
+  addBox(A, -0.24, 0, -0.24, 0.24, 0.12, -0.18, GOLD);   // front
+  addBox(A, -0.24, 0, 0.18, 0.24, 0.12, 0.24, GOLD);     // back
+  addBox(A, -0.24, 0, -0.24, -0.18, 0.12, 0.24, GOLD);   // left
+  addBox(A, 0.18, 0, -0.24, 0.24, 0.12, 0.24, GOLD);     // right
+  // Five points on top (four corners + a taller one at the front).
+  addBox(A, -0.24, 0.12, -0.24, -0.16, 0.22, -0.16, GOLD);
+  addBox(A, 0.16, 0.12, -0.24, 0.24, 0.22, -0.16, GOLD);
+  addBox(A, -0.24, 0.12, 0.16, -0.16, 0.22, 0.24, GOLD);
+  addBox(A, 0.16, 0.12, 0.16, 0.24, 0.22, 0.24, GOLD);
+  addBox(A, -0.04, 0.12, -0.24, 0.04, 0.27, -0.16, GOLD);
+  addBox(A, -0.035, 0.04, -0.245, 0.035, 0.10, -0.225, GEM); // a red jewel up front
+}
 
 export class Character {
   constructor(gl) {
@@ -58,6 +76,8 @@ export class Character {
       addBox(A, 0.04, 0.2, -0.215, 0.12, 0.28, -0.2, EYE);            // eyes (front = -z)
       addBox(A, -0.12, 0.2, -0.215, -0.04, 0.28, -0.2, EYE);
     });
+    this.crown = mesh(gl, buildCrown);
+    this.wearCrown = false;        // toggled when the Golden Crown is bought
     this.parts = [
       { m: this.leg, mount: [-0.1, 0.7, 0], dir: 1, swing: true },
       { m: this.leg, mount: [0.1, 0.7, 0], dir: -1, swing: true },
@@ -87,6 +107,12 @@ export class Character {
       mat4.multiply(this._M, this._P, this._L);
       gl.uniformMatrix4fv(prog.u.uModel, false, this._M);
       p.m.draw(prog);
+    }
+    if (this.wearCrown) { // perched on top of the head (rides the body's lean)
+      mat4.translate(this._T, 0, 1.66, 0);
+      mat4.multiply(this._M, this._P, this._T);
+      gl.uniformMatrix4fv(prog.u.uModel, false, this._M);
+      this.crown.draw(prog);
     }
   }
 }

@@ -55,6 +55,7 @@ let lastTool = 'build', actionAnim = 0;
 let saveDirty = false, lastSave = 0;
 let prevX = 0, prevZ = 0, goalToastTimer = 0;
 let shake = 0;            // camera kick from explosions
+let trailT = 0;           // throttle for the "Sparkle Trail" shop reward
 const fuses = [];         // lit TNT awaiting detonation: { x, y, z, t }
 const canvas = document.getElementById('game');
 
@@ -467,6 +468,11 @@ function updateGems() {
 function applyUnlocks() {
   maxHearts = MAX_HEARTS + (goals.hasUnlock('heart') ? 1 : 0);
   if (hearts > maxHearts) hearts = maxHearts;
+  if (player) {
+    player.speedMul = goals.hasUnlock('boots') ? 1.55 : 1;
+    player.jumpMul = goals.hasUnlock('superjump') ? 1.4 : 1;
+  }
+  if (character) character.wearCrown = goals.hasUnlock('crown');
   updateHearts();
 }
 function explodeRadius() { return goals.hasUnlock('megatnt') ? 4.6 : 3.2; }
@@ -480,9 +486,14 @@ function ensurePet() {
 
 // --- Treasure shop: spend 💎 (mined + earned from goals) on fun unlocks ---
 const SHOP = [
-  { id: 'pet', icon: '🐾', name: 'Pet Friend', cost: 5, desc: 'A cute pet that follows you around' },
+  { id: 'pet', icon: '🐾', name: 'Pet Friend', cost: 5, desc: 'A cute cat that follows you around' },
+  { id: 'boots', icon: '👟', name: 'Speed Boots', cost: 6, desc: 'Zoom around — walk much faster!' },
+  { id: 'superjump', icon: '🦘', name: 'Super Jump', cost: 6, desc: 'Boing! Jump up really high' },
   { id: 'heart', icon: '❤️', name: 'Extra Heart', cost: 8, desc: 'One more heart for night adventures' },
+  { id: 'sparkle', icon: '✨', name: 'Sparkle Trail', cost: 8, desc: 'Leave a trail of sparkles as you run' },
   { id: 'megatnt', icon: '💥', name: 'Mega TNT', cost: 10, desc: 'Bigger, more powerful explosions!' },
+  { id: 'rainbow', icon: '🌈', name: 'Rainbow Block', cost: 10, desc: 'A magic rainbow block to build with' },
+  { id: 'crown', icon: '👑', name: 'Golden Crown', cost: 14, desc: 'Wear a royal crown — be the king!' },
 ];
 function buildShop() {
   document.getElementById('shop-gems').textContent = 'You have 💎 ' + goals.gems;
@@ -504,9 +515,13 @@ function buyItem(it) {
   if (goals.hasUnlock(it.id)) return;
   if (!goals.spend(it.cost)) { sound.play('deny'); showToast('Mine more 💎 first! (need ' + it.cost + ')'); return; }
   goals.setUnlock(it.id);
+  goals.bump('bought');                 // counts toward the "Treasure shopper" goal
   applyUnlocks();
   if (it.id === 'pet') { ensurePet(); if (dimension !== 'over') showToast('🐾 Your new pet is waiting at home — tap 🏠!'); }
   if (it.id === 'heart') { hearts = maxHearts; updateHearts(); }
+  if (it.id === 'rainbow') {             // reveal it in the picker + select it right away
+    buildPicker(); selected = B.RAINBOW; refreshBlocksButton(); saveDirty = true;
+  }
   sound.play('treasure');
   updateGems(); buildShop();
   showToast('✨ Unlocked: ' + it.name + '!');
@@ -572,6 +587,7 @@ function buildPicker() {
   const body = document.getElementById('picker-body');
   body.innerHTML = '';
   for (const cat of CATEGORIES) {
+    if (cat.locked && !goals.hasUnlock(cat.locked)) continue;   // hidden until bought
     const label = document.createElement('div');
     label.className = 'pick-cat'; label.textContent = cat.name;
     body.appendChild(label);
@@ -885,6 +901,15 @@ function frame(now) {
   }
   mat4.multiply(pv, proj, view);
 
+  // Sparkle Trail (shop reward): drop little ✨ behind you while you move.
+  if (goals.hasUnlock('sparkle')) {
+    trailT -= dt;
+    if (player.moveAmt > 0.45 && trailT <= 0) {
+      trailT = 0.09;
+      spawnParticles([player.pos[0], player.pos[1] + 0.3, player.pos[2]], '✨', 'puff', 1, 26);
+    }
+  }
+
   const kind = WORLD_KINDS[dimension];
   gl.useProgram(worldProg.program);
   gl.uniformMatrix4fv(worldProg.u.uProj, false, proj);
@@ -1059,6 +1084,7 @@ function init() {
     portalOpen: () => portalUnlocked,
     hearts: () => hearts,
     night: () => night,
+    crown: () => character.wearCrown,
     gems: () => goals.gems,
     buy: (idd) => { const it = SHOP.find((s) => s.id === idd); if (it) buyItem(it); },
     resetWorld: () => resetWorld(),

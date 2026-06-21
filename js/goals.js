@@ -27,13 +27,16 @@ export const GOAL_DEFS = [
   { id: 'meetghast', icon: '👻', title: 'Meet a ghast', desc: 'Find a friendly ghast', metric: 'ghast', target: 1 },
   { id: 'meetblaze', icon: '🔥', title: 'Meet a blaze', desc: 'Find a friendly blaze', metric: 'blaze', target: 1 },
   { id: 'explorer2', icon: '🗺️', title: 'Adventurer', desc: 'Walk a long way (250)', metric: 'dist', target: 250 },
+  { id: 'shopper', icon: '🛍️', title: 'Treasure shopper', desc: 'Buy 3 things from the shop', metric: 'bought', target: 3 },
+  { id: 'diamond2', icon: '💠', title: 'Diamond king', desc: 'Mine 15 diamonds', metric: 'diamond', target: 15 },
+  { id: 'marathon', icon: '🏃', title: 'Marathon', desc: 'Walk really far (500)', metric: 'dist', target: 500 },
 ];
 
 const KEY = 'ezrablocks.goals.v1';
 
 export class Goals {
   constructor() {
-    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0 };
+    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0, bought: 0 };
     this.usedTypes = new Set();
     this.done = {};
     this.stars = 0;

@@ -19,7 +19,7 @@ export const B = {
   BIRCH_LOG: 27, BIRCH_PLANKS: 28, DARK_PLANKS: 29, GOLD: 30,
   DIAMOND: 31, BOOKSHELF: 32, GLOWSTONE: 33, PUMPKIN: 34, OBSIDIAN: 35,
   NETHERRACK: 36, PORTAL: 37, LAVA: 38,
-  DOOR: 39, DOOR_OPEN: 40, TNT: 41,
+  DOOR: 39, DOOR_OPEN: 40, TNT: 41, RAINBOW: 42,
 };
 
 const W = [1, 1, 1]; // white tint for textured blocks
@@ -74,6 +74,7 @@ export const BLOCKS = {
   [B.DOOR]: nat(TILE.DOOR, '#8a5a2a'),
   [B.DOOR_OPEN]: { tiles: { top: TILE.DOOR_OPEN, side: TILE.DOOR_OPEN, bottom: TILE.DOOR_OPEN }, tint: W, ui: '#5e3c1c', passable: true },
   [B.TNT]: nat3(TILE.TNT_TOP, TILE.TNT_SIDE, TILE.TNT_TOP, '#c0392b'),
+  [B.RAINBOW]: nat(TILE.RAINBOW, '#ff66cc'),
 };
 
 // Build blocks grouped into categories for the pop-up picker.
@@ -86,6 +87,8 @@ export const CATEGORIES = [
   { name: 'Wood', blocks: [B.PLANKS, B.BIRCH_PLANKS, B.DARK_PLANKS, B.BOOKSHELF] },
   { name: 'Shiny', blocks: [B.GOLD, B.DIAMOND, B.ICE, B.GLASS] },
   { name: 'Fun', blocks: [B.PUMPKIN] },
+  // Shown in the picker only after it's bought in the 💎 shop.
+  { name: 'Special ✨', blocks: [B.RAINBOW], locked: 'rainbow' },
   { name: 'Nether', blocks: [B.NETHERRACK, B.LAVA] },
   { name: 'Colours', blocks: [B.RED, B.ORANGE, B.YELLOW, B.GREEN, B.CYAN, B.BLUE, B.PURPLE, B.PINK, B.WHITE, B.BLACK] },
 ];
