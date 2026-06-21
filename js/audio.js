@@ -55,6 +55,11 @@ export class Sound {
       case 'coo': // soft, friendly call when you meet a nether creature
         this.blip(300, 0.26, 'sine', 0.10, 250);
         break;
+      case 'treasure': // cheerful little sparkle when you dig up gold/diamond
+        this.blip(784, 0.10, 'triangle', 0.14, 1175);
+        setTimeout(() => this.blip(1047, 0.12, 'triangle', 0.13, 1568), 80);
+        setTimeout(() => this.blip(1319, 0.16, 'sine', 0.12), 170);
+        break;
     }
   }
 }

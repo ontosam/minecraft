@@ -12,10 +12,12 @@ and feels like Minecraft, but it's calmer and built to be easy to navigate:
 - 🛡️ **Protect your house** from a *friendly* creeper: it wanders up and nibbles
   a block with a little "uh-oh" — **tap it and it poofs harmlessly**, and your
   blocks always come back. Earns ⭐ for defending. (It never hurts your kid.)
-- 🌀 **Explore the Nether:** find a glowing purple **portal** (a little **map** in
-  the corner helps) and step through to a whole new fiery world, home to
-  **friendly ghasts and blazes** — floaty creatures that are fun to find and pet
-  and never hurt anyone.
+- ⛏️ **Dig for treasure:** hidden **gold and diamond** are buried in the ground —
+  dig them up for a sparkle and a ⭐.
+- 🌀 **Earn your way to the Nether:** complete a few **goals** (⭐4) and a dormant
+  portal **opens** with a celebration. Step through (a little **map** helps you
+  find it) into a whole new fiery world, home to **friendly ghasts and blazes** —
+  floaty creatures that are fun to find and pet and never hurt anyone.
 - ⭐ **Goals** that earn stars and get a little harder over time, so there's
   always a next thing to do.
 - 💾 **Auto-saves** on the device and picks up right where he left off.

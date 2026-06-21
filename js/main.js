@@ -16,6 +16,7 @@ import { Goals, GOAL_DEFS } from './goals.js';
 const SAVE_KEY = 'ezrablocks.save.v2';
 const SKY = [0.62, 0.82, 0.96];          // overworld daytime blue
 const NETHER_SKY = [0.32, 0.12, 0.13];   // warm, dim Nether red
+const NETHER_STARS = 4;                   // stars needed to open the Nether portal
 
 function showError(msg) {
   const el = document.getElementById('error-overlay');
@@ -34,6 +35,8 @@ let sky = SKY;                           // active sky/fog colour
 let portalCooldown = 0;                  // brief grace after a swap so you don't bounce back
 let overPos = null, netherPos = null;    // remembered player position in each dimension
 let minimapDirty = true;                 // redraw the minimap's terrain layer when set
+let portalUnlocked = false;              // the Nether portal opens once enough stars are earned
+let portalHintTimer = 0;                 // throttle the "earn more stars" nudge
 let identity, proj, view, pv, scratch4;
 let selected = B.GRASS;
 let lastTool = 'build', actionAnim = 0;
@@ -61,8 +64,8 @@ function netherPortalCoords() {
 }
 function refreshSpawn(w) { w.spawn[1] = w.heightAt(Math.floor(w.spawn[0]), Math.floor(w.spawn[2])) + 2; }
 function ensurePortals() {
-  if (!overworld.arrival) overworld.addPortal(...overworldPortalCoords());
-  if (!nether.arrival) nether.addPortal(...netherPortalCoords());
+  if (!overworld.arrival) overworld.addPortal(...overworldPortalCoords(), portalUnlocked);
+  if (!nether.arrival) nether.addPortal(...netherPortalCoords(), true); // home portal always open
 }
 
 function loadGame() {
@@ -81,6 +84,7 @@ function loadGame() {
       overPos = obj.overPos || overworld.spawn.slice();
       netherPos = obj.netherPos || nether.arrival.slice();
       player.yaw = obj.yaw || 0;
+      portalUnlocked = !!obj.pu;
       setDimension(obj.dim === 'nether' ? 'nether' : 'over');
       player.pos = (dimension === 'over' ? overPos : netherPos).slice();
       return true;
@@ -90,6 +94,7 @@ function loadGame() {
       refreshSpawn(overworld); refreshSpawn(nether); ensurePortals();
       if (obj.player) { player.pos = obj.player.pos.slice(); player.yaw = obj.player.yaw || 0; }
       overPos = player.pos.slice(); netherPos = nether.arrival.slice();
+      portalUnlocked = false;
       setDimension('over');
       return true;
     }
@@ -101,7 +106,7 @@ function saveGame() {
   try {
     if (dimension === 'over') overPos = player.pos.slice(); else netherPos = player.pos.slice();
     const obj = {
-      v: 3, dim: dimension, sel: selected, zoom: zoomIndex, yaw: player.yaw,
+      v: 3, dim: dimension, sel: selected, zoom: zoomIndex, yaw: player.yaw, pu: portalUnlocked,
       over: overworld.serialize(), nether: nether.serialize(),
       overPos: overPos || overworld.spawn.slice(),
       netherPos: netherPos || nether.spawn.slice(),
@@ -131,6 +136,19 @@ function enterPortal() {
   saveDirty = true;
   sound.play('portal');
   if (dimension === 'nether') goals.bump('nether'); // first trip completes "Find the portal"
+}
+
+// The Nether portal is a reward: it opens once enough goal-stars are earned.
+function maybeUnlockNether(silent) {
+  if (portalUnlocked || goals.stars < NETHER_STARS) return;
+  portalUnlocked = true;
+  overworld.setPortalActive(true);
+  minimapDirty = true;
+  saveDirty = true;
+  if (!silent) {
+    // let any "Goal done!" toast show first, then the big celebration
+    setTimeout(() => { showToast('✨ The Nether portal opened! Find the 🌀 on your map! ✨', 4200); sound.play('portal'); }, 1300);
+  }
 }
 
 // --- Camera (third-person, follows the character) ---
@@ -213,10 +231,16 @@ function doDig(hit) {
   const [x, y, z] = hit.block;
   const id = world.get(x, y, z);
   if (id === B.AIR || (BLOCKS[id] && BLOCKS[id].indestructible)) { sound.play('deny'); return; }
+  const key = world.idx(x, y, z);
+  const wasPlaced = world.placed.has(key);
   world.set(x, y, z, B.AIR);
-  world.placed.delete(world.idx(x, y, z));
+  world.placed.delete(key);
   sound.play('dig'); saveDirty = true; actionAnim = 1; minimapDirty = true;
   goals.onDig();
+  // Buried treasure! Natural gold/diamond the player dug up (not their own block).
+  if (!wasPlaced && (id === B.GOLD || id === B.DIAMOND)) {
+    goals.bump('treasure'); sound.play('treasure'); spawnSparkles([x + 0.5, y + 0.6, z + 0.5]);
+  }
 }
 
 function doPet() {
@@ -255,6 +279,7 @@ function spawnParticles(worldPos, text, cls, n, spread) {
 }
 function spawnHearts(worldPos) { spawnParticles(worldPos, '💗', 'heart', 4, 40); }
 function spawnPuffs(worldPos) { spawnParticles(worldPos, '💨', 'puff', 6, 60); }
+function spawnSparkles(worldPos) { spawnParticles(worldPos, '✨', 'puff', 7, 56); }
 
 // Tap a creeper to defend: it poofs harmlessly, your blocks pop back, +a star.
 function doDefend(cr) {
@@ -316,6 +341,12 @@ function buildGoals() {
   const body = document.getElementById('goals-body');
   body.innerHTML = '';
   document.getElementById('goals-title').textContent = 'My Goals  ⭐' + goals.stars + '/' + GOAL_DEFS.length;
+  if (!portalUnlocked) {
+    const note = document.createElement('div');
+    note.className = 'goal-note';
+    note.textContent = '🌀 Earn ⭐' + NETHER_STARS + ' to open the Nether portal!  (You have ⭐' + goals.stars + ')';
+    body.appendChild(note);
+  }
   for (const g of GOAL_DEFS) {
     const done = !!goals.done[g.id];
     const prog = goals.progress(g);
@@ -331,14 +362,14 @@ function buildGoals() {
   }
 }
 
-function showGoalToast(g) {
+function showToast(text, ms) {
   const el = document.getElementById('goaltoast');
-  el.textContent = '⭐ Goal done: ' + g.title + '!';
+  el.textContent = text;
   el.classList.add('show');
-  sound.play('pet');
   clearTimeout(goalToastTimer);
-  goalToastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+  goalToastTimer = setTimeout(() => el.classList.remove('show'), ms || 2600);
 }
+function showGoalToast(g) { showToast('⭐ Goal done: ' + g.title + '!'); sound.play('pet'); }
 
 function holdButton(id, fn, repeat) {
   const el = document.getElementById(id);
@@ -434,9 +465,12 @@ function drawMinimap() {
   mmCtx.imageSmoothingEnabled = false;
   mmCtx.clearRect(0, 0, MM_SIZE, MM_SIZE);
   mmCtx.drawImage(mmTerrain, 0, 0, SX, SZ, 0, 0, MM_SIZE, MM_SIZE);
-  // portal marker (pulsing purple ring)
+  // portal marker — purple when open, dim grey while still locked
   if (world.arrival) {
-    mmCtx.strokeStyle = '#c89cff'; mmCtx.fillStyle = 'rgba(150,90,230,0.85)'; mmCtx.lineWidth = 2;
+    const locked = (dimension === 'over' && !portalUnlocked);
+    mmCtx.strokeStyle = locked ? '#9a9aa0' : '#c89cff';
+    mmCtx.fillStyle = locked ? 'rgba(120,120,130,0.7)' : 'rgba(150,90,230,0.9)';
+    mmCtx.lineWidth = 2;
     const ox = world.arrival[0] * s, oz = world.arrival[2] * s;
     mmCtx.beginPath(); mmCtx.arc(ox, oz, 4.5, 0, Math.PI * 2); mmCtx.fill(); mmCtx.stroke();
   }
@@ -475,10 +509,15 @@ function frame(now) {
 
   // Step into a portal swirl → travel between the overworld and the Nether.
   portalCooldown = Math.max(0, portalCooldown - dt);
+  portalHintTimer = Math.max(0, portalHintTimer - dt);
   if (portalCooldown === 0) {
     const bx = Math.floor(player.pos[0]), bz = Math.floor(player.pos[2]);
     if (world.get(bx, Math.floor(player.pos[1] + 0.4), bz) === B.PORTAL ||
         world.get(bx, Math.floor(player.pos[1] + 1.2), bz) === B.PORTAL) enterPortal();
+    else if (dimension === 'over' && !portalUnlocked && overworld.arrival && portalHintTimer === 0) {
+      const dx = player.pos[0] - overworld.arrival[0], dz = player.pos[2] - overworld.arrival[2];
+      if (dx * dx + dz * dz < 2.6) { showToast('Earn ⭐' + NETHER_STARS + ' to open the Nether! (You have ⭐' + goals.stars + ')'); portalHintTimer = 4; }
+    }
   }
 
   if (dimension === 'over') { animals.update(dt, player); creepers.update(dt, player, goals.stars); }
@@ -553,7 +592,7 @@ function init() {
   controls = new Controls(canvas);
   sound = new Sound();
   goals = new Goals();
-  goals.onComplete = (g) => { showGoalToast(g); refreshGoalsButton(); };
+  goals.onComplete = (g) => { showGoalToast(g); refreshGoalsButton(); maybeUnlockNether(false); };
 
   if (!loadGame()) {
     overworld.generate();
@@ -565,6 +604,8 @@ function init() {
     overPos = player.pos.slice();
     netherPos = nether.arrival.slice();
   }
+  maybeUnlockNether(true);                       // open now if a returning player already qualifies
+  overworld.setPortalActive(portalUnlocked);     // keep the swirl in sync with the lock state
   camYaw = player.yaw;
   prevX = player.pos[0]; prevZ = player.pos[2];
   overworld.rebuildAll();
@@ -601,6 +642,7 @@ function init() {
     rayHit: (x, y) => rayHitAt(x, y),
     sel: () => selected,
     dim: () => dimension,
+    portalOpen: () => portalUnlocked,
     enterPortal: () => enterPortal(),
     goals,
     spawnCreeper: () => creepers.spawnNow(player),

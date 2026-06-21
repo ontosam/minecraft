@@ -114,6 +114,8 @@ export class World {
     this.placed = new Set();  // packed indices of blocks the *player* placed
     this.spawn = [SX / 2 + 0.5, 12, SZ / 2 + 0.5];
     this.arrival = null;      // where to drop the player when arriving via portal
+    this.portalFrame = null;  // [ox, oy, oz] of the portal so it can be (de)activated
+    this.portalActive = false;
   }
 
   idx(x, y, z) { return x + z * SX + y * SX * SZ; }
@@ -206,6 +208,21 @@ export class World {
       trees++;
     }
 
+    // Hidden treasure to discover by digging: pockets of gold + diamond, kept
+    // down in the stone layer so they feel like a real find.
+    for (let i = 0; i < 34; i++) {
+      const id = rand() < 0.6 ? B.GOLD : B.DIAMOND;
+      const x = 2 + Math.floor(rand() * (SX - 4)), z = 2 + Math.floor(rand() * (SZ - 4));
+      const surf = this.heightAt(x, z);
+      if (surf < 5) continue;
+      const cy = 1 + Math.floor(rand() * (surf - 3));   // within the stone band
+      const n = 1 + Math.floor(rand() * 3);
+      for (let k = 0; k < n; k++) {
+        const bx = x + Math.floor(rand() * 2), by = cy + Math.floor(rand() * 2), bz = z + Math.floor(rand() * 2);
+        if (this.get(bx, by, bz) === B.STONE) this.data[this.idx(bx, by, bz)] = id;
+      }
+    }
+
     // Spawn on solid ground in the middle.
     const sh = this.heightAt(Math.floor(this.spawn[0]), Math.floor(this.spawn[2]));
     this.spawn[1] = sh + 2;
@@ -247,13 +264,23 @@ export class World {
       if (rand() < 0.5) this.data[this.idx(x, h + 1, z)] = B.GLOWSTONE;
       else this.data[this.idx(x, h, z)] = B.LAVA;
     }
+    // A little buried treasure down here too.
+    for (let i = 0; i < 14; i++) {
+      const id = rand() < 0.6 ? B.GOLD : B.DIAMOND;
+      const x = 2 + Math.floor(rand() * (SX - 4)), z = 2 + Math.floor(rand() * (SZ - 4));
+      const surf = this.heightAt(x, z);
+      if (surf < 3) continue;
+      const cy = 1 + Math.floor(rand() * (surf - 1));
+      if (this.get(x, cy, z) === B.NETHERRACK) this.data[this.idx(x, cy, z)] = id;
+    }
     this.spawn = [SX / 2 + 0.5, 12, SZ / 2 + 0.5];
     this.spawn[1] = this.heightAt(Math.floor(this.spawn[0]), Math.floor(this.spawn[2])) + 2;
   }
 
-  // Build a portal (obsidian frame + passable swirl) grounded on a small pad,
-  // with a step in front. Records `arrival` = where to drop an arriving player.
-  addPortal(ox, oz, groundBlock) {
+  // Build a portal: an obsidian frame on a small pad with a step in front. The
+  // swirl interior is filled only when `active` (so it can be a locked reward).
+  // Records `arrival` = where to drop an arriving player.
+  addPortal(ox, oz, groundBlock, active) {
     let oy = 1;
     for (let dx = 0; dx < 4; dx++) oy = Math.max(oy, this.heightAt(ox + dx, oz) + 1, this.heightAt(ox + dx, oz + 1) + 1);
     for (let dx = 0; dx < 4; dx++) {
@@ -261,11 +288,21 @@ export class World {
       for (let yy = this.heightAt(ox + dx, oz + 1) + 1; yy < oy; yy++) this.set(ox + dx, yy, oz + 1, groundBlock);
       for (let dy = 0; dy < 5; dy++) {
         const edge = (dx === 0 || dx === 3 || dy === 0 || dy === 4);
-        this.set(ox + dx, oy + dy, oz, edge ? B.OBSIDIAN : B.PORTAL);
+        if (edge) this.set(ox + dx, oy + dy, oz, B.OBSIDIAN);
       }
     }
+    this.portalFrame = [ox, oy, oz];
     this.arrival = [ox + 1.5, oy, oz + 1.5];
+    this.setPortalActive(!!active);
     return this.arrival;
+  }
+
+  // Fill (or clear) the portal swirl — used to open the gateway once it's earned.
+  setPortalActive(active) {
+    if (!this.portalFrame) return;
+    const [ox, oy, oz] = this.portalFrame;
+    for (let dx = 1; dx < 3; dx++) for (let dy = 1; dy < 4; dy++) this.set(ox + dx, oy + dy, oz, active ? B.PORTAL : B.AIR);
+    this.portalActive = !!active;
   }
 
   markAllDirty() { for (let i = 0; i < this.meshes.length; i++) this.dirty.add(i); }
@@ -376,7 +413,7 @@ export class World {
 
   // --- Save / load (raw bytes, base64 into localStorage) ---
   serialize() {
-    return { v: 1, w: bytesToBase64(this.data), p: [...this.placed], a: this.arrival };
+    return { v: 1, w: bytesToBase64(this.data), p: [...this.placed], a: this.arrival, pf: this.portalFrame };
   }
   loadFrom(obj) {
     if (!obj || obj.v !== 1 || !obj.w) return false;
@@ -385,6 +422,7 @@ export class World {
     this.data.set(bytes);
     this.placed = new Set(obj.p || []);
     this.arrival = obj.a || null;
+    this.portalFrame = obj.pf || null;
     return true;
   }
 }

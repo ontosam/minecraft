@@ -7,10 +7,12 @@ export const GOAL_DEFS = [
   { id: 'builder', icon: '🧱', title: 'Builder', desc: 'Place 12 blocks', metric: 'place', target: 12 },
   { id: 'rainbow', icon: '🌈', title: 'Mix it up', desc: 'Build with 4 different blocks', metric: 'variety', target: 4 },
   { id: 'digger', icon: '⛏️', title: 'Digger', desc: 'Dig 8 blocks', metric: 'dig', target: 8 },
+  { id: 'treasure', icon: '💎', title: 'Treasure hunter', desc: 'Dig up hidden gold or diamond', metric: 'treasure', target: 1 },
   { id: 'defend', icon: '🛡️', title: 'Protect your house!', desc: 'Bonk a creeper to save your blocks', metric: 'defend', target: 1 },
   { id: 'pets', icon: '💞', title: 'Best friends', desc: 'Pet 5 animals', metric: 'pet', target: 5 },
   { id: 'architect', icon: '🏠', title: 'Architect', desc: 'Place 30 blocks', metric: 'place', target: 30 },
   { id: 'guard', icon: '🦸', title: 'Block hero', desc: 'Bonk 5 creepers', metric: 'defend', target: 5 },
+  { id: 'treasure5', icon: '💰', title: 'Treasure chest', desc: 'Find 5 hidden treasures', metric: 'treasure', target: 5 },
   { id: 'portal', icon: '🌀', title: 'Find the portal', desc: 'Step into the Nether portal', metric: 'nether', target: 1 },
   { id: 'meetghast', icon: '👻', title: 'Meet a ghast', desc: 'Find a friendly ghast', metric: 'ghast', target: 1 },
   { id: 'meetblaze', icon: '🔥', title: 'Meet a blaze', desc: 'Find a friendly blaze', metric: 'blaze', target: 1 },
@@ -21,7 +23,7 @@ const KEY = 'ezrablocks.goals.v1';
 
 export class Goals {
   constructor() {
-    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, nether: 0, ghast: 0, blaze: 0 };
+    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0 };
     this.usedTypes = new Set();
     this.done = {};
     this.stars = 0;

@@ -36,12 +36,19 @@ Two more rounds shipped + deployed:
    through a **portal** (find it via a new **minimap**, top-right). Home to
    **friendly ghasts** (big floaty white coo-ers) and **blazes** (glowy spinning
    rods) — both harmless, pettable, with "meet" goals. New goals: Find the portal,
-   Meet a ghast, Meet a blaze. All verified headless (portal swap both ways via
-   real block detection, mobs, goals, building in both worlds, **v3 save with both
-   dimensions**, and **v2 saves upgrade safely** — old worlds get a portal
-   injected). Possible follow-ups: ghast/blaze sounds richer, nether structures,
-   make blaze/ghast pettable-to-follow, minimap position (currently top-right —
-   the dad asked for "bottom" but that clashes with the walking thumb).
+   Meet a ghast, Meet a blaze.
+3. **Make it a journey (engagement pass):** the Nether portal is now a **reward**
+   — it starts as a **dormant obsidian frame** and **opens with a celebration once
+   ⭐`NETHER_STARS`(=4) goals are earned** (locked frame nudges the kid + minimap
+   marker is greyed until then; `maybeUnlockNether`, `portalUnlocked`, saved as
+   `pu`). Plus **buried treasure**: gold/diamond pockets hidden in the stone (both
+   worlds) — digging up a *natural* one (not your own placed block) sparkles ✨ +
+   chimes + counts toward "Treasure hunter"/"Treasure chest" goals.
+   All verified headless (locked→unlock at ⭐4→travel, treasure dig, portal swap
+   both ways, mobs/goals, building in both worlds, **v3 save** persists the unlock,
+   **v2 saves upgrade safely** — old worlds get a portal). Minimap is top-right
+   (dad approved "anywhere"). Follow-ups: richer creature sounds, nether
+   structures, build-shape challenges, giants (roadmap #2).
 
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
@@ -84,9 +91,11 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
   mesher** (16×16 columns, face culling + baked ambient occlusion), `raycast`
   (DDA), save/load (base64 of the byte array + `placed`: a Set of packed indices
   of **player-placed** blocks, so creepers target your house not nature; +
-  `arrival`: the portal drop point). Also `generateNether()` (netherrack +
-  glowstone + lava), `addPortal()` (obsidian frame + passable swirl), and a
-  `passable` block flag (the portal is walk-through). Chunk meshes use **Uint16**
+  `arrival`: the portal drop point; `portalFrame` for (de)activation). Terrain
+  also hides **gold/diamond ore** in the stone. Also `generateNether()`
+  (netherrack + glowstone + lava + a little ore), `addPortal(ox,oz,ground,active)`
+  + `setPortalActive()` (obsidian frame; the **passable** swirl interior is filled
+  only when active — a dormant frame is the locked state). Chunk meshes use **Uint16**
   indices with a guard (`base+24 > 0xffff` breaks) so extreme builds can't
   overflow.
 - `js/player.js` — third-person physics: **camera-relative** movement, character
@@ -116,9 +125,9 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
   `aim{active,x,y}` tracks the finger/cursor for the live indicator.
 - `js/audio.js` — tiny WebAudio synth (place/dig/jump/pet/deny/uhoh/poof/portal/
   coo). No files.
-- `js/goals.js` — `GOAL_DEFS` + `Goals` (counters incl. `defend`/`nether`/`ghast`/
-  `blaze`, stars, localStorage, generic `bump(metric)`). Saves on every
-  completion; throttled otherwise.
+- `js/goals.js` — `GOAL_DEFS` + `Goals` (counters incl. `defend`/`treasure`/
+  `nether`/`ghast`/`blaze`, stars, localStorage, generic `bump(metric)`). Saves on
+  every completion; throttled otherwise.
 - `js/main.js` — the glue: GL/program/atlas setup; **camera** (`camYaw/camPitch`,
   `cameraFollow`, collision pull-in, `screenRay`/`rayHitAt`); **zoom/"switch
   view"** (`ZOOM_LEVELS=[7,4.5,3]`, `zoomIndex`, eased `camDistEased`, 🔍/🗺️
@@ -126,6 +135,9 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
   `world` pointer, `dimension`, `setDimension`/`enterPortal`, per-dim `sky`/fog +
   entity update/draw; `portalCooldown`; `overPos`/`netherPos`); **minimap**
   (`initMinimap`/`drawMinimap`, top-down terrain + you + portal, `minimapDirty`);
+  **Nether gating** (`portalUnlocked`, `NETHER_STARS`, `maybeUnlockNether` on goal
+  completion → opens the portal + celebration; locked-frame nudge); **treasure**
+  (digging a natural gold/diamond → `goals.bump('treasure')` + `spawnSparkles`);
   render loop; build/dig (`doBuild/doDig(hit)`, `doAction`, `lastTool`); **tap
   routing**: in the overworld a tap first tries `creepers.pickRay` (→`doDefend`,
   poof + ⭐), else `doAction` (no hover indicator — tap anywhere); UI wiring;
@@ -167,9 +179,10 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
 - Keep it **non-scary and forgiving**: always daytime, no death, no fall damage,
   can't leave the world, no accidental world-wipe button.
 - Save keys: `ezrablocks.save.v2` (the localStorage *key* name is unchanged; the
-  JSON inside is now **v3** — both dimensions' world bytes + `placed` + `arrival`,
-  player position per dimension, current `dim`, selected block, `zoom`. Loader
-  still reads old **v2** payloads and injects a portal). `ezrablocks.goals.v1`.
+  JSON inside is now **v3** — both dimensions' world bytes + `placed` + `arrival` +
+  `portalFrame`, player position per dimension, current `dim`, selected block,
+  `zoom`, `pu` (portal-unlocked). Loader still reads old **v2** payloads and
+  injects a portal). `ezrablocks.goals.v1`.
   iOS clears localStorage for non-home-screen sites — **Add to Home Screen** for
   durable progress.
 
