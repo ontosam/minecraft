@@ -177,18 +177,45 @@ function travelTo(dest) {
   goals.bump('travel');
 }
 
-// Flint & steel: pop a lit obsidian portal on the ground in front of the player.
+// Flint & steel portals line up in a tidy row right by home, one slot per
+// destination — so they never stack behind each other and are easy to find.
+const HUB_DESTS = ['gold', 'ant', 'tnt'];
+function placeHubPortal(W, kind, dest) {
+  const slot = Math.max(0, HUB_DESTS.indexOf(dest));
+  const sp = W.spawn;
+  const ox = Math.max(1, Math.min(SX - 5, Math.floor(sp[0]) - 9 + slot * 6));
+  const oz = Math.max(1, Math.min(SZ - 3, Math.floor(sp[2]) - 6));
+  return W.addPortal(ox, oz, kind.ground, dest, true);
+}
 function lightPortal(dest) {
-  const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
-  let ox = Math.round(player.pos[0] + fx * 3) - 1;
-  let oz = Math.round(player.pos[2] + fz * 3);
-  ox = Math.max(1, Math.min(SX - 5, ox));
-  oz = Math.max(1, Math.min(SZ - 3, oz));
-  world.addPortal(ox, oz, WORLD_KINDS[dimension].ground, dest, true);
+  if (!WORLD_KINDS[dest]) return;
+  let p = world.portals.find((q) => q.dest === dest);   // one portal per destination
+  if (p) world.setPortalActive(p, true);
+  else if (HUB_DESTS.includes(dest)) p = placeHubPortal(world, WORLD_KINDS[dimension], dest);
+  else p = world.addPortal(Math.min(SX - 5, Math.floor(world.spawn[0]) - 2), Math.max(1, Math.floor(world.spawn[2]) - 6), WORLD_KINDS[dimension].ground, dest, true);
   minimapDirty = true; saveDirty = true;
-  portalCooldown = 0.6;
+  portalCooldown = 0.8;
   sound.play('portal');
-  showToast('🌀 A portal to ' + WORLD_KINDS[dest].name + '! Walk into it!', 3200);
+  showToast('🌀 ' + WORLD_KINDS[dest].emoji + ' Portal to ' + WORLD_KINDS[dest].name + ' is ready by your home — tap 🏠, then walk in!', 4000);
+}
+
+// Re-lay any flint portals in a world into the tidy row (cleans up older saves
+// where they were dropped on top of each other). Never touches builds — only
+// clears the old obsidian/swirl blocks and rebuilds the frames in a neat line.
+function tidyPortals(key) {
+  const W = worlds[key].world, kind = WORLD_KINDS[key];
+  const dests = [...new Set(W.portals.filter((p) => HUB_DESTS.includes(p.dest)).map((p) => p.dest))];
+  if (!dests.length) return;
+  for (const p of W.portals) {
+    if (!HUB_DESTS.includes(p.dest)) continue;
+    const [ox, oy, oz] = p.f;
+    for (let dx = 0; dx <= 3; dx++) for (let dy = 0; dy <= 4; dy++) {
+      const id = W.get(ox + dx, oy + dy, oz);
+      if (id === B.OBSIDIAN || id === B.PORTAL) W.set(ox + dx, oy + dy, oz, B.AIR);
+    }
+  }
+  W.portals = W.portals.filter((p) => !HUB_DESTS.includes(p.dest));
+  for (const dest of dests) placeHubPortal(W, kind, dest);
 }
 
 // The Nether portal is a reward: it opens once enough goal-stars are earned.
@@ -292,6 +319,7 @@ function doDig(hit) {
   const [x, y, z] = hit.block;
   const id = world.get(x, y, z);
   if (id === B.AIR || (BLOCKS[id] && BLOCKS[id].indestructible)) { sound.play('deny'); return; }
+  if (world.isPortalBlock(x, y, z)) { sound.play('deny'); return; }   // portals can't be broken
   if (isDoor(id)) { removeDoor(x, y, z); return; }
   const key = world.idx(x, y, z);
   const wasPlaced = world.placed.has(key);
@@ -835,6 +863,7 @@ function loadGame() {
       }
       if (!worlds.over) return false;
       worlds.over.world.carveBeachIfClear();
+      for (const k of Object.keys(worlds)) { tidyPortals(k); worlds[k].world.rebuildAll(); }
       Object.assign(positions, obj.pos || {});
       setDimension(worlds[obj.dim] ? obj.dim : 'over');
       player.yaw = obj.yaw || 0;

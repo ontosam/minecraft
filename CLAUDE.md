@@ -114,6 +114,14 @@ All shipped + deployed to `main`:
    hit→bonk→lava→knockout**, save/resume) with screenshots.
    Tuning candidates: night dim is gentle (`uDayLight≈0.4`) — could go darker;
    zombies cap at 4; lava damage is also active in the Nether.
+   **Post-feedback fixes (same session):** flint portals were stacking in front of
+   each other (hard to find/enter) — they now line up in a tidy **row by home**,
+   **one per destination** (`HUB_DESTS`, `placeHubPortal`, keyed by `dest` so
+   re-lighting never duplicates). **Portal frames are now unbreakable** (`World.
+   isPortalBlock` guards both digging and explosions), so a gateway can't be lost;
+   the 🏠 button is the always-works safety net. Older saves get their stacked
+   portals **auto-tidied into the row on load** (`tidyPortals`, v4 only — clears
+   just the old obsidian/swirl, never builds).
 
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at

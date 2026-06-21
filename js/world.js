@@ -435,6 +435,7 @@ export class World {
       if (id === B.AIR) continue;
       const def = BLOCKS[id];
       if (def && def.indestructible) continue;       // bedrock + portal survive
+      if (this.isPortalBlock(x, y, z)) continue;     // portal frames survive blasts
       if (id === B.TNT) { chain.push([x, y, z]); continue; }
       this.set(x, y, z, B.AIR);
       this.placed.delete(this.idx(x, y, z));
@@ -478,6 +479,16 @@ export class World {
       if (z === oz && x >= ox + 1 && x <= ox + 2 && y >= oy + 1 && y <= oy + 3) return p;
     }
     return null;
+  }
+
+  // Is this block part of any portal (frame or swirl)? Such blocks are protected
+  // from digging and explosions, so a gateway can never be accidentally lost.
+  isPortalBlock(x, y, z) {
+    for (const p of this.portals) {
+      const [ox, oy, oz] = p.f;
+      if (z === oz && x >= ox && x <= ox + 3 && y >= oy && y <= oy + 4) return true;
+    }
+    return false;
   }
 
   markAllDirty() { for (let i = 0; i < this.meshes.length; i++) this.dirty.add(i); }
