@@ -50,6 +50,42 @@ Two more rounds shipped + deployed:
    (dad approved "anywhere"). Follow-ups: richer creature sounds, nether
    structures, build-shape challenges, giants (roadmap #2).
 
+## Status (session 4)
+Shipped Ezra's next batch of wishes (dad delegated the order + the "make worlds
+scalable" design). Two increments:
+1. **Fly + beach + water bucket (the "soft landing" wish).** A **🕊️ Fly** toggle
+   (topbar): hold **Up** (the Jump button relabels) to rise, **let go to drift
+   down gently**. **Water is swim-through now** (`passable`): gentle buoyancy + a
+   **splash** on entry = a soft landing in any pool. **"Water 🪣"** is selectable
+   in the picker (placed water is *not* added to `world.placed`, so creepers ignore
+   it). A big **beach lagoon** in the overworld (`World.carveBeach`), also added to
+   existing saves but **only if untouched** (`carveBeachIfClear`). New goals:
+   *Take off!*, *Big splash!*. Sounds: `fly`, `splash`. (player.js: `flying`,
+   `inWaterAt`, `onSplash`.)
+2. **Scalable worlds + flint & steel + Gold/Ant worlds (Ezra's #1 wish).** Worlds
+   are now a **registry of recipes** — `js/worlds.js` `WORLD_KINDS` (name/emoji,
+   `sky`, `fog`, `gen` = a World method name, `ground`, `mobs` list, flags
+   `home`/`reward`/`flint`). main.js holds a **lazy `worlds` map**
+   (key→`{world,mobs,kind}`) built on first visit (`ensureDim`/`registerDim`,
+   `makeMobs`/`populateMobs`/`updateMobs`/`drawMobs`). **Portals became a list per
+   world with a destination** (`World.portals`, `addPortal(ox,oz,ground,dest,
+   active)`, `setPortalActive(portal,active)`, `portalAt(x,y,z)`). **Flint & steel**
+   (🔥 topbar → "Where to?" menu built from the registry) pops a **lit obsidian
+   portal in front of the player** to the chosen world (`lightPortal`); stepping in
+   `travelTo(dest)`. **Every away world auto-gets an always-open obsidian portal
+   home** ("back to obsidian"); the **Nether stays the ⭐4 reward** (excluded from
+   the flint menu). New worlds: **Gold World** (`generateGold`) and **Ant World**
+   (`generateAnt` + an `ant` species in animals.js, spawned via
+   `new Animals(gl,w,['ant'])`). New goal: *World hopper*. **Save is now v4** (a map
+   of visited worlds, per-world `positions`, `pu`); the loader still reads **v3/v2**
+   and upgrades them (and adds the beach). Verified: Node logic tests (fly/water
+   physics, generators, portal list, save round-trip) + headless browser (clean
+   boot, flint→travel→Gold/Ant, **v4 save+resume**, screenshots of beach/gold/ant/
+   flint-menu). Dev branch this session: **`claude/jolly-brown-mndfr5`** (mirror to
+   `main`/live pending the dad's OK). Tuning candidates: gold-world treasure makes
+   the "treasure" goals trivial there; flint can make many portals (no limit);
+   ant-world ants are small — could enlarge.
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files
@@ -98,10 +134,15 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
   only when active — a dormant frame is the locked state). Chunk meshes use **Uint16**
   indices with a guard (`base+24 > 0xffff` breaks) so extreme builds can't
   overflow.
+- `js/worlds.js` — the **world registry** (`WORLD_KINDS`, `WORLD_ORDER`): each
+  world is a recipe (name/emoji, `sky`, `fog`, `gen` method name, `ground`, `mobs`
+  list, `home`/`reward`/`flint` flags). Add an entry + a `generateXyz()` on World
+  and it shows up everywhere (flint menu, travel, minimap, save) automatically.
 - `js/player.js` — third-person physics: **camera-relative** movement, character
   faces travel (but **backpedals** when moving toward the camera), gravity, AABB
   collision, auto-jump, walk-phase, `movingForward` flag (camera trails only
-  when true).
+  when true). Also **flying** (`flying`: hold to rise, release = gentle sink, sky
+  cap) and **water** (`inWaterAt`: buoyant soft sink/swim + `onSplash` callback).
 - `js/character.js` — blocky kid (legs/arms/body/head, eyes+hair); walk-swing +
   **action chop + forward body-lean** when building/digging (`act` param).
 - `js/animals.js` — pig/sheep/cow/chick/cat; wander AI; `petNearest` → follower.
@@ -179,10 +220,10 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
 - Keep it **non-scary and forgiving**: always daytime, no death, no fall damage,
   can't leave the world, no accidental world-wipe button.
 - Save keys: `ezrablocks.save.v2` (the localStorage *key* name is unchanged; the
-  JSON inside is now **v3** — both dimensions' world bytes + `placed` + `arrival` +
-  `portalFrame`, player position per dimension, current `dim`, selected block,
-  `zoom`, `pu` (portal-unlocked). Loader still reads old **v2** payloads and
-  injects a portal). `ezrablocks.goals.v1`.
+  JSON inside is now **v4** — a `worlds` map (each = bytes + `placed` + `portals`
+  list), per-world `pos`itions, current `dim`, selected block, `zoom`, `pu`
+  (portal-unlocked). Loader still reads old **v3/v2** payloads and upgrades them —
+  re-adds standard portals + carves the beach if untouched). `ezrablocks.goals.v1`.
   iOS clears localStorage for non-home-screen sites — **Add to Home Screen** for
   durable progress.
 

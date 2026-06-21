@@ -138,7 +138,8 @@ body {
 }
 
 #picker,
-#goals {
+#goals,
+#portalmenu {
   position: fixed;
   inset: 0;
   z-index: 30;
@@ -151,7 +152,8 @@ body {
 }
 
 #picker.hidden,
-#goals.hidden {
+#goals.hidden,
+#portalmenu.hidden {
   display: none;
 }
 
@@ -331,6 +333,46 @@ body {
   border-color: #ffc21f;
   box-shadow: 0 0 0 3px #ffe39a;
   transform: scale(1.05);
+}
+
+/* Flint & steel "Where to?" menu */
+#portalmenu-body {
+  padding: 14px 16px 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: center;
+}
+
+.portal-choice {
+  width: 132px;
+  height: 104px;
+  border-radius: 18px;
+  border: 3px solid #d7c7f5;
+  background: linear-gradient(135deg, #f3ecff, #e6efff);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.portal-choice:active {
+  transform: translateY(2px);
+  box-shadow: 0 0 0 3px #ffe39a;
+}
+
+.portal-choice .pe {
+  font-size: 40px;
+  line-height: 1;
+}
+
+.portal-choice b {
+  font-size: 16px;
+  font-weight: 800;
+  color: #4a3b86;
 }
 
 /* Bottom-right action buttons */

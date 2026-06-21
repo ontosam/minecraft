@@ -116,9 +116,7 @@ export class World {
     this.dirty = new Set();
     this.placed = new Set();  // packed indices of blocks the *player* placed
     this.spawn = [SX / 2 + 0.5, 12, SZ / 2 + 0.5];
-    this.arrival = null;      // where to drop the player when arriving via portal
-    this.portalFrame = null;  // [ox, oy, oz] of the portal so it can be (de)activated
-    this.portalActive = false;
+    this.portals = [];        // gateways: { f:[ox,oy,oz], dest, a:[x,y,z], active }
   }
 
   idx(x, y, z) { return x + z * SX + y * SX * SZ; }
@@ -308,10 +306,92 @@ export class World {
     this.spawn[1] = this.heightAt(Math.floor(this.spawn[0]), Math.floor(this.spawn[2])) + 2;
   }
 
+  // A shiny Gold World: golden hills over sand, glowstone lamps + diamond
+  // outcrops, and loads of buried treasure to dig up.
+  generateGold() {
+    this.data.fill(B.AIR);
+    this.placed = new Set();
+    this.portals = [];
+    const rand = mulberry32(7777);
+    for (let x = 0; x < SX; x++) {
+      for (let z = 0; z < SZ; z++) {
+        let h = 6 + Math.round(1.4 * Math.sin(x * 0.16) + 1.4 * Math.cos(z * 0.15) + 1.1 * Math.sin((x + z) * 0.08));
+        h = Math.max(3, Math.min(12, h));
+        for (let y = 0; y <= h; y++) {
+          let id;
+          if (y === 0) id = B.BEDROCK;
+          else if (y === h) id = B.GOLD;
+          else if (y >= h - 2) id = B.SAND;
+          else id = B.STONE;
+          this.data[this.idx(x, y, z)] = id;
+        }
+      }
+    }
+    for (let i = 0; i < 70; i++) {                 // glowstone lamps + diamond outcrops
+      const x = 2 + Math.floor(rand() * (SX - 4)), z = 2 + Math.floor(rand() * (SZ - 4));
+      const h = this.heightAt(x, z);
+      this.data[this.idx(x, h + 1, z)] = rand() < 0.5 ? B.GLOWSTONE : B.DIAMOND;
+    }
+    for (let i = 0; i < 60; i++) {                 // lots of buried treasure
+      const id = rand() < 0.5 ? B.GOLD : B.DIAMOND;
+      const x = 2 + Math.floor(rand() * (SX - 4)), z = 2 + Math.floor(rand() * (SZ - 4));
+      const surf = this.heightAt(x, z);
+      if (surf < 4) continue;
+      const cy = 1 + Math.floor(rand() * (surf - 2));
+      if (this.get(x, cy, z) === B.STONE) this.data[this.idx(x, cy, z)] = id;
+    }
+    this.spawn = [SX / 2 + 0.5, 12, SZ / 2 + 0.5];
+    this.spawn[1] = this.heightAt(Math.floor(this.spawn[0]), Math.floor(this.spawn[2])) + 2;
+  }
+
+  // A cosy Ant World: brown dirt + gravel ground with little dirt anthills and
+  // tunnel mouths — home to friendly ants you can pet.
+  generateAnt() {
+    this.data.fill(B.AIR);
+    this.placed = new Set();
+    this.portals = [];
+    const rand = mulberry32(5151);
+    for (let x = 0; x < SX; x++) {
+      for (let z = 0; z < SZ; z++) {
+        let h = 6 + Math.round(1.2 * Math.sin(x * 0.14) + 1.2 * Math.cos(z * 0.13));
+        h = Math.max(4, Math.min(11, h));
+        for (let y = 0; y <= h; y++) {
+          let id;
+          if (y === 0) id = B.BEDROCK;
+          else if (y === h) id = rand() < 0.2 ? B.SAND : B.DIRT;
+          else if (y >= h - 3) id = B.DIRT;
+          else id = rand() < 0.3 ? B.GRAVEL : B.STONE;
+          this.data[this.idx(x, y, z)] = id;
+        }
+      }
+    }
+    for (let i = 0; i < 16; i++) {                 // little dirt anthills with a hole on top
+      const x = 4 + Math.floor(rand() * (SX - 8)), z = 4 + Math.floor(rand() * (SZ - 8));
+      const h = this.heightAt(x, z);
+      const r = 1 + Math.floor(rand() * 2);
+      for (let dy = 1; dy <= r + 1; dy++) for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
+        if (Math.abs(dx) + Math.abs(dz) > (r + 1 - dy) + 1) continue;
+        const lx = x + dx, lz = z + dz;
+        if (lx > 0 && lx < SX && lz > 0 && lz < SZ) this.data[this.idx(lx, h + dy, lz)] = B.DIRT;
+      }
+      this.data[this.idx(x, h + 1, z)] = B.AIR;     // tunnel mouth
+    }
+    for (let i = 0; i < 18; i++) {                 // a little treasure underground
+      const id = rand() < 0.6 ? B.GOLD : B.DIAMOND;
+      const x = 2 + Math.floor(rand() * (SX - 4)), z = 2 + Math.floor(rand() * (SZ - 4));
+      const surf = this.heightAt(x, z);
+      if (surf < 4) continue;
+      const cy = 1 + Math.floor(rand() * (surf - 2));
+      if (this.get(x, cy, z) === B.STONE) this.data[this.idx(x, cy, z)] = id;
+    }
+    this.spawn = [SX / 2 + 0.5, 12, SZ / 2 + 0.5];
+    this.spawn[1] = this.heightAt(Math.floor(this.spawn[0]), Math.floor(this.spawn[2])) + 2;
+  }
+
   // Build a portal: an obsidian frame on a small pad with a step in front. The
   // swirl interior is filled only when `active` (so it can be a locked reward).
-  // Records `arrival` = where to drop an arriving player.
-  addPortal(ox, oz, groundBlock, active) {
+  // `dest` is the world key this gateway leads to; returns the portal record.
+  addPortal(ox, oz, groundBlock, dest, active) {
     let oy = 1;
     for (let dx = 0; dx < 4; dx++) oy = Math.max(oy, this.heightAt(ox + dx, oz) + 1, this.heightAt(ox + dx, oz + 1) + 1);
     for (let dx = 0; dx < 4; dx++) {
@@ -322,18 +402,28 @@ export class World {
         if (edge) this.set(ox + dx, oy + dy, oz, B.OBSIDIAN);
       }
     }
-    this.portalFrame = [ox, oy, oz];
-    this.arrival = [ox + 1.5, oy, oz + 1.5];
-    this.setPortalActive(!!active);
-    return this.arrival;
+    const portal = { f: [ox, oy, oz], dest, a: [ox + 1.5, oy, oz + 1.5], active: false };
+    this.portals.push(portal);
+    this.setPortalActive(portal, !!active);
+    return portal;
   }
 
-  // Fill (or clear) the portal swirl — used to open the gateway once it's earned.
-  setPortalActive(active) {
-    if (!this.portalFrame) return;
-    const [ox, oy, oz] = this.portalFrame;
+  // Fill (or clear) one portal's swirl — used to open a gateway once it's earned.
+  setPortalActive(portal, active) {
+    if (!portal) return;
+    const [ox, oy, oz] = portal.f;
     for (let dx = 1; dx < 3; dx++) for (let dy = 1; dy < 4; dy++) this.set(ox + dx, oy + dy, oz, active ? B.PORTAL : B.AIR);
-    this.portalActive = !!active;
+    portal.active = !!active;
+  }
+
+  // Which active portal's swirl is at this block? (for stepping through)
+  portalAt(x, y, z) {
+    for (const p of this.portals) {
+      if (!p.active) continue;
+      const [ox, oy, oz] = p.f;
+      if (z === oz && x >= ox + 1 && x <= ox + 2 && y >= oy + 1 && y <= oy + 3) return p;
+    }
+    return null;
   }
 
   markAllDirty() { for (let i = 0; i < this.meshes.length; i++) this.dirty.add(i); }
@@ -444,16 +534,17 @@ export class World {
 
   // --- Save / load (raw bytes, base64 into localStorage) ---
   serialize() {
-    return { v: 1, w: bytesToBase64(this.data), p: [...this.placed], a: this.arrival, pf: this.portalFrame };
+    return { v: 2, w: bytesToBase64(this.data), p: [...this.placed], portals: this.portals };
   }
   loadFrom(obj) {
-    if (!obj || obj.v !== 1 || !obj.w) return false;
+    if (!obj || !obj.w) return false;
     const bytes = base64ToBytes(obj.w);
     if (bytes.length !== this.data.length) return false;
     this.data.set(bytes);
     this.placed = new Set(obj.p || []);
-    this.arrival = obj.a || null;
-    this.portalFrame = obj.pf || null;
+    // v2 saves carry a portal list; older saves get their portals re-added by
+    // the caller (the swirl blocks themselves live in the saved bytes).
+    this.portals = (obj.portals || []).map((p) => ({ f: p.f.slice(), dest: p.dest, a: p.a.slice(), active: !!p.active }));
     return true;
   }
 }
