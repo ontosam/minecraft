@@ -13,10 +13,15 @@ export const B = {
   PLANKS: 7, WATER: 8, BEDROCK: 9, BRICK: 10, GLASS: 11,
   RED: 12, ORANGE: 13, YELLOW: 14, GREEN: 15, CYAN: 16,
   BLUE: 17, PURPLE: 18, PINK: 19, WHITE: 20, BLACK: 21,
+  COBBLE: 22, STONE_BRICK: 23, SNOW: 24, ICE: 25, GRAVEL: 26,
+  BIRCH_LOG: 27, BIRCH_PLANKS: 28, DARK_PLANKS: 29, GOLD: 30,
+  DIAMOND: 31, BOOKSHELF: 32, GLOWSTONE: 33, PUMPKIN: 34, OBSIDIAN: 35,
 };
 
 const W = [1, 1, 1]; // white tint for textured blocks
 function colored(tile, tint, ui) { return { tiles: { top: tile, side: tile, bottom: tile }, tint, ui }; }
+function nat(tile, ui) { return { tiles: { top: tile, side: tile, bottom: tile }, tint: W, ui }; }
+function nat3(top, side, bottom, ui) { return { tiles: { top, side, bottom }, tint: W, ui }; }
 
 // Block definitions: which atlas tiles to use per face, a tint colour, and a
 // swatch colour for the on-screen palette.
@@ -42,13 +47,35 @@ export const BLOCKS = {
   [B.PINK]: colored(TILE.NEUTRAL, [0.95, 0.55, 0.75], '#f28cbf'),
   [B.WHITE]: colored(TILE.NEUTRAL, [0.96, 0.96, 0.97], '#f5f5f7'),
   [B.BLACK]: colored(TILE.NEUTRAL, [0.2, 0.2, 0.24], '#2e2e36'),
+
+  [B.COBBLE]: nat(TILE.COBBLE, '#8a8a90'),
+  [B.STONE_BRICK]: nat(TILE.STONE_BRICK, '#9a9aa1'),
+  [B.SNOW]: nat(TILE.SNOW, '#eef3fb'),
+  [B.ICE]: nat(TILE.ICE, '#a9d6ee'),
+  [B.GRAVEL]: nat(TILE.GRAVEL, '#847f7a'),
+  [B.BIRCH_LOG]: nat3(TILE.LOG_TOP, TILE.BIRCH_LOG, TILE.LOG_TOP, '#e7e2d4'),
+  [B.BIRCH_PLANKS]: nat(TILE.BIRCH_PLANKS, '#dacca0'),
+  [B.DARK_PLANKS]: nat(TILE.DARK_PLANKS, '#4f3a22'),
+  [B.GOLD]: nat(TILE.GOLD, '#f2c63a'),
+  [B.DIAMOND]: nat(TILE.DIAMOND, '#59d6c8'),
+  [B.BOOKSHELF]: nat3(TILE.PLANKS, TILE.BOOKSHELF, TILE.PLANKS, '#9a6b3a'),
+  [B.GLOWSTONE]: nat(TILE.GLOWSTONE, '#e8c24a'),
+  [B.PUMPKIN]: nat3(TILE.PUMPKIN_TOP, TILE.PUMPKIN_SIDE, TILE.PUMPKIN_TOP, '#e07b1e'),
+  [B.OBSIDIAN]: nat(TILE.OBSIDIAN, '#241a33'),
 };
 
-// Order shown in the build palette.
-export const PALETTE = [
-  B.GRASS, B.DIRT, B.STONE, B.SAND, B.LOG, B.PLANKS, B.LEAVES, B.BRICK, B.GLASS,
-  B.RED, B.ORANGE, B.YELLOW, B.GREEN, B.CYAN, B.BLUE, B.PURPLE, B.PINK, B.WHITE, B.BLACK,
+// Build blocks grouped into categories for the pop-up picker.
+export const CATEGORIES = [
+  { name: 'Nature', blocks: [B.GRASS, B.DIRT, B.SAND, B.GRAVEL, B.SNOW, B.LOG, B.BIRCH_LOG, B.LEAVES] },
+  { name: 'Stone', blocks: [B.STONE, B.COBBLE, B.STONE_BRICK, B.BRICK, B.OBSIDIAN, B.GLOWSTONE] },
+  { name: 'Wood', blocks: [B.PLANKS, B.BIRCH_PLANKS, B.DARK_PLANKS, B.BOOKSHELF] },
+  { name: 'Shiny', blocks: [B.GOLD, B.DIAMOND, B.ICE, B.GLASS] },
+  { name: 'Fun', blocks: [B.PUMPKIN] },
+  { name: 'Colours', blocks: [B.RED, B.ORANGE, B.YELLOW, B.GREEN, B.CYAN, B.BLUE, B.PURPLE, B.PINK, B.WHITE, B.BLACK] },
 ];
+
+// Flat list (first entry is the default selected block).
+export const PALETTE = CATEGORIES.flatMap((c) => c.blocks);
 
 // CCW, outward-facing quads. Each vertex: position offset (o) and uv selector.
 const FACES = [

@@ -32,9 +32,8 @@
       <button id="btn-home" class="mini" title="Go home">🏠</button>
       <button id="btn-sound" class="mini" title="Sound on/off">🔊</button>
       <button id="btn-new" class="mini" title="New world">✨</button>
+      <button id="btn-blocks" title="Pick a block"></button>
     </div>
-
-    <div id="palette"></div>
 
     <div id="actions">
       <button id="btn-pet" class="act pet"><span>🐾</span><b>Pet</b></button>
@@ -46,6 +45,13 @@
     <div id="toast"><b>iPad:</b> drag the left side to walk, the right side to look.
       <b>Laptop:</b> <b>W A S D</b> to move, drag the mouse to look. Then aim the + and tap
       <b>Build</b> / <b>Dig</b>.</div>
+  </div>
+
+  <div id="picker" class="hidden">
+    <div class="picker-panel">
+      <div class="picker-head"><span>Pick a block</span><button id="picker-close">✕</button></div>
+      <div id="picker-body"></div>
+    </div>
   </div>
 
   <div id="hearts"></div>

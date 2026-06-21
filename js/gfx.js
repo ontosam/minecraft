@@ -1,14 +1,18 @@
 // WebGL setup, shader programs, procedural texture atlas, and mesh helpers.
 // Targets WebGL1 (works on essentially every iPad) with no external libraries.
 
-export const ATLAS = { tile: 16, perRow: 4, size: 64 }; // 4x4 grid of 16px tiles
+export const ATLAS = { tile: 16, perRow: 8, size: 128 }; // 8x8 grid of 16px tiles
 
 // Tile indices in the atlas.
 export const TILE = {
   GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, STONE: 3,
   SAND: 4, LOG_SIDE: 5, LOG_TOP: 6, LEAVES: 7,
   PLANKS: 8, WATER: 9, BEDROCK: 10, NEUTRAL: 11,
-  BRICK: 12, GLASS: 13,
+  BRICK: 12, GLASS: 13, COBBLE: 14, STONE_BRICK: 15,
+  SNOW: 16, ICE: 17, GRAVEL: 18, BIRCH_PLANKS: 19,
+  DARK_PLANKS: 20, GOLD: 21, DIAMOND: 22, BOOKSHELF: 23,
+  GLOWSTONE: 24, PUMPKIN_SIDE: 25, PUMPKIN_TOP: 26, OBSIDIAN: 27,
+  BIRCH_LOG: 28,
 };
 
 export function initGL(canvas) {
@@ -201,11 +205,84 @@ function buildAtlasCanvas() {
   ctx.fillStyle = shade(0x9fd0e0, 1);
   ctx.strokeRect && (ctx.fillRect(p[0], p[1], T, 1), ctx.fillRect(p[0], p[1] + T - 1, T, 1), ctx.fillRect(p[0], p[1], 1, T), ctx.fillRect(p[0] + T - 1, p[1], 1, T));
 
+  // --- extra building blocks ---
+  // Cobblestone: lumpy grey stones
+  p = at(TILE.COBBLE); noise(ctx, p[0], p[1], 0x8f8f96, 0.22, 40);
+  { const r = rng(401); for (let i = 0; i < 10; i++) { const x = Math.floor(r() * 14), y = Math.floor(r() * 14); ctx.fillStyle = shade(r() < 0.5 ? 0x6d6d74 : 0xaeaeb6, 1); ctx.fillRect(p[0] + x, p[1] + y, 2 + Math.floor(r() * 2), 2 + Math.floor(r() * 2)); } }
+
+  // Stone bricks
+  p = at(TILE.STONE_BRICK); noise(ctx, p[0], p[1], 0x9a9aa1, 0.08, 42);
+  ctx.fillStyle = shade(0x6a6a70, 1);
+  for (let y = 0; y < T; y += 8) ctx.fillRect(p[0], p[1] + y, T, 1);
+  for (let y = 0; y < T; y += 8) ctx.fillRect(p[0] + (y % 16 === 0 ? 8 : 0), p[1] + y, 1, 8);
+
+  p = at(TILE.SNOW); noise(ctx, p[0], p[1], 0xeef3fb, 0.05, 43);
+
+  p = at(TILE.ICE); noise(ctx, p[0], p[1], 0xa9d6ee, 0.07, 44);
+  ctx.fillStyle = shade(0xcdeaf7, 1); for (let i = 0; i < T; i++) ctx.fillRect(p[0] + i, p[1] + ((i * 5) % T), 1, 1);
+
+  p = at(TILE.GRAVEL); noise(ctx, p[0], p[1], 0x847f7a, 0.3, 45);
+
+  p = at(TILE.BIRCH_PLANKS); noise(ctx, p[0], p[1], 0xdacca0, 0.08, 46);
+  ctx.fillStyle = shade(0xb7a577, 1); for (let y = 0; y < T; y += 5) ctx.fillRect(p[0], p[1] + y, T, 1);
+
+  p = at(TILE.DARK_PLANKS); noise(ctx, p[0], p[1], 0x4f3a22, 0.1, 47);
+  ctx.fillStyle = shade(0x352616, 1); for (let y = 0; y < T; y += 5) ctx.fillRect(p[0], p[1] + y, T, 1);
+
+  // Gold: bright with a highlight + sparkles
+  p = at(TILE.GOLD); noise(ctx, p[0], p[1], 0xf2c63a, 0.08, 48);
+  ctx.fillStyle = shade(0xfff0a0, 1); ctx.fillRect(p[0] + 1, p[1] + 1, 5, 1); ctx.fillRect(p[0] + 1, p[1] + 1, 1, 5);
+  { const r = rng(480); for (let i = 0; i < 5; i++) ctx.fillRect(p[0] + Math.floor(r() * T), p[1] + Math.floor(r() * T), 1, 1); }
+
+  // Diamond: teal with sparkles
+  p = at(TILE.DIAMOND); noise(ctx, p[0], p[1], 0x59d6c8, 0.1, 49);
+  ctx.fillStyle = shade(0xd7fbf5, 1); { const r = rng(491); for (let i = 0; i < 6; i++) ctx.fillRect(p[0] + Math.floor(r() * T), p[1] + Math.floor(r() * T), 1, 1); }
+
+  // Bookshelf: planks top/bottom, colourful book spines in the middle
+  p = at(TILE.BOOKSHELF); noise(ctx, p[0], p[1], 0xc99a5b, 0.1, 50);
+  ctx.fillStyle = shade(0x8a6a3a, 1); ctx.fillRect(p[0], p[1], T, 3); ctx.fillRect(p[0], p[1] + T - 3, T, 3);
+  { const cols = [0xc0392b, 0x2980b9, 0x27ae60, 0xe0b020, 0x8e44ad]; const r = rng(500); for (let x = 0; x < T; x += 2) { ctx.fillStyle = shade(cols[Math.floor(r() * cols.length)], 1); ctx.fillRect(p[0] + x, p[1] + 4, 1, 8); } }
+
+  // Glowstone
+  p = at(TILE.GLOWSTONE); noise(ctx, p[0], p[1], 0xe8c24a, 0.12, 51);
+  { const r = rng(510); for (let i = 0; i < 8; i++) { ctx.fillStyle = shade(0xfff0b0, 1); ctx.fillRect(p[0] + Math.floor(r() * 14), p[1] + Math.floor(r() * 14), 2, 2); } }
+
+  // Pumpkin side with a friendly carved face
+  p = at(TILE.PUMPKIN_SIDE); noise(ctx, p[0], p[1], 0xe07b1e, 0.08, 52);
+  ctx.fillStyle = shade(0xb35e12, 1); for (let x = 2; x < T; x += 4) ctx.fillRect(p[0] + x, p[1], 1, T);
+  ctx.fillStyle = shade(0x3a2410, 1);
+  ctx.fillRect(p[0] + 3, p[1] + 5, 3, 2); ctx.fillRect(p[0] + 10, p[1] + 5, 3, 2);
+  ctx.fillRect(p[0] + 4, p[1] + 10, 8, 1); ctx.fillRect(p[0] + 4, p[1] + 9, 1, 1); ctx.fillRect(p[0] + 11, p[1] + 9, 1, 1);
+
+  p = at(TILE.PUMPKIN_TOP); noise(ctx, p[0], p[1], 0xd9781e, 0.08, 53);
+  ctx.fillStyle = shade(0x6e4a1e, 1); ctx.fillRect(p[0] + 6, p[1] + 6, 4, 4);
+
+  p = at(TILE.OBSIDIAN); noise(ctx, p[0], p[1], 0x241a33, 0.18, 54);
+  { const r = rng(540); for (let i = 0; i < 6; i++) { ctx.fillStyle = shade(0x5a4a7a, 1); ctx.fillRect(p[0] + Math.floor(r() * T), p[1] + Math.floor(r() * T), 1, 1); } }
+
+  p = at(TILE.BIRCH_LOG); noise(ctx, p[0], p[1], 0xe7e2d4, 0.06, 55);
+  ctx.fillStyle = shade(0x2a2a2a, 1); { const r = rng(550); for (let i = 0; i < 6; i++) ctx.fillRect(p[0] + Math.floor(r() * 13), p[1] + Math.floor(r() * 15), 2 + Math.floor(r() * 2), 1); }
+
+  return c;
+}
+
+let _atlasCanvas = null;
+
+// A small canvas showing one atlas tile, scaled up crisply (for the UI picker).
+export function blockPreview(tile, size) {
+  if (!_atlasCanvas) _atlasCanvas = buildAtlasCanvas();
+  const t = ATLAS.tile;
+  const col = tile % ATLAS.perRow, row = Math.floor(tile / ATLAS.perRow);
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(_atlasCanvas, col * t, row * t, t, t, 0, 0, size, size);
   return c;
 }
 
 export function makeAtlasTexture(gl) {
-  const canvas = buildAtlasCanvas();
+  const canvas = _atlasCanvas || (_atlasCanvas = buildAtlasCanvas());
   const tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);

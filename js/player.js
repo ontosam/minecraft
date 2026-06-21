@@ -1,11 +1,11 @@
 // Third-person player: moves relative to the camera, turns to face the way it
 // walks, with gentle physics and auto-jump. Looking is handled by the camera.
 
-const HALF = 0.3;       // half width
+const HALF = 0.28;      // half width (slim, so tight corners are easy to leave)
 const HEIGHT = 1.7;     // body height
 const GRAVITY = 22;
 const JUMP = 7.2;
-const SPEED = 4.2;      // gentle walk speed
+const SPEED = 3.7;      // gentle walk speed
 const EPS = 1e-3;
 
 export class Player {

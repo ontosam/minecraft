@@ -2,8 +2,8 @@
 // controls, UI, rendering, and autosave together.
 
 import { mat4 } from './math.js';
-import { initGL, makeWorldProgram, makeLineProgram, makeAtlasTexture, GLMesh } from './gfx.js';
-import { World, BLOCKS, PALETTE, B, SX, SY, SZ } from './world.js';
+import { initGL, makeWorldProgram, makeLineProgram, makeAtlasTexture, GLMesh, blockPreview } from './gfx.js';
+import { World, BLOCKS, CATEGORIES, B, SX, SY, SZ } from './world.js';
 import { Player } from './player.js';
 import { Animals } from './animals.js';
 import { Controls } from './input.js';
@@ -120,8 +120,8 @@ function targetCells() {
 }
 
 function overlapsPlayer(x, y, z) {
-  const px0 = Math.floor(player.pos[0] - 0.3), px1 = Math.floor(player.pos[0] + 0.3);
-  const pz0 = Math.floor(player.pos[2] - 0.3), pz1 = Math.floor(player.pos[2] + 0.3);
+  const px0 = Math.floor(player.pos[0] - 0.28), px1 = Math.floor(player.pos[0] + 0.28);
+  const pz0 = Math.floor(player.pos[2] - 0.28), pz1 = Math.floor(player.pos[2] + 0.28);
   const py0 = Math.floor(player.pos[1]), py1 = Math.floor(player.pos[1] + 1.7 - 0.001);
   return x >= px0 && x <= px1 && y >= py0 && y <= py1 && z >= pz0 && z <= pz1;
 }
@@ -172,22 +172,45 @@ function spawnHearts(worldPos) {
 }
 
 // --- UI wiring ---
-function buildPalette() {
-  const row = document.getElementById('palette');
-  row.innerHTML = '';
-  for (const id of PALETTE) {
-    const sw = document.createElement('button');
-    sw.className = 'swatch';
-    sw.style.background = BLOCKS[id].ui;
-    sw.dataset.id = id;
-    if (id === selected) sw.classList.add('sel');
-    sw.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      selected = id; saveDirty = true;
-      row.querySelectorAll('.swatch').forEach((s) => s.classList.remove('sel'));
-      sw.classList.add('sel');
-    });
-    row.appendChild(sw);
+function blockIcon(id, size) {
+  const cv = blockPreview(BLOCKS[id].tiles.side, size);
+  return cv;
+}
+
+function refreshBlocksButton() {
+  const b = document.getElementById('btn-blocks');
+  b.innerHTML = '';
+  b.appendChild(blockIcon(selected, 46));
+}
+
+function openPicker() { document.getElementById('picker').classList.remove('hidden'); }
+function closePicker() { document.getElementById('picker').classList.add('hidden'); }
+
+function buildPicker() {
+  const body = document.getElementById('picker-body');
+  body.innerHTML = '';
+  for (const cat of CATEGORIES) {
+    const label = document.createElement('div');
+    label.className = 'pick-cat'; label.textContent = cat.name;
+    body.appendChild(label);
+    const grid = document.createElement('div');
+    grid.className = 'pick-grid';
+    for (const id of cat.blocks) {
+      const tile = document.createElement('button');
+      tile.className = 'pick-tile';
+      if (id === selected) tile.classList.add('sel');
+      tile.appendChild(blockIcon(id, 46));
+      tile.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        selected = id; saveDirty = true;
+        body.querySelectorAll('.pick-tile').forEach((s) => s.classList.remove('sel'));
+        tile.classList.add('sel');
+        refreshBlocksButton();
+        closePicker();
+      });
+      grid.appendChild(tile);
+    }
+    body.appendChild(grid);
   }
 }
 
@@ -210,7 +233,11 @@ function holdButton(id, fn, repeat) {
 }
 
 function wireUI() {
-  buildPalette();
+  buildPicker();
+  refreshBlocksButton();
+  document.getElementById('btn-blocks').addEventListener('pointerdown', (e) => { e.preventDefault(); openPicker(); });
+  document.getElementById('picker-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closePicker(); });
+  document.getElementById('picker').addEventListener('pointerdown', (e) => { if (e.target.id === 'picker') closePicker(); });
   holdButton('btn-build', doBuild, false);
   holdButton('btn-dig', doDig, false);
   holdButton('btn-pet', doPet, false);
@@ -352,6 +379,7 @@ function init() {
     world, player, animals,
     cam: () => ({ yaw: camYaw, pitch: camPitch, pos: camPos.slice(), dir: camDir.slice() }),
     target: () => targetCells(),
+    sel: () => selected,
   };
 
   last = performance.now();
