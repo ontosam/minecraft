@@ -183,6 +183,44 @@ to `main`/live pending the dad's OK).
    Sky World home-portal can land on a tree (cosmetic); sky-world treasure adds
    to the "treasure goals are easy in resource-rich worlds" note.
 
+## Status (session 8)
+Dad approved session 7 → pushed live to `main`. Then he handed over a wishlist
+with full autonomy ("keep him busy like Minecraft, reward him, make him work;
+he gets anxious losing lives so let him feel the loss but always recover").
+Shipped as five verified increments on **`claude/gifted-gates-h9dzy2`**, mirrored
+to `main`. Now **33 goals**, **10 shop items**, **49 block ids**.
+1. **Half-heart stakes + tougher zombies.** Hearts now track in **half** steps and
+   render full/half/empty (CSS `.hs` slot: a 🤍 base with a clipped ❤️ overlay).
+   Regen is a bit quicker (0.5 every 2.2s after 4s safe) so he always climbs back.
+   Zombies need **3** bare-hand bonks now (was 2); `bonk(a, dmg)` takes damage.
+   `__ezra.hurt(n)` debug hook.
+2. **🕷️ Spiders (`js/spiders.js`).** Quick, low, cute (big eyes) night mob that
+   spawns with zombies, skitters in and **nibbles half a heart**; 2 taps to shoo
+   (1 with the sword). Same vertical-reach escape rule. Wired into the over mob
+   set, tap routing, knockout cleanup; `hiss` sound; 'Spider shoo-er' goal.
+3. **⚔️ Diamond Sword (Ezra asked).** Shop item (12💎). `swordDamage()` = 3 when
+   owned → one-shots zombies/spiders. Visibly **held in the action hand**
+   (`character.holdSword` + sword mesh that swings with the chop). 'Monster masher'
+   goal (`monster` counter, bumped on any night-mob defeat). `__ezra.sword()`.
+4. **⚙️ Redstone (Ezra asked).** New blocks LEVER/REDSTONE/REDLAMP (+ on-states)
+   in a 'Redstone ⚙️' picker tab. `World.updateRedstone()` floods power from
+   on-levers through connected wire into touching lamps (REDLAMP↔REDLAMP_ON);
+   recomputed on lever toggle, on place/dig of a redstone block, and on load
+   (in `registerDim`). Tap a lever to flip it. Goals: 'Lever flipper', 'Light it
+   up!'. `__ezra.toggleLever(x,y,z)`.
+5. **🟢 Bouncy Slime block (creative extra).** `B.SLIME` (Fun tab): land with
+   speed → spring up in decaying hops (`player.onBounce`, threshold vy<-3.5,
+   bounce = min(13, -vy*0.85)); trampolines! 'Boing!' goal + sound.
+   Verified throughout: Node logic tests (zombie/spider vertical-attack + HP +
+   sword one-shot, redstone flood/break, slime bounce decays & settles) +
+   headless (half-heart HUD + regen, spider live −0.5, sword one-shot, a
+   lever→wire→lamp circuit lighting, a full build-everything **save/reload**
+   keeping the lit lamp/slime/rainbow + all unlocks, and the world-hop
+   regression). Tuning candidates: night dim still gentle (uDayLight≈0.4) so
+   mobs are easy to spot but the scene isn't dark; up to 4 zombies + 3 spiders
+   at once (weak but many — could cap lower if it feels busy); slime+sword could
+   later combine (sword "knockback").
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files
