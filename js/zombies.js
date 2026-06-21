@@ -63,6 +63,8 @@ function makeMesh(gl) {
 
 const SPEED = 1.5;          // a bit quicker than creepers — they come for you
 const ATTACK_RANGE = 1.5;
+const ATTACK_VRANGE = 2.0;  // must be at roughly your height to reach you (so
+                            // flying or towering up is a real escape)
 const ATTACK_CD = 1.1;      // seconds between bonks
 const SPAWN_RING = [10, 18];
 const PICK_RADIUS = 1.0;
@@ -137,6 +139,7 @@ export class Zombies {
       }
 
       const dx = player.pos[0] - a.pos[0], dz = player.pos[2] - a.pos[2];
+      const dy = player.pos[1] - a.pos[1];
       const d = Math.hypot(dx, dz);
       this.turnToward(a, player.pos[0], player.pos[2]);
 
@@ -144,7 +147,9 @@ export class Zombies {
       a.groan -= dt;
       if (a.groan <= 0) { a.groan = 4 + Math.random() * 5; this.emit('groan', [a.pos[0], a.pos[1] + 1.3, a.pos[2]]); }
 
-      if (d <= ATTACK_RANGE) {
+      // Only bonk if it's actually next to you *and* near your height — a zombie
+      // can't reach up to hit you when you've flown or climbed away.
+      if (d <= ATTACK_RANGE && Math.abs(dy) <= ATTACK_VRANGE) {
         if (a.atk <= 0) { a.atk = ATTACK_CD; a.lunge = 1; this.emit('hit', [a.pos[0], a.pos[1] + 1, a.pos[2]]); }
       } else {
         this.step(a, dt);
