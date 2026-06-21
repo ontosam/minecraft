@@ -68,7 +68,7 @@ const ATTACK_VRANGE = 2.0;  // must be at roughly your height to reach you (so
 const ATTACK_CD = 1.1;      // seconds between bonks
 const SPAWN_RING = [10, 18];
 const PICK_RADIUS = 1.0;
-const HP = 2;               // takes two taps to defeat
+const HP = 3;               // a bit tougher now — three bare-hand taps (or one sword hit)
 
 class Zombie {
   constructor(mesh, x, y, z) {
@@ -190,10 +190,11 @@ export class Zombies {
     return best;
   }
 
-  // Bonk a zombie. Returns true if this defeated it (for a star/poof).
-  bonk(a) {
+  // Bonk a zombie (dmg = how hard, e.g. the sword hits harder). Returns true if
+  // this defeated it (for a star/poof).
+  bonk(a, dmg) {
     a.hurt = 1;
-    a.hp -= 1;
+    a.hp -= (dmg || 1);
     if (a.hp <= 0) { a.state = 'poof'; return true; }
     return false;
   }

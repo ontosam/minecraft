@@ -450,8 +450,8 @@ function doDefend(cr) {
 function doBonkZombie(z) {
   const zb = mobs().zombies;
   if (!zb) return;
-  const defeated = zb.bonk(z);
-  sound.play('poof');
+  const defeated = zb.bonk(z, swordDamage());
+  sound.play(defeated ? 'poof' : 'dig');
   spawnPuffs([z.pos[0], z.pos[1] + 1.0, z.pos[2]]);
   if (defeated) goals.bump('zombie');
 }
@@ -459,7 +459,14 @@ function doBonkZombie(z) {
 // --- Hearts: getting hurt, a gentle knock-out, slow regen ---
 function updateHearts() {
   const el = document.getElementById('hearts-bar');
-  if (el) el.textContent = '❤️'.repeat(hearts) + '🤍'.repeat(Math.max(0, maxHearts - hearts));
+  if (!el) return;
+  // Render each heart as full / half / empty so damage can land in half-hearts.
+  let html = '';
+  for (let i = 1; i <= maxHearts; i++) {
+    const cls = hearts >= i ? 'hf' : (hearts >= i - 0.5 ? 'hh' : 'he');
+    html += '<span class="hs ' + cls + '"></span>';
+  }
+  el.innerHTML = html;
 }
 function updateGems() {
   const el = document.getElementById('gem-bar');
@@ -476,6 +483,8 @@ function applyUnlocks() {
   updateHearts();
 }
 function explodeRadius() { return goals.hasUnlock('megatnt') ? 4.6 : 3.2; }
+// How much a single tap-bonk hurts an enemy — the Diamond Sword hits much harder.
+function swordDamage() { return goals.hasUnlock('sword') ? 3 : 1; }
 function ensurePet() {
   if (!goals.hasUnlock('pet')) return;
   const am = worlds.over && worlds.over.mobs.animals;
@@ -838,7 +847,9 @@ function frame(now) {
   invuln = Math.max(0, invuln - dt);
   hurtFlash = Math.max(0, hurtFlash - dt);
   sinceHurt += dt;
-  if (hearts > 0 && hearts < maxHearts && sinceHurt > 5) { regenT += dt; if (regenT >= 3) { regenT = 0; hearts++; updateHearts(); } }
+  // Gentle, fairly quick regen (in half-hearts) once you've been safe a moment —
+  // so getting hurt stings but you always climb back. Keeps an anxious kid in it.
+  if (hearts > 0 && hearts < maxHearts && sinceHurt > 4) { regenT += dt; if (regenT >= 2.2) { regenT = 0; hearts = Math.min(maxHearts, hearts + 0.5); updateHearts(); } }
   const nightTarget = (night && dimension === 'over') ? 1 : 0;
   nightAmt += (nightTarget - nightAmt) * Math.min(1, dt * 1.5);
   if (hurtEl) hurtEl.style.opacity = (hurtFlash * 0.9).toFixed(3);
@@ -1090,6 +1101,7 @@ function init() {
     dim: () => dimension,
     portalOpen: () => portalUnlocked,
     hearts: () => hearts,
+    hurt: (n) => hurt(n),
     night: () => night,
     crown: () => character.wearCrown,
     gems: () => goals.gems,

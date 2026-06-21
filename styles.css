@@ -243,18 +243,47 @@ body {
   color: #2fb24a;
 }
 
-/* Hearts (health) — top centre */
+/* Hearts (health) — top centre. Each heart can be full / half / empty so
+   damage can land in half-hearts (the red overlay is clipped for a half). */
 #hearts-bar {
   position: absolute;
   top: max(12px, env(safe-area-inset-top));
   left: 50%;
   transform: translateX(-50%);
   font-size: 22px;
-  letter-spacing: 1px;
   line-height: 1;
   pointer-events: none;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, .5);
   white-space: nowrap;
+}
+
+.hs {
+  position: relative;
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin: 0 1.5px;
+  vertical-align: middle;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .5));
+}
+
+.hs::before {
+  content: "🤍";
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.hs.hf::after,
+.hs.hh::after {
+  content: "❤️";
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.hs.hh::after {
+  width: .52em;
+  overflow: hidden;
 }
 
 /* Diamonds (💎) counter — tap to open the shop. Top-left, under the topbar. */
