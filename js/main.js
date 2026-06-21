@@ -57,6 +57,7 @@ let saveDirty = false, lastSave = 0;
 let prevX = 0, prevZ = 0, goalToastTimer = 0;
 let shake = 0;            // camera kick from explosions
 let trailT = 0;           // throttle for the "Sparkle Trail" shop reward
+let riding = null;        // the pony Animal you're currently riding (or null)
 const fuses = [];         // lit TNT awaiting detonation: { x, y, z, t }
 const canvas = document.getElementById('game');
 
@@ -172,6 +173,7 @@ function setDimension(key) {
 // Travel through a gateway to another world, arriving at the matching portal.
 function travelTo(dest) {
   if (!WORLD_KINDS[dest]) return;
+  if (riding) dismount();                   // the pony stays home in the overworld
   fuses.length = 0;                         // cancel any fuses lit in the world we're leaving
   positions[dimension] = player.pos.slice();
   const from = dimension;
@@ -530,9 +532,52 @@ function ensurePet() {
   am.spawnPet(sp[0], sp[2]);
 }
 
+// The rideable pony lives in the overworld; re-spawned each load if owned.
+function ponyMob() { return worlds.over && worlds.over.mobs.animals; }
+function findPony() { const am = ponyMob(); return am && am.list.find((a) => a.isPony); }
+function ensurePony() {
+  const btn = document.getElementById('btn-ride');
+  if (!goals.hasUnlock('pony')) { if (btn) btn.style.display = 'none'; return; }
+  if (btn) btn.style.display = '';
+  const am = ponyMob();
+  if (am && !findPony()) { const sp = worlds.over.world.spawn; am.spawnPony(sp[0], sp[2]); }
+}
+
+// Hop on / off the pony. Mounting snaps the pony to you (kid-friendly — it
+// always comes when called); dismounting sets it down beside you.
+function toggleRide() {
+  if (riding) { dismount(); return; }
+  if (dimension !== 'over') { showToast('🐴 Your pony is back home — tap 🏠 first!'); return; }
+  const pony = findPony();
+  if (!pony) { showToast('🐴 Buy a Ride-On Pony in the 💎 shop!'); return; }
+  riding = pony;
+  pony.ridden = true; pony.follower = false;
+  player.pos = pony.pos.slice(); player.pos[1] += 0.05;
+  player.mountSpeed = 1.7; player.mountJump = 1.18;
+  camYaw = player.yaw;
+  sound.play('neigh');
+  goals.bump('ride');
+  updateRideButton();
+}
+function dismount() {
+  if (!riding) return;
+  const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
+  riding.pos = [player.pos[0] - fx * 1.0, player.pos[1], player.pos[2] - fz * 1.0];
+  riding.ridden = false; riding.follower = true;
+  riding = null;
+  player.mountSpeed = 1; player.mountJump = 1;
+  sound.play('neigh');
+  updateRideButton();
+}
+function updateRideButton() {
+  const b = document.getElementById('btn-ride');
+  if (b) b.classList.toggle('on', !!riding);
+}
+
 // --- Treasure shop: spend 💎 (mined + earned from goals) on fun unlocks ---
 const SHOP = [
   { id: 'pet', icon: '🐾', name: 'Pet Friend', cost: 5, desc: 'A cute cat that follows you around' },
+  { id: 'pony', icon: '🐴', name: 'Ride-On Pony', cost: 16, desc: 'Your own pony — tap 🐴 to ride it fast!' },
   { id: 'boots', icon: '👟', name: 'Speed Boots', cost: 6, desc: 'Zoom around — walk much faster!' },
   { id: 'superjump', icon: '🦘', name: 'Super Jump', cost: 6, desc: 'Boing! Jump up really high' },
   { id: 'heart', icon: '❤️', name: 'Extra Heart', cost: 8, desc: 'One more heart for night adventures' },
@@ -566,6 +611,7 @@ function buyItem(it) {
   goals.bump('bought');                 // counts toward the "Treasure shopper" goal
   applyUnlocks();
   if (it.id === 'pet') { ensurePet(); if (dimension !== 'over') showToast('🐾 Your new pet is waiting at home — tap 🏠!'); }
+  if (it.id === 'pony') { ensurePony(); showToast(dimension === 'over' ? '🐴 Your pony is here — tap 🐴 to ride!' : '🐴 Your pony is at home — tap 🏠, then 🐴 to ride!'); }
   if (it.id === 'heart') { hearts = maxHearts; updateHearts(); }
   if (it.id === 'rainbow') {             // reveal it in the picker + select it right away
     buildPicker(); selected = B.RAINBOW; refreshBlocksButton(); saveDirty = true;
@@ -605,6 +651,7 @@ function hurt(n) {
   if (hearts <= 0) knockout();
 }
 function knockout() {
+  if (riding) dismount();
   showToast('💤 Oof! You got sleepy — back home, safe and sound.', 3400);
   night = false; updateNightButton();
   const om = worlds.over && worlds.over.mobs;
@@ -798,6 +845,8 @@ function wireUI() {
     if (night) goals.bump('night');
   });
 
+  document.getElementById('btn-ride').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); toggleRide(); });
+
   document.getElementById('gem-bar').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); openShop(); });
   document.getElementById('shop-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeShop(); });
   document.getElementById('shop').addEventListener('pointerdown', (e) => { if (e.target.id === 'shop') closeShop(); });
@@ -986,7 +1035,12 @@ function frame(now) {
   gl.uniform1i(worldProg.u.uTex, 0);
 
   world.draw(worldProg);
-  character.draw(worldProg, player.pos[0], player.pos[1], player.pos[2], player.yaw, player.walkPhase, player.moveAmt, actionAnim);
+  // While riding, the pony tracks the player and the kid sits up on its back.
+  if (riding) {
+    riding.pos[0] = player.pos[0]; riding.pos[1] = player.pos[1]; riding.pos[2] = player.pos[2];
+    riding.yaw = player.yaw; riding.walking = player.moving;
+  }
+  character.draw(worldProg, player.pos[0], player.pos[1] + (riding ? 0.62 : 0), player.pos[2], player.yaw, player.walkPhase, player.moveAmt, actionAnim, !!riding);
   drawMobs(m);
 
   drawMinimap();
@@ -1107,6 +1161,7 @@ function init() {
   hurtEl = document.getElementById('hurt-flash');
   applyUnlocks();
   ensurePet();
+  ensurePony();
   updateHearts();
   updateNightButton();
   updateGems();
@@ -1160,6 +1215,8 @@ function init() {
     spawnCreeper: () => { const c = mobs().creepers; if (c) c.spawnNow(player); },
     lightTNT: (x, y, z) => lightTNT(x, y, z),
     toggleLever: (x, y, z) => toggleLever(x, y, z),
+    riding: () => !!riding,
+    toggleRide: () => toggleRide(),
   };
 
   last = performance.now();

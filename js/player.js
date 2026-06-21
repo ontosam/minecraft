@@ -33,6 +33,8 @@ export class Player {
     this.flying = false;   // fly mode (toggled from the UI)
     this.speedMul = 1;     // shop "Speed Boots" multiply walk speed
     this.jumpMul = 1;      // shop "Super Jump" multiply jump height
+    this.mountSpeed = 1;   // extra speed while riding the pony
+    this.mountJump = 1;    // extra jump while riding the pony
     this.inWater = false;  // currently standing/swimming in water
     this._wasInWater = false;
     this.onSplash = null;  // (pos) => void — fired the moment you enter water
@@ -72,8 +74,8 @@ export class Player {
     const wl = Math.hypot(wx, wz);
     if (wl > 1) { wx /= wl; wz /= wl; }
     this.moving = wl > 0.05;
-    this.vel[0] = wx * SPEED * this.speedMul;
-    this.vel[2] = wz * SPEED * this.speedMul;
+    this.vel[0] = wx * SPEED * this.speedMul * this.mountSpeed;
+    this.vel[2] = wz * SPEED * this.speedMul * this.mountSpeed;
 
     // How forward-facing is the movement (relative to the camera)?
     const mag = Math.hypot(wx, wz);
@@ -106,7 +108,7 @@ export class Player {
         if (this.vel[1] > 2.2) this.vel[1] = 2.2;
       }
     } else {
-      if (input.jump && this.onGround) { this.vel[1] = JUMP * this.jumpMul; this.onGround = false; }
+      if (input.jump && this.onGround) { this.vel[1] = JUMP * this.jumpMul * this.mountJump; this.onGround = false; }
       this.vel[1] -= GRAVITY * dt;
       if (this.vel[1] < -28) this.vel[1] = -28;
     }

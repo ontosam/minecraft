@@ -91,10 +91,10 @@ export class Character {
     this.sword = mesh(gl, buildSword);
     this.holdSword = false;        // toggled when the Diamond Sword is bought
     this.parts = [
-      { m: this.leg, mount: [-0.1, 0.7, 0], dir: 1, swing: true },
-      { m: this.leg, mount: [0.1, 0.7, 0], dir: -1, swing: true },
-      { m: this.arm, mount: [-0.26, 1.2, 0], dir: -1, swing: true },
-      { m: this.arm, mount: [0.26, 1.2, 0], dir: 1, swing: true, action: true },
+      { m: this.leg, mount: [-0.1, 0.7, 0], dir: 1, swing: true, leg: true },
+      { m: this.leg, mount: [0.1, 0.7, 0], dir: -1, swing: true, leg: true },
+      { m: this.arm, mount: [-0.26, 1.2, 0], dir: -1, swing: true, armp: true },
+      { m: this.arm, mount: [0.26, 1.2, 0], dir: 1, swing: true, action: true, armp: true },
       { m: this.body, mount: [0, 0.7, 0], dir: 0, swing: false },
       { m: this.head, mount: [0, 1.25, 0], dir: 0, swing: false },
     ];
@@ -103,7 +103,7 @@ export class Character {
     this._T2 = mat4.create(); this._M2 = mat4.create();
   }
 
-  draw(prog, x, y, z, yaw, phase, amt, act) {
+  draw(prog, x, y, z, yaw, phase, amt, act, seated) {
     const gl = this.gl;
     mat4.model(this._P, x, y, z, yaw, 1, 1, 1);
     if (act > 0) { // lean the whole body forward so the action reads from behind
@@ -114,6 +114,10 @@ export class Character {
     for (const p of this.parts) {
       let swing = p.swing ? Math.sin(phase) * 0.5 * amt * p.dir : 0;
       if (p.action && act > 0) swing = chop;
+      if (seated) {                          // sitting astride a mount
+        if (p.leg) swing = 1.3;              // legs stick forward over the pony's sides
+        else if (p.armp && !(p.action && act > 0)) swing = -0.45; // hands on the reins
+      }
       mat4.translate(this._T, p.mount[0], p.mount[1], p.mount[2]);
       mat4.rotateX(this._R, swing);
       mat4.multiply(this._L, this._T, this._R);
