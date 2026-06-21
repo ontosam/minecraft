@@ -39,7 +39,14 @@ export const WORLD_KINDS = {
     mobs: ['ants'],
     flint: true,
   },
+  tnt: {
+    name: 'TNT World', emoji: '💥',
+    sky: [0.55, 0.40, 0.34], fog: [34, 72],
+    gen: 'generateTnt', ground: B.STONE,
+    mobs: [],                   // a demolition playground — no creatures to hurt
+    flint: true,
+  },
 };
 
 // Display order for menus/minimap.
-export const WORLD_ORDER = ['over', 'nether', 'gold', 'ant'];
+export const WORLD_ORDER = ['over', 'nether', 'gold', 'ant', 'tnt'];

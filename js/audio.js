@@ -70,6 +70,13 @@ export class Sound {
       case 'door': // soft wooden click when a door opens/closes
         this.blip(280, 0.09, 'square', 0.07, 230);
         break;
+      case 'fuse': // quick sizzle when TNT is lit
+        this.blip(1000, 0.12, 'square', 0.05, 1300);
+        break;
+      case 'boom': // a low, rumbly (but friendly) explosion
+        this.blip(110, 0.42, 'sawtooth', 0.22, 40);
+        this.blip(70, 0.5, 'square', 0.18, 30);
+        break;
     }
   }
 }

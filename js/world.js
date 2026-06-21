@@ -73,6 +73,7 @@ export const BLOCKS = {
   [B.PORTAL]: { tiles: { top: TILE.NETHER_PORTAL, side: TILE.NETHER_PORTAL, bottom: TILE.NETHER_PORTAL }, tint: W, ui: '#9959d9', indestructible: true, passable: true },
   [B.DOOR]: nat(TILE.DOOR, '#8a5a2a'),
   [B.DOOR_OPEN]: { tiles: { top: TILE.DOOR_OPEN, side: TILE.DOOR_OPEN, bottom: TILE.DOOR_OPEN }, tint: W, ui: '#5e3c1c', passable: true },
+  [B.TNT]: nat3(TILE.TNT_TOP, TILE.TNT_SIDE, TILE.TNT_TOP, '#c0392b'),
 };
 
 // Build blocks grouped into categories for the pop-up picker.
@@ -80,6 +81,7 @@ export const CATEGORIES = [
   { name: 'Nature', blocks: [B.GRASS, B.DIRT, B.SAND, B.GRAVEL, B.SNOW, B.LOG, B.BIRCH_LOG, B.LEAVES] },
   { name: 'Water 🪣', blocks: [B.WATER] },
   { name: 'House 🏠', blocks: [B.DOOR, B.GLASS, B.PLANKS, B.BRICK] },
+  { name: 'Boom 💥', blocks: [B.TNT] },
   { name: 'Stone', blocks: [B.STONE, B.COBBLE, B.STONE_BRICK, B.BRICK, B.OBSIDIAN, B.GLOWSTONE] },
   { name: 'Wood', blocks: [B.PLANKS, B.BIRCH_PLANKS, B.DARK_PLANKS, B.BOOKSHELF] },
   { name: 'Shiny', blocks: [B.GOLD, B.DIAMOND, B.ICE, B.GLASS] },
@@ -390,6 +392,54 @@ export class World {
     }
     this.spawn = [SX / 2 + 0.5, 12, SZ / 2 + 0.5];
     this.spawn[1] = this.heightAt(Math.floor(this.spawn[0]), Math.floor(this.spawn[2])) + 2;
+  }
+
+  // A rocky TNT World: piles of TNT and stone towers, just waiting to be blown up.
+  generateTnt() {
+    this.data.fill(B.AIR);
+    this.placed = new Set();
+    this.portals = [];
+    const rand = mulberry32(9090);
+    for (let x = 0; x < SX; x++) {
+      for (let z = 0; z < SZ; z++) {
+        let h = 5 + Math.round(1.0 * Math.sin(x * 0.15) + 1.0 * Math.cos(z * 0.14));
+        h = Math.max(3, Math.min(9, h));
+        for (let y = 0; y <= h; y++) this.data[this.idx(x, y, z)] = (y === 0) ? B.BEDROCK : B.STONE;
+      }
+    }
+    for (let i = 0; i < 44; i++) {                  // scattered TNT piles
+      const x = 3 + Math.floor(rand() * (SX - 6)), z = 3 + Math.floor(rand() * (SZ - 6));
+      const h = this.heightAt(x, z), pile = 1 + Math.floor(rand() * 3);
+      for (let k = 0; k < pile; k++) this.data[this.idx(x, h + 1 + k, z)] = B.TNT;
+    }
+    for (let i = 0; i < 22; i++) {                  // stone towers (with a little TNT inside)
+      const x = 3 + Math.floor(rand() * (SX - 6)), z = 3 + Math.floor(rand() * (SZ - 6));
+      const h = this.heightAt(x, z), th = 2 + Math.floor(rand() * 4);
+      for (let k = 1; k <= th; k++) this.data[this.idx(x, h + k, z)] = (rand() < 0.3) ? B.TNT : B.STONE;
+    }
+    this.spawn = [SX / 2 + 0.5, 12, SZ / 2 + 0.5];
+    this.spawn[1] = this.heightAt(Math.floor(this.spawn[0]), Math.floor(this.spawn[2])) + 2;
+  }
+
+  // Boom! Clear destructible blocks within radius r of (cx,cy,cz). Returns the
+  // positions of any *other* TNT caught in the blast (for chain reactions).
+  explode(cx, cy, cz, r) {
+    const chain = [], r2 = r * r;
+    const y0 = Math.max(1, Math.floor(cy - r)), y1 = Math.min(SY - 1, Math.floor(cy + r));
+    const x0 = Math.max(0, Math.floor(cx - r)), x1 = Math.min(SX - 1, Math.floor(cx + r));
+    const z0 = Math.max(0, Math.floor(cz - r)), z1 = Math.min(SZ - 1, Math.floor(cz + r));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
+      const dx = x + 0.5 - cx, dy = y + 0.5 - cy, dz = z + 0.5 - cz;
+      if (dx * dx + dy * dy + dz * dz > r2) continue;
+      const id = this.get(x, y, z);
+      if (id === B.AIR) continue;
+      const def = BLOCKS[id];
+      if (def && def.indestructible) continue;       // bedrock + portal survive
+      if (id === B.TNT) { chain.push([x, y, z]); continue; }
+      this.set(x, y, z, B.AIR);
+      this.placed.delete(this.idx(x, y, z));
+    }
+    return chain;
   }
 
   // Build a portal: an obsidian frame on a small pad with a step in front. The

@@ -42,6 +42,8 @@ let selected = B.GRASS;
 let lastTool = 'build', actionAnim = 0;
 let saveDirty = false, lastSave = 0;
 let prevX = 0, prevZ = 0, goalToastTimer = 0;
+let shake = 0;            // camera kick from explosions
+const fuses = [];         // lit TNT awaiting detonation: { x, y, z, t }
 const canvas = document.getElementById('game');
 
 // Third-person follow camera.
@@ -139,6 +141,7 @@ function setDimension(key) {
 // Travel through a gateway to another world, arriving at the matching portal.
 function travelTo(dest) {
   if (!WORLD_KINDS[dest]) return;
+  fuses.length = 0;                         // cancel any fuses lit in the world we're leaving
   positions[dimension] = player.pos.slice();
   const from = dimension;
   ensureDim(dest);
@@ -219,6 +222,11 @@ function computeCamera() {
   camPos[0] = camTarget[0] - camDir[0] * dist;
   camPos[1] = camTarget[1] - camDir[1] * dist;
   camPos[2] = camTarget[2] - camDir[2] * dist;
+  if (shake > 0.001) {
+    camPos[0] += (Math.random() - 0.5) * shake;
+    camPos[1] += (Math.random() - 0.5) * shake;
+    camPos[2] += (Math.random() - 0.5) * shake;
+  }
   mat4.lookAt(view, camPos, camTarget, [0, 1, 0]);
 }
 
@@ -304,6 +312,34 @@ function removeDoor(x, y, z) {
   sound.play('dig'); saveDirty = true; actionAnim = 1; minimapDirty = true; goals.onDig();
 }
 
+// --- TNT: place it, tap to light it, then BOOM (it chain-reacts) ---
+function lightTNT(x, y, z) {
+  if (world.get(x, y, z) !== B.TNT) return;
+  if (fuses.some((f) => f.x === x && f.y === y && f.z === z)) return;
+  fuses.push({ x, y, z, t: 1.1 });
+  sound.play('fuse');
+  spawnParticles([x + 0.5, y + 1.0, z + 0.5], '🧨', 'puff', 1, 6);
+}
+function detonate(x, y, z) {
+  world.set(x, y, z, B.AIR);
+  world.placed.delete(world.idx(x, y, z));
+  const chain = world.explode(x + 0.5, y + 0.5, z + 0.5, 3.2);
+  sound.play('boom');
+  spawnBoom([x + 0.5, y + 0.6, z + 0.5]);
+  shake = Math.min(0.7, shake + 0.5);
+  saveDirty = true; minimapDirty = true;
+  goals.bump('boom');
+  // gentle knockback away from the blast — a thrill, never harmful
+  const dx = player.pos[0] - (x + 0.5), dy = player.pos[1] - (y + 0.5), dz = player.pos[2] - (z + 0.5);
+  const d = Math.hypot(dx, dy, dz);
+  if (d < 5.5) {
+    const k = (1 - d / 5.5) * 9, inv = 1 / (d || 1);
+    player.vel[0] += dx * inv * k; player.vel[2] += dz * inv * k;
+    player.vel[1] += 4 + (1 - d / 5.5) * 3;
+  }
+  for (const [cx, cy, cz] of chain) if (!fuses.some((f) => f.x === cx && f.y === cy && f.z === cz)) fuses.push({ x: cx, y: cy, z: cz, t: 0.12 + Math.random() * 0.12 });
+}
+
 function doPet() {
   // Pet the nearest friendly creature in whichever world you're in.
   const m = mobs();
@@ -345,6 +381,7 @@ function spawnHearts(worldPos) { spawnParticles(worldPos, '💗', 'heart', 4, 40
 function spawnPuffs(worldPos) { spawnParticles(worldPos, '💨', 'puff', 6, 60); }
 function spawnSparkles(worldPos) { spawnParticles(worldPos, '✨', 'puff', 7, 56); }
 function spawnSplash(worldPos) { spawnParticles([worldPos[0], worldPos[1] + 0.3, worldPos[2]], '💦', 'puff', 7, 60); }
+function spawnBoom(worldPos) { spawnParticles(worldPos, '💥', 'puff', 9, 72); }
 
 // Tap a creeper to defend: it poofs harmlessly, your blocks pop back, +a star.
 function doDefend(cr) {
@@ -602,6 +639,7 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000 || 0);
   last = now;
   actionAnim = Math.max(0, actionAnim - dt * 3);
+  shake = Math.max(0, shake - dt * 2.2);
 
   controls.frame();
   applyLook();
@@ -628,9 +666,17 @@ function frame(now) {
     }
   }
 
+  // Tick lit TNT fuses → detonate when they reach zero.
+  for (let i = fuses.length - 1; i >= 0; i--) {
+    fuses[i].t -= dt;
+    if (fuses[i].t > 0) continue;
+    const f = fuses.splice(i, 1)[0];
+    if (world.get(f.x, f.y, f.z) === B.TNT) detonate(f.x, f.y, f.z);
+  }
+
   const m = mobs();
   updateMobs(m, dt);
-  world.flushDirty(2);
+  world.flushDirty(fuses.length ? 6 : 2);   // catch up faster while things are blowing up
 
   resize();
   gl.viewport(0, 0, canvas.width, canvas.height);
@@ -648,7 +694,9 @@ function frame(now) {
     if (cr) doDefend(cr);
     else {
       const hit = world.raycast(camPos, dir, REACH);
-      if (hit && isDoor(world.get(hit.block[0], hit.block[1], hit.block[2]))) toggleDoor(hit.block[0], hit.block[1], hit.block[2]);
+      const bid = hit ? world.get(hit.block[0], hit.block[1], hit.block[2]) : 0;
+      if (hit && isDoor(bid)) toggleDoor(hit.block[0], hit.block[1], hit.block[2]);
+      else if (hit && bid === B.TNT) lightTNT(hit.block[0], hit.block[1], hit.block[2]);
       else doAction(hit);
     }
   }
@@ -821,6 +869,7 @@ function init() {
     enterPortal: () => travelTo(dimension === 'over' ? 'nether' : 'over'),
     goals,
     spawnCreeper: () => { const c = mobs().creepers; if (c) c.spawnNow(player); },
+    lightTNT: (x, y, z) => lightTNT(x, y, z),
   };
 
   last = performance.now();
