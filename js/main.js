@@ -299,6 +299,9 @@ function init() {
     navigator.serviceWorker.register('sw.js').catch(() => { });
   }
 
+  // Lightweight debug handle (handy for support and automated demos).
+  window.__ezra = { world, player, animals };
+
   last = performance.now();
   requestAnimationFrame(frame);
 }
