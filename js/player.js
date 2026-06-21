@@ -1,9 +1,8 @@
-// First-person player: gentle movement, auto-jump over 1-block steps, and
-// forgiving AABB collision against the voxel world. No fall damage, no death.
+// Third-person player: moves relative to the camera, turns to face the way it
+// walks, with gentle physics and auto-jump. Looking is handled by the camera.
 
 const HALF = 0.3;       // half width
 const HEIGHT = 1.7;     // body height
-const EYE = 1.55;       // eye height above feet
 const GRAVITY = 22;
 const JUMP = 7.2;
 const SPEED = 4.2;      // gentle walk speed
@@ -14,24 +13,17 @@ export class Player {
     this.world = world;
     this.pos = world.spawn.slice();
     this.vel = [0, 0, 0];
-    this.yaw = 0;
-    this.pitch = -0.15;
+    this.yaw = 0;          // facing (the way the character walks)
     this.onGround = false;
-    this.lookSens = 0.0042; // low sensitivity for small hands
+    this.moving = false;
+    this.walkPhase = 0;    // drives the limb-swing animation
+    this.moveAmt = 0;      // 0..1 eased "how much we're moving"
   }
 
   goHome() {
     this.pos = this.world.spawn.slice();
     this.vel = [0, 0, 0];
-    this.pitch = -0.15;
   }
-
-  lookDir() {
-    const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
-    return [-Math.sin(this.yaw) * cp, sp, -Math.cos(this.yaw) * cp];
-  }
-
-  eye() { return [this.pos[0], this.pos[1] + EYE, this.pos[2]]; }
 
   boxHits(x, y, z) {
     const w = this.world;
@@ -45,34 +37,35 @@ export class Player {
     return false;
   }
 
-  update(dt, input) {
-    // Look (from right-side drag).
-    this.yaw -= input.lookDX * this.lookSens;
-    this.pitch -= input.lookDY * this.lookSens;
-    this.pitch = Math.max(-1.5, Math.min(1.5, this.pitch));
-    input.lookDX = 0; input.lookDY = 0;
-
-    // Desired horizontal movement relative to facing.
-    const fH = [-Math.sin(this.yaw), 0, -Math.cos(this.yaw)];
-    const right = [Math.cos(this.yaw), 0, -Math.sin(this.yaw)];
-    let wx = fH[0] * input.moveY + right[0] * input.moveX;
-    let wz = fH[2] * input.moveY + right[2] * input.moveX;
+  // camYaw: the camera's horizontal angle; movement is relative to it.
+  update(dt, input, camYaw) {
+    const fwd = [-Math.sin(camYaw), 0, -Math.cos(camYaw)];
+    const right = [Math.cos(camYaw), 0, -Math.sin(camYaw)];
+    let wx = fwd[0] * input.moveY + right[0] * input.moveX;
+    let wz = fwd[2] * input.moveY + right[2] * input.moveX;
     const wl = Math.hypot(wx, wz);
     if (wl > 1) { wx /= wl; wz /= wl; }
+    this.moving = wl > 0.05;
     this.vel[0] = wx * SPEED;
     this.vel[2] = wz * SPEED;
+
+    // Turn the character to face the direction of travel.
+    if (this.moving) {
+      const target = Math.atan2(-wx, -wz);
+      let d = target - this.yaw;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      this.yaw += Math.max(-12 * dt, Math.min(12 * dt, d));
+    }
 
     if (input.jump && this.onGround) { this.vel[1] = JUMP; this.onGround = false; }
     this.vel[1] -= GRAVITY * dt;
     if (this.vel[1] < -28) this.vel[1] = -28;
 
-    const movingH = wl > 0.05;
-
     // X axis
     let nx = this.pos[0] + this.vel[0] * dt;
     if (this.boxHits(nx, this.pos[1], this.pos[2])) {
-      nx = this.vel[0] > 0 ? Math.floor(nx + HALF) - HALF - EPS
-        : Math.ceil(nx - HALF) + HALF + EPS;
+      nx = this.vel[0] > 0 ? Math.floor(nx + HALF) - HALF - EPS : Math.ceil(nx - HALF) + HALF + EPS;
       this.vel[0] = 0;
     }
     this.pos[0] = nx;
@@ -80,8 +73,7 @@ export class Player {
     // Z axis
     let nz = this.pos[2] + this.vel[2] * dt;
     if (this.boxHits(this.pos[0], this.pos[1], nz)) {
-      nz = this.vel[2] > 0 ? Math.floor(nz + HALF) - HALF - EPS
-        : Math.ceil(nz - HALF) + HALF + EPS;
+      nz = this.vel[2] > 0 ? Math.floor(nz + HALF) - HALF - EPS : Math.ceil(nz - HALF) + HALF + EPS;
       this.vel[2] = 0;
     }
     this.pos[2] = nz;
@@ -96,25 +88,23 @@ export class Player {
     }
     this.pos[1] = ny;
 
-    // Auto-jump: if a single-block step is right in front while walking, hop up.
-    // We check the block ahead is solid but the one above it (and our headroom)
-    // is clear, so we never bounce against taller walls.
-    if (this.onGround && movingH) {
-      const mag = Math.hypot(wx, wz); // intended direction (velocity may be zeroed by a wall)
-      if (mag > 0.1) {
-        const dx = wx / mag, dz = wz / mag;
-        const ax = Math.floor(this.pos[0] + dx * (HALF + 0.25));
-        const az = Math.floor(this.pos[2] + dz * (HALF + 0.25));
-        const fy = Math.floor(this.pos[1] + 0.1);
-        if (this.world.solidAt(ax, fy, az) && !this.world.solidAt(ax, fy + 1, az) &&
-          !this.boxHits(this.pos[0], this.pos[1] + 1.05, this.pos[2])) {
-          this.vel[1] = JUMP; // enough to clear a full 1-block step
-          this.onGround = false;
-        }
+    // Auto-jump a single-block step in the walking direction.
+    if (this.onGround && this.moving) {
+      const mag = Math.hypot(wx, wz);
+      const dx = wx / mag, dz = wz / mag;
+      const ax = Math.floor(this.pos[0] + dx * (HALF + 0.25));
+      const az = Math.floor(this.pos[2] + dz * (HALF + 0.25));
+      const fy = Math.floor(this.pos[1] + 0.1);
+      if (this.world.solidAt(ax, fy, az) && !this.world.solidAt(ax, fy + 1, az) &&
+        !this.boxHits(this.pos[0], this.pos[1] + 1.05, this.pos[2])) {
+        this.vel[1] = JUMP; this.onGround = false;
       }
     }
 
-    // Safety net: never fall out of the world.
+    // Walk animation + eased "moving" amount.
+    this.walkPhase += dt * 9 * (this.moving ? 1 : 0);
+    this.moveAmt += ((this.moving ? 1 : 0) - this.moveAmt) * Math.min(1, dt * 10);
+
     if (this.pos[1] < -4) this.goHome();
   }
 }

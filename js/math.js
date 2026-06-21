@@ -87,6 +87,23 @@ export const mat4 = {
     return out;
   },
 
+  translate(out, x, y, z) {
+    out[0] = 1; out[1] = 0; out[2] = 0; out[3] = 0;
+    out[4] = 0; out[5] = 1; out[6] = 0; out[7] = 0;
+    out[8] = 0; out[9] = 0; out[10] = 1; out[11] = 0;
+    out[12] = x; out[13] = y; out[14] = z; out[15] = 1;
+    return out;
+  },
+
+  rotateX(out, rad) {
+    const c = Math.cos(rad), s = Math.sin(rad);
+    out[0] = 1; out[1] = 0; out[2] = 0; out[3] = 0;
+    out[4] = 0; out[5] = c; out[6] = s; out[7] = 0;
+    out[8] = 0; out[9] = -s; out[10] = c; out[11] = 0;
+    out[12] = 0; out[13] = 0; out[14] = 0; out[15] = 1;
+    return out;
+  },
+
   // Transform (x,y,z,1) by m, writing [x,y,z,w] into out4. Used to project to screen.
   transformPoint(out4, m, x, y, z) {
     out4[0] = m[0] * x + m[4] * y + m[8] * z + m[12];

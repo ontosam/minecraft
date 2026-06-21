@@ -8,6 +8,7 @@ import { Player } from './player.js';
 import { Animals } from './animals.js';
 import { Controls } from './input.js';
 import { Sound } from './audio.js';
+import { Character } from './character.js';
 
 const SAVE_KEY = 'ezrablocks.save.v2';
 const SKY = [0.62, 0.82, 0.96];
@@ -22,11 +23,16 @@ function showError(msg) {
 window.addEventListener('error', (e) => showError(e.message || e.error || 'Unknown error'));
 window.addEventListener('unhandledrejection', (e) => showError(e.reason && e.reason.message || e.reason || 'Promise error'));
 
-let gl, worldProg, lineProg, atlas, world, player, animals, controls, sound;
+let gl, worldProg, lineProg, atlas, world, player, animals, controls, sound, character;
 let highlight, identity, proj, view, pv, scratch4, scratch4m;
 let selected = B.GRASS;
 let saveDirty = false, lastSave = 0;
 const canvas = document.getElementById('game');
+
+// Third-person follow camera.
+let camYaw = 0, camPitch = 0.42;
+const CAM_DIST = 5.0, CAM_LOOK = 0.005;
+const camPos = [0, 0, 0], camDir = [0, 0, -1], camTarget = [0, 0, 0];
 
 function buildHighlight() {
   const a = -0.004, b = 1.004;
@@ -48,7 +54,7 @@ function loadGame() {
         world.spawn[1] = world.heightAt(x, z) + 2;
         if (obj.player) {
           player.pos = obj.player.pos.slice();
-          player.yaw = obj.player.yaw; player.pitch = obj.player.pitch;
+          player.yaw = obj.player.yaw || 0;
         }
         if (typeof obj.sel === 'number' && BLOCKS[obj.sel]) selected = obj.sel;
         return true;
@@ -62,18 +68,55 @@ function saveGame() {
   try {
     const obj = {
       v: 2, world: world.serialize(), sel: selected,
-      player: { pos: player.pos, yaw: player.yaw, pitch: player.pitch },
+      player: { pos: player.pos, yaw: player.yaw },
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(obj));
     saveDirty = false;
   } catch (e) { /* ignore quota errors */ }
 }
 
-// --- Build / dig actions ---
+// --- Camera (third-person, follows the character) ---
+function applyLook() {
+  camYaw += controls.lookDX * CAM_LOOK;
+  camPitch += controls.lookDY * CAM_LOOK;
+  camPitch = Math.max(-0.1, Math.min(1.25, camPitch));
+  controls.lookDX = 0; controls.lookDY = 0;
+}
+
+function cameraFollow(dt) {
+  // Ease the camera around behind the character while walking (unless the
+  // player is actively dragging to look around).
+  if (controls.lookPtr === null && player.moving) {
+    let d = player.yaw - camYaw;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    camYaw += d * Math.min(1, dt * 2.5);
+  }
+}
+
+function computeCamera() {
+  const cp = Math.cos(camPitch), sp = Math.sin(camPitch);
+  camDir[0] = -Math.sin(camYaw) * cp;
+  camDir[1] = -sp;
+  camDir[2] = -Math.cos(camYaw) * cp;
+  camTarget[0] = player.pos[0];
+  camTarget[1] = player.pos[1] + 1.2;
+  camTarget[2] = player.pos[2];
+  // Pull the camera in if there's terrain behind the character.
+  let dist = CAM_DIST;
+  for (let t = 0.4; t <= CAM_DIST; t += 0.3) {
+    const x = camTarget[0] - camDir[0] * t, y = camTarget[1] - camDir[1] * t, z = camTarget[2] - camDir[2] * t;
+    if (world.solidAt(Math.floor(x), Math.floor(y), Math.floor(z))) { dist = Math.max(1.4, t - 0.3); break; }
+  }
+  camPos[0] = camTarget[0] - camDir[0] * dist;
+  camPos[1] = camTarget[1] - camDir[1] * dist;
+  camPos[2] = camTarget[2] - camDir[2] * dist;
+  mat4.lookAt(view, camPos, camTarget, [0, 1, 0]);
+}
+
+// --- Build / dig actions (aim from the camera through the screen centre) ---
 function targetCells() {
-  const eye = player.eye();
-  const hit = world.raycast(eye, player.lookDir(), 6);
-  return hit;
+  return world.raycast(camPos, camDir, CAM_DIST + 6);
 }
 
 function overlapsPlayer(x, y, z) {
@@ -211,7 +254,9 @@ function frame(now) {
   last = now;
 
   controls.frame();
-  player.update(dt, controls);
+  applyLook();
+  player.update(dt, controls, camYaw);
+  cameraFollow(dt);
   animals.update(dt, player);
   world.flushDirty(2);
 
@@ -222,8 +267,7 @@ function frame(now) {
 
   const aspect = canvas.width / Math.max(1, canvas.height);
   mat4.perspective(proj, 1.05, aspect, 0.08, 120);
-  const eye = player.eye(), dir = player.lookDir();
-  mat4.lookAt(view, eye, [eye[0] + dir[0], eye[1] + dir[1], eye[2] + dir[2]], [0, 1, 0]);
+  computeCamera();
   mat4.multiply(pv, proj, view);
 
   gl.useProgram(worldProg.program);
@@ -238,6 +282,7 @@ function frame(now) {
   gl.uniform1i(worldProg.u.uTex, 0);
 
   world.draw(worldProg);
+  character.draw(worldProg, player.pos[0], player.pos[1], player.pos[2], player.yaw, player.walkPhase, player.moveAmt);
   animals.draw(worldProg);
 
   // Targeted-block highlight.
@@ -271,10 +316,12 @@ function init() {
   world = new World(gl);
   player = new Player(world);
   animals = new Animals(gl, world);
+  character = new Character(gl);
   controls = new Controls(canvas);
   sound = new Sound();
 
   if (!loadGame()) { world.generate(); player.goHome(); }
+  camYaw = player.yaw;
   world.rebuildAll();
   animals.spawn(10);
   buildHighlight();
@@ -301,7 +348,11 @@ function init() {
   }
 
   // Lightweight debug handle (handy for support and automated demos).
-  window.__ezra = { world, player, animals };
+  window.__ezra = {
+    world, player, animals,
+    cam: () => ({ yaw: camYaw, pitch: camPitch, pos: camPos.slice(), dir: camDir.slice() }),
+    target: () => targetCells(),
+  };
 
   last = performance.now();
   requestAnimationFrame(frame);
