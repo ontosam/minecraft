@@ -181,7 +181,7 @@ function travelTo(dest) {
 
 // Flint & steel portals line up in a tidy row right by home, one slot per
 // destination — so they never stack behind each other and are easy to find.
-const HUB_DESTS = ['gold', 'ant', 'tnt'];
+const HUB_DESTS = ['gold', 'ant', 'tnt', 'sky'];
 function placeHubPortal(W, kind, dest) {
   const slot = Math.max(0, HUB_DESTS.indexOf(dest));
   const sp = W.spawn;
@@ -494,6 +494,7 @@ const SHOP = [
   { id: 'megatnt', icon: '💥', name: 'Mega TNT', cost: 10, desc: 'Bigger, more powerful explosions!' },
   { id: 'rainbow', icon: '🌈', name: 'Rainbow Block', cost: 10, desc: 'A magic rainbow block to build with' },
   { id: 'crown', icon: '👑', name: 'Golden Crown', cost: 14, desc: 'Wear a royal crown — be the king!' },
+  { id: 'skyworld', icon: '☁️', name: 'Sky World', cost: 20, desc: 'A whole new floating-islands world — best with Fly!' },
 ];
 function buildShop() {
   document.getElementById('shop-gems').textContent = 'You have 💎 ' + goals.gems;
@@ -522,6 +523,7 @@ function buyItem(it) {
   if (it.id === 'rainbow') {             // reveal it in the picker + select it right away
     buildPicker(); selected = B.RAINBOW; refreshBlocksButton(); saveDirty = true;
   }
+  if (it.id === 'skyworld') showToast('☁️ Sky World unlocked! Tap 🔥, choose Sky World, then walk in!', 4200);
   sound.play('treasure');
   updateGems(); buildShop();
   showToast('✨ Unlocked: ' + it.name + '!');
@@ -618,7 +620,12 @@ function buildPortalMenu() {
   body.innerHTML = '';
   const dests = [];
   if (dimension !== 'over') dests.push('over');                       // Home
-  for (const k of WORLD_ORDER) if (k !== dimension && WORLD_KINDS[k].flint) dests.push(k);
+  for (const k of WORLD_ORDER) {
+    const kind = WORLD_KINDS[k];
+    if (k === dimension || !kind.flint) continue;
+    if (kind.locked && !goals.hasUnlock(kind.locked)) continue;       // bought-only worlds
+    dests.push(k);
+  }
   for (const k of dests) {
     const kind = WORLD_KINDS[k];
     const btn = document.createElement('button');

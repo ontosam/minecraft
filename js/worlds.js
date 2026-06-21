@@ -46,7 +46,15 @@ export const WORLD_KINDS = {
     mobs: [],                   // a demolition playground — no creatures to hurt
     flint: true,
   },
+  sky: {
+    name: 'Sky World', emoji: '☁️',
+    sky: [0.56, 0.78, 0.96], fog: [44, 96],
+    gen: 'generateSky', ground: B.GRASS,
+    mobs: ['animals'],
+    flint: true,                // appears in the flint menu…
+    locked: 'skyworld',         // …but only after it's bought in the 💎 shop
+  },
 };
 
 // Display order for menus/minimap.
-export const WORLD_ORDER = ['over', 'nether', 'gold', 'ant', 'tnt'];
+export const WORLD_ORDER = ['over', 'nether', 'gold', 'ant', 'tnt', 'sky'];

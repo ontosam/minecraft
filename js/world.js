@@ -427,6 +427,62 @@ export class World {
     this.spawn[1] = this.heightAt(Math.floor(this.spawn[0]), Math.floor(this.spawn[2])) + 2;
   }
 
+  // A dreamy Sky World: grassy islands floating in a bright sky, with trees,
+  // glowstone lanterns, buried treasure, and soft clouds. Made for flying.
+  generateSky() {
+    this.data.fill(B.AIR);
+    this.placed = new Set();
+    this.portals = [];
+    const rand = mulberry32(2024);
+    const cxC = Math.floor(SX / 2), czC = Math.floor(SZ / 2);
+    // Build one floating island: a grassy disc that narrows as it goes down.
+    const island = (cx, cz, r, ty) => {
+      for (let dy = 0; dy < 6; dy++) {
+        const rr = r - dy * 1.2;
+        const y = ty - dy;
+        if (rr < 0.6 || y < 1) break;
+        for (let x = Math.max(1, Math.floor(cx - rr)); x <= Math.min(SX - 2, Math.ceil(cx + rr)); x++) {
+          for (let z = Math.max(1, Math.floor(cz - rr)); z <= Math.min(SZ - 2, Math.ceil(cz + rr)); z++) {
+            if (Math.hypot(x - cx, z - cz) > rr) continue;
+            this.data[this.idx(x, y, z)] = dy === 0 ? B.GRASS : (dy <= 2 ? B.DIRT : B.STONE);
+          }
+        }
+      }
+    };
+    // A big central island so spawn + the home portal sit on solid ground.
+    island(cxC, czC, 8, 10);
+    for (let i = 0; i < 16; i++) {
+      const cx = 6 + Math.floor(rand() * (SX - 12)), cz = 6 + Math.floor(rand() * (SZ - 12));
+      if (Math.hypot(cx - cxC, cz - czC) < 12) continue;        // keep the centre clear
+      island(cx, cz, 3 + Math.floor(rand() * 4), 7 + Math.floor(rand() * 9));
+    }
+    // Friendly trees on the grassy tops.
+    let trees = 0;
+    for (let attempt = 0; attempt < 300 && trees < 10; attempt++) {
+      const x = 3 + Math.floor(rand() * (SX - 6)), z = 3 + Math.floor(rand() * (SZ - 6));
+      const h = this.heightAt(x, z);
+      if (h > 0 && this.get(x, h, z) === B.GRASS) { this.placeTree(x, h + 1, z, rand); trees++; }
+    }
+    // Glowstone lanterns + a little buried treasure to dig up.
+    for (let i = 0; i < 40; i++) {
+      const x = 2 + Math.floor(rand() * (SX - 4)), z = 2 + Math.floor(rand() * (SZ - 4));
+      const h = this.heightAt(x, z);
+      if (h < 1) continue;
+      if (rand() < 0.4) this.data[this.idx(x, h + 1, z)] = B.GLOWSTONE;
+      else { const cy = Math.max(1, h - 1 - Math.floor(rand() * 2)); const cur = this.get(x, cy, z); if (cur === B.STONE || cur === B.DIRT) this.data[this.idx(x, cy, z)] = rand() < 0.5 ? B.GOLD : B.DIAMOND; }
+    }
+    // Soft clouds drifting up high (kept clear of the centre/spawn).
+    for (let i = 0; i < 26; i++) {
+      const x = 2 + Math.floor(rand() * (SX - 4)), z = 2 + Math.floor(rand() * (SZ - 4)), y = 16 + Math.floor(rand() * 4);
+      if (Math.hypot(x - cxC, z - czC) < 12) continue;
+      this.data[this.idx(x, y, z)] = B.SNOW;
+      if (x + 1 < SX) this.data[this.idx(x + 1, y, z)] = B.SNOW;
+      if (z + 1 < SZ) this.data[this.idx(x, y, z + 1)] = B.SNOW;
+    }
+    this.spawn = [cxC + 0.5, 12, czC + 0.5];
+    this.spawn[1] = this.heightAt(cxC, czC) + 2;
+  }
+
   // Boom! Clear destructible blocks within radius r of (cx,cy,cz). Returns the
   // positions of any *other* TNT caught in the blast (for chain reactions).
   explode(cx, cy, cz, r) {
