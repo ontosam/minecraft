@@ -210,6 +210,7 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000 || 0);
   last = now;
 
+  controls.frame();
   player.update(dt, controls);
   animals.update(dt, player);
   world.flushDirty(2);
