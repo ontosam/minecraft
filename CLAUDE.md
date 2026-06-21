@@ -144,6 +144,45 @@ End-of-arc additions (reset + an incentive economy beyond stars). All deployed:
   Idea backlog: more shop items (speed boots, sparkle trail, new worlds), build
   challenges that check structures, spend 💎 to instantly unlock the Nether.
 
+## Status (session 7)
+Two bug fixes the dad flagged + a big reward pass (he said Ezra loves 💎;
+"add more rewards he has to work for, plus special things — pen is yours").
+Dev branch this session: **`claude/gifted-gates-h9dzy2`** (push there; mirror
+to `main`/live pending the dad's OK).
+1. **Reset button was invisible** — the Goals panel is `overflow:hidden`, but
+   `#goals-body` had no internal scroll, so the long (now 28) goal list shoved
+   the "🔄 Start this world fresh…" button off the clipped bottom. Fixed in CSS:
+   `#goals-body` now `flex:1; min-height:0; overflow-y:auto` and `#btn-reset` is
+   `flex:0 0 auto` (pinned, always visible). Verified headless (button is on-
+   screen *and* `elementFromPoint` returns it = clickable).
+2. **Zombie bug** — attacks only checked horizontal distance, so a zombie could
+   bonk you from straight below while you flew/towered up to escape. Added a
+   vertical gate: `ATTACK_VRANGE=2.0`, attack needs `d<=ATTACK_RANGE &&
+   |dy|<=ATTACK_VRANGE` (zombies.js). Flying/climbing is now a real escape.
+   Verified by a Node logic test.
+3. **Bigger 💎 shop** (`SHOP` in main.js) — now 8 items, mixing "work for it"
+   with delight: **👟 Speed Boots** (`player.speedMul`), **🦘 Super Jump**
+   (`player.jumpMul`), **✨ Sparkle Trail** (frame-loop ✨ particles while
+   moving, `trailT`), **🌈 Rainbow Block** (new `B.RAINBOW`/`TILE.RAINBOW`;
+   shows up in a new **"Special ✨"** picker category gated by `cat.locked`, and
+   is auto-selected on buy), **👑 Golden Crown** (`character.wearCrown` + a crown
+   mesh on the head), plus the existing Pet/Heart/Mega-TNT. Costs 5–20💎.
+   `applyUnlocks()` now also sets speed/jump/crown; `buyItem` bumps a new
+   `bought` counter. 3 new goals (Treasure shopper, Diamond king, Marathon →
+   28 total). All unlocks persist (goals save `u`).
+4. **☁️ Sky World** (the big-ticket reward, 20💎) — `World.generateSky()`:
+   grassy islands floating in a bright sky + trees/glowstone/treasure/clouds,
+   a guaranteed central island for spawn + the home portal. Registered in
+   `WORLD_KINDS.sky` with `flint:true` + `locked:'skyworld'`; the flint "Where
+   to?" menu hides locked worlds until bought. Added to `WORLD_ORDER` and
+   `HUB_DESTS` (tidy portal row). Falling off just respawns you (no harm) and
+   it pairs perfectly with Fly. Verified headless: hidden→buy→appears in flint
+   menu→travel→build→return home, and **builds persist across save/reload**;
+   full world-hop regression (gold/ant/tnt/nether/over) stays green.
+   New debug hook: `__ezra.crown()`. Tuning candidates: crown sits a touch tall;
+   Sky World home-portal can land on a tree (cosmetic); sky-world treasure adds
+   to the "treasure goals are easy in resource-rich worlds" note.
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files
