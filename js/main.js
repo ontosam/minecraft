@@ -462,7 +462,7 @@ function doBonkZombie(z) {
   const defeated = zb.bonk(z, swordDamage());
   sound.play(defeated ? 'poof' : 'dig');
   spawnPuffs([z.pos[0], z.pos[1] + 1.0, z.pos[2]]);
-  if (defeated) goals.bump('zombie');
+  if (defeated) { goals.bump('zombie'); goals.bump('monster'); }
 }
 
 // Tap a spider to shoo it (two taps, or one with the sword → harmless poof).
@@ -472,7 +472,7 @@ function doBonkSpider(s) {
   const defeated = sp.bonk(s, swordDamage());
   sound.play(defeated ? 'poof' : 'dig');
   spawnPuffs([s.pos[0], s.pos[1] + 0.5, s.pos[2]]);
-  if (defeated) goals.bump('spider');
+  if (defeated) { goals.bump('spider'); goals.bump('monster'); }
 }
 
 // --- Hearts: getting hurt, a gentle knock-out, slow regen ---
@@ -498,7 +498,10 @@ function applyUnlocks() {
     player.speedMul = goals.hasUnlock('boots') ? 1.55 : 1;
     player.jumpMul = goals.hasUnlock('superjump') ? 1.4 : 1;
   }
-  if (character) character.wearCrown = goals.hasUnlock('crown');
+  if (character) {
+    character.wearCrown = goals.hasUnlock('crown');
+    character.holdSword = goals.hasUnlock('sword');
+  }
   updateHearts();
 }
 function explodeRadius() { return goals.hasUnlock('megatnt') ? 4.6 : 3.2; }
@@ -519,6 +522,7 @@ const SHOP = [
   { id: 'superjump', icon: '🦘', name: 'Super Jump', cost: 6, desc: 'Boing! Jump up really high' },
   { id: 'heart', icon: '❤️', name: 'Extra Heart', cost: 8, desc: 'One more heart for night adventures' },
   { id: 'sparkle', icon: '✨', name: 'Sparkle Trail', cost: 8, desc: 'Leave a trail of sparkles as you run' },
+  { id: 'sword', icon: '⚔️', name: 'Diamond Sword', cost: 12, desc: 'Defeat zombies & spiders in one hit!' },
   { id: 'megatnt', icon: '💥', name: 'Mega TNT', cost: 10, desc: 'Bigger, more powerful explosions!' },
   { id: 'rainbow', icon: '🌈', name: 'Rainbow Block', cost: 10, desc: 'A magic rainbow block to build with' },
   { id: 'crown', icon: '👑', name: 'Golden Crown', cost: 14, desc: 'Wear a royal crown — be the king!' },
@@ -1128,6 +1132,7 @@ function init() {
     hurt: (n) => hurt(n),
     night: () => night,
     crown: () => character.wearCrown,
+    sword: () => character.holdSword,
     gems: () => goals.gems,
     buy: (idd) => { const it = SHOP.find((s) => s.id === idd); if (it) buyItem(it); },
     resetWorld: () => resetWorld(),

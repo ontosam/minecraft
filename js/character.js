@@ -45,6 +45,16 @@ function mesh(gl, build) {
 const SKIN = [0.97, 0.80, 0.67], SHIRT = [0.30, 0.62, 0.88], PANTS = [0.33, 0.36, 0.55];
 const SHOE = [0.25, 0.22, 0.24], HAIR = [0.34, 0.22, 0.13], EYE = [0.16, 0.13, 0.12];
 const GOLD = [0.98, 0.82, 0.20], GEM = [0.88, 0.20, 0.32];
+const STEEL = [0.55, 0.86, 0.95], GRIP = [0.32, 0.20, 0.12], GUARD = [0.86, 0.70, 0.28];
+
+// A little diamond sword (shop reward) held in the action hand. Modelled with
+// the grip at the origin and the blade pointing forward (-z) out of the fist.
+function buildSword(A) {
+  addBox(A, -0.022, -0.022, 0.0, 0.022, 0.022, 0.17, GRIP);     // handle (into the palm, +z)
+  addBox(A, -0.10, -0.055, -0.02, 0.10, 0.055, 0.02, GUARD);    // crossguard
+  addBox(A, -0.03, -0.06, -0.60, 0.03, 0.06, -0.02, STEEL);     // blade forward (-z)
+  addBox(A, -0.014, -0.03, -0.68, 0.014, 0.03, -0.60, STEEL);   // pointed tip
+}
 
 // A little golden crown (shop reward) that sits on top of the head. Built with
 // its base centred on the local origin so it can be parked on the head mount.
@@ -78,6 +88,8 @@ export class Character {
     });
     this.crown = mesh(gl, buildCrown);
     this.wearCrown = false;        // toggled when the Golden Crown is bought
+    this.sword = mesh(gl, buildSword);
+    this.holdSword = false;        // toggled when the Diamond Sword is bought
     this.parts = [
       { m: this.leg, mount: [-0.1, 0.7, 0], dir: 1, swing: true },
       { m: this.leg, mount: [0.1, 0.7, 0], dir: -1, swing: true },
@@ -88,6 +100,7 @@ export class Character {
     ];
     this._P = mat4.create(); this._T = mat4.create(); this._R = mat4.create();
     this._L = mat4.create(); this._M = mat4.create();
+    this._T2 = mat4.create(); this._M2 = mat4.create();
   }
 
   draw(prog, x, y, z, yaw, phase, amt, act) {
@@ -107,6 +120,12 @@ export class Character {
       mat4.multiply(this._M, this._P, this._L);
       gl.uniformMatrix4fv(prog.u.uModel, false, this._M);
       p.m.draw(prog);
+      if (p.action && this.holdSword) { // sword gripped in the action hand
+        mat4.translate(this._T2, 0, -0.46, -0.02);
+        mat4.multiply(this._M2, this._M, this._T2);
+        gl.uniformMatrix4fv(prog.u.uModel, false, this._M2);
+        this.sword.draw(prog);
+      }
     }
     if (this.wearCrown) { // perched on top of the head (rides the body's lean)
       mat4.translate(this._T, 0, 1.66, 0);
