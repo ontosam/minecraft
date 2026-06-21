@@ -293,7 +293,9 @@ function init() {
   window.addEventListener('beforeunload', () => { if (saveDirty) saveGame(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden && saveDirty) saveGame(); });
 
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  // Only enable the offline service worker in production (HTTPS), so local
+  // previews always load the latest files.
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('sw.js').catch(() => { });
   }
 

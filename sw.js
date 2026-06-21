@@ -21,22 +21,21 @@ self.addEventListener('activate', (e) => {
   ).then(() => self.clients.claim()));
 });
 
+// Network-first: always try the network so updates show up immediately, and
+// fall back to the cache when offline.
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   e.respondWith(
-    caches.match(req).then((hit) => {
+    fetch(req).then((res) => {
+      if (res && res.ok && res.type === 'basic') {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(req, copy));
+      }
+      return res;
+    }).catch(() => caches.match(req).then((hit) => {
       if (hit) return hit;
-      return fetch(req).then((res) => {
-        if (res && res.ok && res.type === 'basic') {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(req, copy));
-        }
-        return res;
-      }).catch(() => {
-        // Offline fallback for page navigations.
-        if (req.mode === 'navigate') return caches.match('index.html');
-      });
-    })
+      if (req.mode === 'navigate') return caches.match('index.html');
+    }))
   );
 });
