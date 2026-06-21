@@ -16,6 +16,7 @@ export const B = {
   COBBLE: 22, STONE_BRICK: 23, SNOW: 24, ICE: 25, GRAVEL: 26,
   BIRCH_LOG: 27, BIRCH_PLANKS: 28, DARK_PLANKS: 29, GOLD: 30,
   DIAMOND: 31, BOOKSHELF: 32, GLOWSTONE: 33, PUMPKIN: 34, OBSIDIAN: 35,
+  NETHERRACK: 36, PORTAL: 37, LAVA: 38,
 };
 
 const W = [1, 1, 1]; // white tint for textured blocks
@@ -62,6 +63,11 @@ export const BLOCKS = {
   [B.GLOWSTONE]: nat(TILE.GLOWSTONE, '#e8c24a'),
   [B.PUMPKIN]: nat3(TILE.PUMPKIN_TOP, TILE.PUMPKIN_SIDE, TILE.PUMPKIN_TOP, '#e07b1e'),
   [B.OBSIDIAN]: nat(TILE.OBSIDIAN, '#241a33'),
+  [B.NETHERRACK]: nat(TILE.NETHERRACK, '#7a2e2e'),
+  [B.LAVA]: nat(TILE.LAVA, '#e8702a'),
+  // The portal swirl: you walk *through* it (passable) and it can't be dug, so
+  // the gateway can't be accidentally destroyed and leave anyone stuck.
+  [B.PORTAL]: { tiles: { top: TILE.NETHER_PORTAL, side: TILE.NETHER_PORTAL, bottom: TILE.NETHER_PORTAL }, tint: W, ui: '#9959d9', indestructible: true, passable: true },
 };
 
 // Build blocks grouped into categories for the pop-up picker.
@@ -71,6 +77,7 @@ export const CATEGORIES = [
   { name: 'Wood', blocks: [B.PLANKS, B.BIRCH_PLANKS, B.DARK_PLANKS, B.BOOKSHELF] },
   { name: 'Shiny', blocks: [B.GOLD, B.DIAMOND, B.ICE, B.GLASS] },
   { name: 'Fun', blocks: [B.PUMPKIN] },
+  { name: 'Nether', blocks: [B.NETHERRACK, B.LAVA] },
   { name: 'Colours', blocks: [B.RED, B.ORANGE, B.YELLOW, B.GREEN, B.CYAN, B.BLUE, B.PURPLE, B.PINK, B.WHITE, B.BLACK] },
 ];
 
@@ -106,6 +113,7 @@ export class World {
     this.dirty = new Set();
     this.placed = new Set();  // packed indices of blocks the *player* placed
     this.spawn = [SX / 2 + 0.5, 12, SZ / 2 + 0.5];
+    this.arrival = null;      // where to drop the player when arriving via portal
   }
 
   idx(x, y, z) { return x + z * SX + y * SX * SZ; }
@@ -124,12 +132,16 @@ export class World {
     return this.data[this.idx(x, y, z)] !== B.AIR;
   }
 
-  // For physics: borders act as walls.
+  // For physics: borders act as walls. Passable blocks (the portal swirl) are
+  // walk-through so the player can step into the gateway.
   solidAt(x, y, z) {
     if (y < 0) return true;
     if (y >= SY) return false;
     if (x < 0 || x >= SX || z < 0 || z >= SZ) return true;
-    return this.data[this.idx(x, y, z)] !== B.AIR;
+    const id = this.data[this.idx(x, y, z)];
+    if (id === B.AIR) return false;
+    const def = BLOCKS[id];
+    return !(def && def.passable);
   }
 
   heightAt(x, z) {
@@ -214,6 +226,46 @@ export class World {
       }
     }
     this.data[this.idx(x, top + 1, z)] = B.LEAVES;
+  }
+
+  // A reddish Nether world: netherrack ground with scattered glowstone (light)
+  // and small lava patches (glow). Open-topped and bright so it's never gloomy.
+  generateNether() {
+    this.data.fill(B.AIR);
+    this.placed = new Set();
+    const rand = mulberry32(4242);
+    for (let x = 0; x < SX; x++) {
+      for (let z = 0; z < SZ; z++) {
+        let h = 5 + Math.round(1.5 * Math.sin(x * 0.2) + 1.5 * Math.cos(z * 0.18) + 1.2 * Math.sin((x + z) * 0.1));
+        h = Math.max(3, Math.min(11, h));
+        for (let y = 0; y <= h; y++) this.data[this.idx(x, y, z)] = (y === 0) ? B.BEDROCK : B.NETHERRACK;
+      }
+    }
+    for (let i = 0; i < 60; i++) {
+      const x = 3 + Math.floor(rand() * (SX - 6)), z = 3 + Math.floor(rand() * (SZ - 6));
+      const h = this.heightAt(x, z);
+      if (rand() < 0.5) this.data[this.idx(x, h + 1, z)] = B.GLOWSTONE;
+      else this.data[this.idx(x, h, z)] = B.LAVA;
+    }
+    this.spawn = [SX / 2 + 0.5, 12, SZ / 2 + 0.5];
+    this.spawn[1] = this.heightAt(Math.floor(this.spawn[0]), Math.floor(this.spawn[2])) + 2;
+  }
+
+  // Build a portal (obsidian frame + passable swirl) grounded on a small pad,
+  // with a step in front. Records `arrival` = where to drop an arriving player.
+  addPortal(ox, oz, groundBlock) {
+    let oy = 1;
+    for (let dx = 0; dx < 4; dx++) oy = Math.max(oy, this.heightAt(ox + dx, oz) + 1, this.heightAt(ox + dx, oz + 1) + 1);
+    for (let dx = 0; dx < 4; dx++) {
+      for (let yy = this.heightAt(ox + dx, oz) + 1; yy < oy; yy++) this.set(ox + dx, yy, oz, groundBlock);
+      for (let yy = this.heightAt(ox + dx, oz + 1) + 1; yy < oy; yy++) this.set(ox + dx, yy, oz + 1, groundBlock);
+      for (let dy = 0; dy < 5; dy++) {
+        const edge = (dx === 0 || dx === 3 || dy === 0 || dy === 4);
+        this.set(ox + dx, oy + dy, oz, edge ? B.OBSIDIAN : B.PORTAL);
+      }
+    }
+    this.arrival = [ox + 1.5, oy, oz + 1.5];
+    return this.arrival;
   }
 
   markAllDirty() { for (let i = 0; i < this.meshes.length; i++) this.dirty.add(i); }
@@ -324,7 +376,7 @@ export class World {
 
   // --- Save / load (raw bytes, base64 into localStorage) ---
   serialize() {
-    return { v: 1, w: bytesToBase64(this.data), p: [...this.placed] };
+    return { v: 1, w: bytesToBase64(this.data), p: [...this.placed], a: this.arrival };
   }
   loadFrom(obj) {
     if (!obj || obj.v !== 1 || !obj.w) return false;
@@ -332,6 +384,7 @@ export class World {
     if (bytes.length !== this.data.length) return false;
     this.data.set(bytes);
     this.placed = new Set(obj.p || []);
+    this.arrival = obj.a || null;
     return true;
   }
 }

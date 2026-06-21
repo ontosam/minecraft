@@ -12,7 +12,7 @@ export const TILE = {
   SNOW: 16, ICE: 17, GRAVEL: 18, BIRCH_PLANKS: 19,
   DARK_PLANKS: 20, GOLD: 21, DIAMOND: 22, BOOKSHELF: 23,
   GLOWSTONE: 24, PUMPKIN_SIDE: 25, PUMPKIN_TOP: 26, OBSIDIAN: 27,
-  BIRCH_LOG: 28,
+  BIRCH_LOG: 28, NETHERRACK: 29, NETHER_PORTAL: 30, LAVA: 31,
 };
 
 export function initGL(canvas) {
@@ -262,6 +262,16 @@ function buildAtlasCanvas() {
 
   p = at(TILE.BIRCH_LOG); noise(ctx, p[0], p[1], 0xe7e2d4, 0.06, 55);
   ctx.fillStyle = shade(0x2a2a2a, 1); { const r = rng(550); for (let i = 0; i < 6; i++) ctx.fillRect(p[0] + Math.floor(r() * 13), p[1] + Math.floor(r() * 15), 2 + Math.floor(r() * 2), 1); }
+
+  // --- Nether blocks ---
+  p = at(TILE.NETHERRACK); noise(ctx, p[0], p[1], 0x7a2e2e, 0.3, 60);
+  { const r = rng(601); for (let i = 0; i < 14; i++) { ctx.fillStyle = shade(0x4e1c1c, 1); ctx.fillRect(p[0] + Math.floor(r() * 15), p[1] + Math.floor(r() * 15), 1 + Math.floor(r() * 2), 1); } }
+
+  p = at(TILE.NETHER_PORTAL); noise(ctx, p[0], p[1], 0x7a3fb0, 0.18, 62);
+  { const r = rng(621); for (let i = 0; i < 12; i++) { ctx.fillStyle = shade(r() < 0.5 ? 0xc59cf0 : 0x4f2580, 1); ctx.fillRect(p[0] + Math.floor(r() * 14), p[1] + Math.floor(r() * 14), 2, 2); } }
+
+  p = at(TILE.LAVA); noise(ctx, p[0], p[1], 0xe8702a, 0.16, 63);
+  { const r = rng(631); for (let i = 0; i < 9; i++) { ctx.fillStyle = shade(0xffd45a, 1); ctx.fillRect(p[0] + Math.floor(r() * 14), p[1] + Math.floor(r() * 14), 2, 1); } }
 
   return c;
 }

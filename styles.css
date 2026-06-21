@@ -402,6 +402,22 @@ body {
   border: 3px solid rgba(255, 255, 255, .85);
 }
 
+/* Minimap (top-right, out of the way of both thumbs and the top bar) */
+#minimap {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(10px, env(safe-area-inset-right));
+  width: 116px;
+  height: 116px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.18);
+  image-rendering: pixelated;
+  pointer-events: none;
+  z-index: 5;
+}
+
 /* Hearts */
 #hearts {
   position: fixed;

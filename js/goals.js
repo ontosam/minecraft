@@ -11,6 +11,9 @@ export const GOAL_DEFS = [
   { id: 'pets', icon: '💞', title: 'Best friends', desc: 'Pet 5 animals', metric: 'pet', target: 5 },
   { id: 'architect', icon: '🏠', title: 'Architect', desc: 'Place 30 blocks', metric: 'place', target: 30 },
   { id: 'guard', icon: '🦸', title: 'Block hero', desc: 'Bonk 5 creepers', metric: 'defend', target: 5 },
+  { id: 'portal', icon: '🌀', title: 'Find the portal', desc: 'Step into the Nether portal', metric: 'nether', target: 1 },
+  { id: 'meetghast', icon: '👻', title: 'Meet a ghast', desc: 'Find a friendly ghast', metric: 'ghast', target: 1 },
+  { id: 'meetblaze', icon: '🔥', title: 'Meet a blaze', desc: 'Find a friendly blaze', metric: 'blaze', target: 1 },
   { id: 'explorer2', icon: '🗺️', title: 'Adventurer', desc: 'Walk a long way (250)', metric: 'dist', target: 250 },
 ];
 
@@ -18,7 +21,7 @@ const KEY = 'ezrablocks.goals.v1';
 
 export class Goals {
   constructor() {
-    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0 };
+    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, nether: 0, ghast: 0, blaze: 0 };
     this.usedTypes = new Set();
     this.done = {};
     this.stars = 0;
@@ -48,6 +51,7 @@ export class Goals {
   onBuild(id) { this.counts.place++; this.usedTypes.add(id); this.check(); this.save(); }
   onDig() { this.counts.dig++; this.check(); this.save(); }
   onDefend() { this.counts.defend++; this.check(); this.save(); }
+  bump(metric) { if (metric in this.counts) { this.counts[metric]++; this.check(); this.save(); } }
 
   maybeSave() { if (Date.now() - this._lastSave > 1500) this.save(); }
   save() {

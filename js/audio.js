@@ -48,6 +48,13 @@ export class Sound {
       case 'poof': // soft harmless puff
         this.blip(620, 0.16, 'triangle', 0.12, 180);
         break;
+      case 'portal': // gentle shimmer when stepping through a portal
+        this.blip(330, 0.18, 'sine', 0.11, 660);
+        setTimeout(() => this.blip(495, 0.22, 'sine', 0.10, 990), 110);
+        break;
+      case 'coo': // soft, friendly call when you meet a nether creature
+        this.blip(300, 0.26, 'sine', 0.10, 250);
+        break;
     }
   }
 }

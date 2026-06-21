@@ -7,13 +7,15 @@ import { World, BLOCKS, CATEGORIES, B, SX, SY, SZ } from './world.js';
 import { Player } from './player.js';
 import { Animals } from './animals.js';
 import { Creepers } from './creepers.js';
+import { NetherMobs } from './nethermobs.js';
 import { Controls } from './input.js';
 import { Sound } from './audio.js';
 import { Character } from './character.js';
 import { Goals, GOAL_DEFS } from './goals.js';
 
 const SAVE_KEY = 'ezrablocks.save.v2';
-const SKY = [0.62, 0.82, 0.96];
+const SKY = [0.62, 0.82, 0.96];          // overworld daytime blue
+const NETHER_SKY = [0.32, 0.12, 0.13];   // warm, dim Nether red
 
 function showError(msg) {
   const el = document.getElementById('error-overlay');
@@ -25,7 +27,13 @@ function showError(msg) {
 window.addEventListener('error', (e) => showError(e.message || e.error || 'Unknown error'));
 window.addEventListener('unhandledrejection', (e) => showError(e.reason && e.reason.message || e.reason || 'Promise error'));
 
-let gl, worldProg, atlas, world, player, animals, creepers, controls, sound, character, goals;
+let gl, worldProg, atlas, world, player, animals, creepers, nethermobs, controls, sound, character, goals;
+let overworld, nether;                   // the two dimensions; `world` points at the active one
+let dimension = 'over';                  // 'over' | 'nether'
+let sky = SKY;                           // active sky/fog colour
+let portalCooldown = 0;                  // brief grace after a swap so you don't bounce back
+let overPos = null, netherPos = null;    // remembered player position in each dimension
+let minimapDirty = true;                 // redraw the minimap's terrain layer when set
 let identity, proj, view, pv, scratch4;
 let selected = B.GRASS;
 let lastTool = 'build', actionAnim = 0;
@@ -44,24 +52,46 @@ let camDistEased = camDist;    // smoothed toward camDist for a gentle zoom
 const REACH = 16;              // how far a build/dig tap can reach from the camera
 const camPos = [0, 0, 0], camDir = [0, 0, -1], camTarget = [0, 0, 0];
 
+// Where each dimension's portal sits (deterministic, so old saves can be upgraded).
+function overworldPortalCoords() {
+  return [Math.min(SX - 5, Math.floor(overworld.spawn[0]) + 4), Math.min(SZ - 3, Math.floor(overworld.spawn[2]) + 8), B.DIRT];
+}
+function netherPortalCoords() {
+  return [Math.min(SX - 5, Math.max(1, Math.floor(nether.spawn[0]) - 1)), Math.min(SZ - 3, Math.floor(nether.spawn[2]) + 2), B.NETHERRACK];
+}
+function refreshSpawn(w) { w.spawn[1] = w.heightAt(Math.floor(w.spawn[0]), Math.floor(w.spawn[2])) + 2; }
+function ensurePortals() {
+  if (!overworld.arrival) overworld.addPortal(...overworldPortalCoords());
+  if (!nether.arrival) nether.addPortal(...netherPortalCoords());
+}
+
 function loadGame() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
-    if (raw) {
-      const obj = JSON.parse(raw);
-      if (world.loadFrom(obj.world)) {
-        const x = Math.floor(world.spawn[0]), z = Math.floor(world.spawn[2]);
-        world.spawn[1] = world.heightAt(x, z) + 2;
-        if (obj.player) {
-          player.pos = obj.player.pos.slice();
-          player.yaw = obj.player.yaw || 0;
-        }
-        if (typeof obj.sel === 'number' && BLOCKS[obj.sel]) selected = obj.sel;
-        if (typeof obj.zoom === 'number' && ZOOM_LEVELS[obj.zoom] !== undefined) {
-          zoomIndex = obj.zoom; camDist = camDistEased = ZOOM_LEVELS[zoomIndex];
-        }
-        return true;
-      }
+    if (!raw) return false;
+    const obj = JSON.parse(raw);
+    if (typeof obj.sel === 'number' && BLOCKS[obj.sel]) selected = obj.sel;
+    if (typeof obj.zoom === 'number' && ZOOM_LEVELS[obj.zoom] !== undefined) {
+      zoomIndex = obj.zoom; camDist = camDistEased = ZOOM_LEVELS[zoomIndex];
+    }
+    if (obj.v === 3 && obj.over) {                 // new two-dimension save
+      if (!overworld.loadFrom(obj.over)) return false;
+      if (!obj.nether || !nether.loadFrom(obj.nether)) nether.generateNether();
+      refreshSpawn(overworld); refreshSpawn(nether); ensurePortals();
+      overPos = obj.overPos || overworld.spawn.slice();
+      netherPos = obj.netherPos || nether.arrival.slice();
+      player.yaw = obj.yaw || 0;
+      setDimension(obj.dim === 'nether' ? 'nether' : 'over');
+      player.pos = (dimension === 'over' ? overPos : netherPos).slice();
+      return true;
+    }
+    if (obj.world && overworld.loadFrom(obj.world)) { // old overworld-only save
+      nether.generateNether();
+      refreshSpawn(overworld); refreshSpawn(nether); ensurePortals();
+      if (obj.player) { player.pos = obj.player.pos.slice(); player.yaw = obj.player.yaw || 0; }
+      overPos = player.pos.slice(); netherPos = nether.arrival.slice();
+      setDimension('over');
+      return true;
     }
   } catch (e) { /* fall through to a fresh world */ }
   return false;
@@ -69,13 +99,38 @@ function loadGame() {
 
 function saveGame() {
   try {
+    if (dimension === 'over') overPos = player.pos.slice(); else netherPos = player.pos.slice();
     const obj = {
-      v: 2, world: world.serialize(), sel: selected, zoom: zoomIndex,
-      player: { pos: player.pos, yaw: player.yaw },
+      v: 3, dim: dimension, sel: selected, zoom: zoomIndex, yaw: player.yaw,
+      over: overworld.serialize(), nether: nether.serialize(),
+      overPos: overPos || overworld.spawn.slice(),
+      netherPos: netherPos || nether.spawn.slice(),
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(obj));
     saveDirty = false;
   } catch (e) { /* ignore quota errors */ }
+}
+
+// --- Dimensions: the overworld and the Nether ---
+function setDimension(dim) {
+  dimension = dim;
+  world = (dim === 'over') ? overworld : nether;
+  player.world = world;
+  sky = (dim === 'over') ? SKY : NETHER_SKY;
+  minimapDirty = true;
+}
+
+function enterPortal() {
+  if (dimension === 'over') overPos = player.pos.slice(); else netherPos = player.pos.slice();
+  setDimension(dimension === 'over' ? 'nether' : 'over');
+  const a = world.arrival || world.spawn;
+  player.pos = [a[0], a[1] + 0.3, a[2]];
+  player.vel = [0, 0, 0];
+  camYaw = player.yaw;
+  portalCooldown = 1.3;
+  saveDirty = true;
+  sound.play('portal');
+  if (dimension === 'nether') goals.bump('nether'); // first trip completes "Find the portal"
 }
 
 // --- Camera (third-person, follows the character) ---
@@ -149,7 +204,7 @@ function doBuild(hit) {
   if (world.get(x, y, z) !== B.AIR || overlapsPlayer(x, y, z)) { sound.play('deny'); return; }
   world.set(x, y, z, selected);
   world.placed.add(world.idx(x, y, z)); // remember it's the player's, so creepers find the house
-  sound.play('place'); saveDirty = true; actionAnim = 1;
+  sound.play('place'); saveDirty = true; actionAnim = 1; minimapDirty = true;
   goals.onBuild(selected);
 }
 
@@ -160,12 +215,13 @@ function doDig(hit) {
   if (id === B.AIR || (BLOCKS[id] && BLOCKS[id].indestructible)) { sound.play('deny'); return; }
   world.set(x, y, z, B.AIR);
   world.placed.delete(world.idx(x, y, z));
-  sound.play('dig'); saveDirty = true; actionAnim = 1;
+  sound.play('dig'); saveDirty = true; actionAnim = 1; minimapDirty = true;
   goals.onDig();
 }
 
 function doPet() {
-  const p = animals.petNearest(player);
+  // In the overworld you pet animals; in the Nether you pet the floaty creatures.
+  const p = (dimension === 'over') ? animals.petNearest(player) : nethermobs.petNearest(player);
   if (p) { sound.play('pet'); spawnHearts(p); goals.onPet(); }
 }
 
@@ -342,6 +398,59 @@ function wireUI() {
   document.getElementById('goals').addEventListener('pointerdown', (e) => { if (e.target.id === 'goals') document.getElementById('goals').classList.add('hidden'); });
 }
 
+// --- Minimap: a small top-down map (terrain + you + the portal) ---
+let mmCanvas, mmCtx, mmTerrain, mmTerrainCtx;
+const MM_SIZE = 120;
+function hexToRgb(h) { const n = parseInt((h || '#888').slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function initMinimap() {
+  mmCanvas = document.getElementById('minimap');
+  if (!mmCanvas) return;
+  mmCanvas.width = MM_SIZE; mmCanvas.height = MM_SIZE;
+  mmCtx = mmCanvas.getContext('2d');
+  mmTerrain = document.createElement('canvas'); mmTerrain.width = SX; mmTerrain.height = SZ;
+  mmTerrainCtx = mmTerrain.getContext('2d');
+}
+function renderMinimapTerrain() {
+  const img = mmTerrainCtx.createImageData(SX, SZ);
+  for (let z = 0; z < SZ; z++) for (let x = 0; x < SX; x++) {
+    const h = world.heightAt(x, z);
+    let r = 110, g = 150, b = 95;
+    if (h >= 0) {
+      const def = BLOCKS[world.get(x, h, z)];
+      const c = hexToRgb(def ? def.ui : '#888');
+      const f = 0.65 + 0.35 * Math.min(1, h / 14);   // higher ground = brighter
+      r = c[0] * f; g = c[1] * f; b = c[2] * f;
+    }
+    const i = (z * SX + x) * 4;
+    img.data[i] = r; img.data[i + 1] = g; img.data[i + 2] = b; img.data[i + 3] = 255;
+  }
+  mmTerrainCtx.putImageData(img, 0, 0);
+  minimapDirty = false;
+}
+function drawMinimap() {
+  if (!mmCtx) return;
+  if (minimapDirty) renderMinimapTerrain();
+  const s = MM_SIZE / SX;
+  mmCtx.imageSmoothingEnabled = false;
+  mmCtx.clearRect(0, 0, MM_SIZE, MM_SIZE);
+  mmCtx.drawImage(mmTerrain, 0, 0, SX, SZ, 0, 0, MM_SIZE, MM_SIZE);
+  // portal marker (pulsing purple ring)
+  if (world.arrival) {
+    mmCtx.strokeStyle = '#c89cff'; mmCtx.fillStyle = 'rgba(150,90,230,0.85)'; mmCtx.lineWidth = 2;
+    const ox = world.arrival[0] * s, oz = world.arrival[2] * s;
+    mmCtx.beginPath(); mmCtx.arc(ox, oz, 4.5, 0, Math.PI * 2); mmCtx.fill(); mmCtx.stroke();
+  }
+  // player arrow (points the way you face)
+  const px = player.pos[0] * s, pz = player.pos[2] * s;
+  const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), rx = -fz, rz = fx;
+  mmCtx.fillStyle = '#fff'; mmCtx.strokeStyle = '#16335f'; mmCtx.lineWidth = 1.5;
+  mmCtx.beginPath();
+  mmCtx.moveTo(px + fx * 6, pz + fz * 6);
+  mmCtx.lineTo(px - fx * 4 + rx * 4, pz - fz * 4 + rz * 4);
+  mmCtx.lineTo(px - fx * 4 - rx * 4, pz - fz * 4 - rz * 4);
+  mmCtx.closePath(); mmCtx.fill(); mmCtx.stroke();
+}
+
 // --- Render ---
 function resize() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -363,13 +472,22 @@ function frame(now) {
   const dm = Math.hypot(dxm, dzm);
   if (dm > 0.0005 && dm < 2) goals.onMove(dm);
   prevX = player.pos[0]; prevZ = player.pos[2];
-  animals.update(dt, player);
-  creepers.update(dt, player, goals.stars);
+
+  // Step into a portal swirl → travel between the overworld and the Nether.
+  portalCooldown = Math.max(0, portalCooldown - dt);
+  if (portalCooldown === 0) {
+    const bx = Math.floor(player.pos[0]), bz = Math.floor(player.pos[2]);
+    if (world.get(bx, Math.floor(player.pos[1] + 0.4), bz) === B.PORTAL ||
+        world.get(bx, Math.floor(player.pos[1] + 1.2), bz) === B.PORTAL) enterPortal();
+  }
+
+  if (dimension === 'over') { animals.update(dt, player); creepers.update(dt, player, goals.stars); }
+  else nethermobs.update(dt, player, SX, SZ);
   world.flushDirty(2);
 
   resize();
   gl.viewport(0, 0, canvas.width, canvas.height);
-  gl.clearColor(SKY[0], SKY[1], SKY[2], 1);
+  gl.clearColor(sky[0], sky[1], sky[2], 1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
   const aspect = canvas.width / Math.max(1, canvas.height);
@@ -379,7 +497,7 @@ function frame(now) {
   if (controls.tapPending) {
     controls.tapPending = false;
     const dir = screenRay(controls.tapX, controls.tapY);
-    const cr = creepers.pickRay(camPos, dir);
+    const cr = (dimension === 'over') ? creepers.pickRay(camPos, dir) : null;
     if (cr) doDefend(cr);
     else doAction(world.raycast(camPos, dir, REACH));
   }
@@ -389,9 +507,9 @@ function frame(now) {
   gl.uniformMatrix4fv(worldProg.u.uProj, false, proj);
   gl.uniformMatrix4fv(worldProg.u.uView, false, view);
   gl.uniformMatrix4fv(worldProg.u.uModel, false, identity);
-  gl.uniform3f(worldProg.u.uFogColor, SKY[0], SKY[1], SKY[2]);
-  gl.uniform1f(worldProg.u.uFogNear, 38);
-  gl.uniform1f(worldProg.u.uFogFar, 78);
+  gl.uniform3f(worldProg.u.uFogColor, sky[0], sky[1], sky[2]);
+  gl.uniform1f(worldProg.u.uFogNear, dimension === 'over' ? 38 : 26);
+  gl.uniform1f(worldProg.u.uFogFar, dimension === 'over' ? 78 : 60);
   gl.uniform1f(worldProg.u.uAlpha, 1);
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, atlas);
@@ -399,11 +517,10 @@ function frame(now) {
 
   world.draw(worldProg);
   character.draw(worldProg, player.pos[0], player.pos[1], player.pos[2], player.yaw, player.walkPhase, player.moveAmt, actionAnim);
-  animals.draw(worldProg);
-  creepers.draw(worldProg);
+  if (dimension === 'over') { animals.draw(worldProg); creepers.draw(worldProg); }
+  else nethermobs.draw(worldProg);
 
-  // (No hover outline/glow indicator: you can tap anywhere to build or dig, so
-  // the floating guide was just in the way — removed at the dad's request.)
+  drawMinimap();
 
   // Autosave.
   if (saveDirty && now - lastSave > 6000) { saveGame(); lastSave = now; }
@@ -420,25 +537,41 @@ function init() {
   proj = mat4.create(); view = mat4.create(); pv = mat4.create();
   scratch4 = new Float32Array(4);
 
-  world = new World(gl);
+  overworld = new World(gl);
+  nether = new World(gl);
+  world = overworld;
   player = new Player(world);
-  animals = new Animals(gl, world);
-  creepers = new Creepers(gl, world);
+  animals = new Animals(gl, overworld);
+  creepers = new Creepers(gl, overworld);
   creepers.onEvent = (type, pos) => {
     if (type === 'uhoh') sound.play('uhoh');
     else if (type === 'chip') saveDirty = true;
   };
+  nethermobs = new NetherMobs(gl, nether);
+  nethermobs.onMeet = (species, pos) => { sound.play('coo'); spawnHearts(pos); goals.bump(species); };
   character = new Character(gl);
   controls = new Controls(canvas);
   sound = new Sound();
   goals = new Goals();
   goals.onComplete = (g) => { showGoalToast(g); refreshGoalsButton(); };
 
-  if (!loadGame()) { world.generate(); player.goHome(); }
+  if (!loadGame()) {
+    overworld.generate();
+    nether.generateNether();
+    refreshSpawn(overworld); refreshSpawn(nether);
+    ensurePortals();
+    setDimension('over');
+    player.goHome();
+    overPos = player.pos.slice();
+    netherPos = nether.arrival.slice();
+  }
   camYaw = player.yaw;
   prevX = player.pos[0]; prevZ = player.pos[2];
-  world.rebuildAll();
+  overworld.rebuildAll();
+  nether.rebuildAll();
   animals.spawn(10);
+  nethermobs.populate(SX, SZ);
+  initMinimap();
   wireUI();
 
   // Resume audio + hide the hint on first interaction.
@@ -462,11 +595,13 @@ function init() {
 
   // Lightweight debug handle (handy for support and automated demos).
   window.__ezra = {
-    world, player, animals, creepers,
+    get world() { return world; }, player, animals, creepers, nethermobs, overworld, nether,
     cam: () => ({ yaw: camYaw, pitch: camPitch, pos: camPos.slice(), dir: camDir.slice() }),
     target: () => targetCells(),
     rayHit: (x, y) => rayHitAt(x, y),
     sel: () => selected,
+    dim: () => dimension,
+    enterPortal: () => enterPortal(),
     goals,
     spawnCreeper: () => creepers.spawnNow(player),
   };

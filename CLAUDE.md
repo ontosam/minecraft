@@ -24,9 +24,24 @@ rebuild after ~6s, or instantly when you defend). **Tap a creeper → harmless
 poof** + a ⭐. New goals **"Protect your house!"** and **"Block hero"**. Paced:
 none appear until you've placed ≥3 blocks; rare/slow at first, ramps gently with
 stars. Verified headless (spawn→seek→nibble→chip→rebuild, tap-to-poof, normal
-build/dig unaffected). On dev branch `claude/gracious-clarke-12zvcy`, **awaiting
-the dad's review before mirroring to `main`** (deploy). Tuning candidates:
+build/dig unaffected). Deployed to `main`. Tuning candidates:
 creeper green vs. grass (could pop more), nibble/rebuild timings, pacing.
+
+## Status (session 3)
+Two more rounds shipped + deployed:
+1. **Navigation:** removed the hover build/dig outline (tap-anywhere made it
+   redundant); added a **🔍/🗺️ "switch view"** zoom button (wide overview default,
+   cycles to close, eased + saved). Movement/feel confirmed good by the dad.
+2. **The Nether (Ezra's wishes #2 & #3):** a **separate Nether dimension** reached
+   through a **portal** (find it via a new **minimap**, top-right). Home to
+   **friendly ghasts** (big floaty white coo-ers) and **blazes** (glowy spinning
+   rods) — both harmless, pettable, with "meet" goals. New goals: Find the portal,
+   Meet a ghast, Meet a blaze. All verified headless (portal swap both ways via
+   real block detection, mobs, goals, building in both worlds, **v3 save with both
+   dimensions**, and **v2 saves upgrade safely** — old worlds get a portal
+   injected). Possible follow-ups: ghast/blaze sounds richer, nether structures,
+   make blaze/ghast pettable-to-follow, minimap position (currently top-right —
+   the dad asked for "bottom" but that clashes with the walking thumb).
 
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
@@ -68,9 +83,12 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
   `CATEGORIES`/`PALETTE`, terrain gen (gentle hills + pond + trees), **chunk
   mesher** (16×16 columns, face culling + baked ambient occlusion), `raycast`
   (DDA), save/load (base64 of the byte array + `placed`: a Set of packed indices
-  of **player-placed** blocks, so creepers target your house not nature). Chunk
-  meshes use **Uint16** indices with a guard (`base+24 > 0xffff` breaks) so
-  extreme builds can't overflow.
+  of **player-placed** blocks, so creepers target your house not nature; +
+  `arrival`: the portal drop point). Also `generateNether()` (netherrack +
+  glowstone + lava), `addPortal()` (obsidian frame + passable swirl), and a
+  `passable` block flag (the portal is walk-through). Chunk meshes use **Uint16**
+  indices with a guard (`base+24 > 0xffff` breaks) so extreme builds can't
+  overflow.
 - `js/player.js` — third-person physics: **camera-relative** movement, character
   faces travel (but **backpedals** when moving toward the camera), gravity, AABB
   collision, auto-jump, walk-phase, `movingForward` flag (camera trails only
@@ -78,6 +96,12 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
 - `js/character.js` — blocky kid (legs/arms/body/head, eyes+hair); walk-swing +
   **action chop + forward body-lean** when building/digging (`act` param).
 - `js/animals.js` — pig/sheep/cow/chick/cat; wander AI; `petNearest` → follower.
+- `js/nethermobs.js` — friendly Nether creatures (built like animals, but they
+  **float**). `NetherMobs` manages ghasts (puffy white cube + tentacles + calm
+  face) and blazes (core + spinning glowing rod ring, drawn as 2 meshes). Gentle
+  drift AI, ease to a hover height over the ground, `petNearest`, and an
+  `onMeet(species,pos)` callback the first time the player comes close (drives the
+  "meet a ghast/blaze" goals). Spawned via `populate(SX,SZ)`.
 - `js/creepers.js` — friendly creepers (built like animals). `Creepers` manages a
   list + a `rebuilds` queue. Per-creeper state `seek`→`nibble`→`poof`; targets
   nearest `world.placed` block via `findTarget` (`unkey` inverts `world.idx`);
@@ -90,17 +114,23 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
   joystick, right half = drag-look. Mouse: drag-look + hover; WASD/arrows + Space.
   **Tap detection**: quick tap (no drag, <300ms) sets `tapPending` + `tapX/tapY`;
   `aim{active,x,y}` tracks the finger/cursor for the live indicator.
-- `js/audio.js` — tiny WebAudio synth (place/dig/jump/pet/deny/uhoh/poof). No files.
-- `js/goals.js` — `GOAL_DEFS` + `Goals` (counters incl. `defend`, stars,
-  localStorage). Saves on every completion; throttled otherwise.
+- `js/audio.js` — tiny WebAudio synth (place/dig/jump/pet/deny/uhoh/poof/portal/
+  coo). No files.
+- `js/goals.js` — `GOAL_DEFS` + `Goals` (counters incl. `defend`/`nether`/`ghast`/
+  `blaze`, stars, localStorage, generic `bump(metric)`). Saves on every
+  completion; throttled otherwise.
 - `js/main.js` — the glue: GL/program/atlas setup; **camera** (`camYaw/camPitch`,
   `cameraFollow`, collision pull-in, `screenRay`/`rayHitAt`); **zoom/"switch
   view"** (`ZOOM_LEVELS=[7,4.5,3]`, `zoomIndex`, eased `camDistEased`, 🔍/🗺️
-  `btn-view`, saved); render loop; build/dig (`doBuild/doDig(hit)`, `doAction`,
-  `lastTool`); **tap routing**: a tap first tries `creepers.pickRay`
-  (→`doDefend`, poof + ⭐), else `doAction` (no hover indicator — tap anywhere);
-  UI wiring (picker, goals, buttons); hearts + `spawnPuffs` (creeper poof);
-  autosave; SW reg.
+  `btn-view`, saved); **two dimensions** (`overworld`/`nether` Worlds, active
+  `world` pointer, `dimension`, `setDimension`/`enterPortal`, per-dim `sky`/fog +
+  entity update/draw; `portalCooldown`; `overPos`/`netherPos`); **minimap**
+  (`initMinimap`/`drawMinimap`, top-down terrain + you + portal, `minimapDirty`);
+  render loop; build/dig (`doBuild/doDig(hit)`, `doAction`, `lastTool`); **tap
+  routing**: in the overworld a tap first tries `creepers.pickRay` (→`doDefend`,
+  poof + ⭐), else `doAction` (no hover indicator — tap anywhere); UI wiring;
+  hearts + `spawnPuffs`; autosave (**v3** save: both dimensions, positions, dim);
+  SW reg.
 - `scripts/serve.mjs`, `scripts/make-icons.mjs`, `sw.js` (offline, network-first,
   https only), `manifest.webmanifest`, `icons/`.
 
@@ -115,8 +145,9 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
   there.
 
 ## Debug & testing (no browser-in-the-loop otherwise)
-- `window.__ezra = { world, player, animals, creepers, cam(), target(),
-  rayHit(x,y), sel(), goals, spawnCreeper() }` — exposed for support/demos.
+- `window.__ezra = { world (active, getter), player, animals, creepers,
+  nethermobs, overworld, nether, cam(), target(), rayHit(x,y), sel(), dim(),
+  enterPortal(), goals, spawnCreeper() }` — exposed for support/demos.
 - **Headless verification** (how every change this session was checked): drive
   the bundled Chromium via the **DevTools Protocol** over a WebSocket (Node 22
   has global `WebSocket`/`fetch`), dispatch real input, read `__ezra`, and
@@ -135,10 +166,12 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
   **16px** (authentic Minecraft look — do not "HD" them).
 - Keep it **non-scary and forgiving**: always daytime, no death, no fall damage,
   can't leave the world, no accidental world-wipe button.
-- Save keys: `ezrablocks.save.v2` (world bytes + `placed` set + player +
-  selected block + `zoom` level), `ezrablocks.goals.v1`. iOS clears localStorage
-  for non-home-screen sites — tell users to **Add to Home Screen** for durable
-  progress.
+- Save keys: `ezrablocks.save.v2` (the localStorage *key* name is unchanged; the
+  JSON inside is now **v3** — both dimensions' world bytes + `placed` + `arrival`,
+  player position per dimension, current `dim`, selected block, `zoom`. Loader
+  still reads old **v2** payloads and injects a portal). `ezrablocks.goals.v1`.
+  iOS clears localStorage for non-home-screen sites — **Add to Home Screen** for
+  durable progress.
 
 ## Roadmap / backlog (priority order)
 1. ~~**Friendly creepers.**~~ ✅ **DONE (session 2)** — see Status above and
@@ -148,16 +181,10 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
    dad's playtest + deploy to `main`. Possible follow-ups if he wants more: a
    tiny telegraph "!" above a nibbling creeper, distinct creeper color so it
    pops against grass, sound-on/off toggle.
-1.5. **The Nether (Ezra's wishes #2 & #3 — NEXT, greenlit in concept).** Find a
-   **Nether portal** (obsidian frame + purple swirl) with help from a small
-   **minimap** (bottom of screen, top-down, marks the player + portal); through
-   it, meet **friendly ghasts** (big white floating cubey creatures, cute teary
-   face; in real MC they drift and shoot fireballs — here: gentle floaters that
-   make a soft sound, never harm) and **blazes** (floating creatures ringed by
-   glowing rods; here: warm glowy, harmless). Possibly **expand the world** for
-   room. Keep it non-scary/no-death. Sub-decisions to make with the dad: separate
-   Nether *dimension* vs. a nether-themed pocket; how big to expand (perf on iPad
-   — `SX*SY*SZ` bytes + chunk count); pettable or just findable. Plan in phases.
+1.5. ~~**The Nether (Ezra's wishes #2 & #3).**~~ ✅ **DONE (session 3)** — separate
+   Nether dimension via a portal, minimap to find it, friendly ghasts + blazes,
+   three new goals. See Status above + `js/nethermobs.js`. Follow-up ideas:
+   richer creature sounds, nether structures/treasure, minimap reposition.
 2. **Giants** — big friendly creatures to find/pet (extend `animals.js`).
 3. **Villagers** — friendly quest-givers (problem-solving; supports "an hour
    without skipping a beat").
