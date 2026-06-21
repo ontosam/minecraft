@@ -58,6 +58,8 @@ let prevX = 0, prevZ = 0, goalToastTimer = 0;
 let shake = 0;            // camera kick from explosions
 let trailT = 0;           // throttle for the "Sparkle Trail" shop reward
 let riding = null;        // the pony Animal you're currently riding (or null)
+let fishing = null;       // an active cast: { wx, wy, wz, t } while waiting for a bite
+let bobberEl = null;      // the on-screen bobber marker
 const fuses = [];         // lit TNT awaiting detonation: { x, y, z, t }
 const canvas = document.getElementById('game');
 
@@ -173,6 +175,7 @@ function setDimension(key) {
 // Travel through a gateway to another world, arriving at the matching portal.
 function travelTo(dest) {
   if (!WORLD_KINDS[dest]) return;
+  if (fishing) reelIn(false);               // reel in before leaving
   if (riding) dismount();                   // the pony stays home in the overworld
   fuses.length = 0;                         // cancel any fuses lit in the world we're leaving
   positions[dimension] = player.pos.slice();
@@ -574,6 +577,58 @@ function updateRideButton() {
   if (b) b.classList.toggle('on', !!riding);
 }
 
+// --- Fishing: a calm activity at any water. Cast near water, wait for a bite,
+// reel in a fish (+💎), sometimes treasure, sometimes a silly old boot. ---
+function findWaterSpot() {
+  const px = Math.floor(player.pos[0]), pz = Math.floor(player.pos[2]), py = Math.floor(player.pos[1]);
+  let best = null, bestD = 1e9;
+  for (let dz = -5; dz <= 5; dz++) for (let dx = -5; dx <= 5; dx++) {
+    const x = px + dx, z = pz + dz;
+    for (let y = py + 2; y >= py - 5; y--) {
+      if (world.get(x, y, z) === B.WATER && world.get(x, y + 1, z) === B.AIR) {
+        const d = dx * dx + dz * dz;
+        if (d < bestD) { bestD = d; best = [x + 0.5, y + 1.0, z + 0.5]; }
+        break;
+      }
+    }
+  }
+  return best;
+}
+function castLine() {
+  if (fishing) { reelIn(false); return; }      // tapping again reels in early
+  const spot = findWaterSpot();
+  if (!spot) { showToast('🎣 Find some water to fish in! 🌊  (try the beach)'); return; }
+  fishing = { wx: spot[0], wy: spot[1], wz: spot[2], t: 1.6 + Math.random() * 2.4 };
+  sound.play('splash');
+  updateFishButton();
+}
+function reelIn(caught) {
+  const f = fishing; fishing = null; hideBobber(); updateFishButton();
+  if (!f || !caught) { if (f) sound.play('splash'); return; }
+  const r = Math.random();
+  let icon, msg, gems;
+  if (r < 0.12) { icon = '🥾'; msg = 'an old boot! Ha! Cast again 🎣'; gems = 0; }
+  else if (r < 0.32) { icon = '💎'; msg = 'sunken treasure! +2 💎'; gems = 2; goals.bump('treasure'); }
+  else { icon = '🐟'; msg = 'a fish! +1 💎'; gems = 1; }
+  goals.bump('fish');
+  if (gems > 0) { goals.addGems(gems); updateGems(); }
+  sound.play(gems > 0 ? 'treasure' : 'deny');
+  spawnParticles([f.wx, f.wy + 0.4, f.wz], icon, 'heart', 1, 8);
+  showToast('🎣 You caught ' + msg);
+}
+function positionBobber(f) {
+  if (!bobberEl) bobberEl = document.getElementById('bobber');
+  if (!bobberEl || !pv) return;
+  mat4.transformPoint(scratch4, pv, f.wx, f.wy, f.wz);
+  if (scratch4[3] <= 0) { bobberEl.style.display = 'none'; return; }
+  bobberEl.style.display = 'block';
+  bobberEl.style.left = (scratch4[0] / scratch4[3] * 0.5 + 0.5) * canvas.clientWidth + 'px';
+  bobberEl.style.top = (1 - (scratch4[1] / scratch4[3] * 0.5 + 0.5)) * canvas.clientHeight + 'px';
+  bobberEl.textContent = (f.t < 0.6) ? '🐠' : '🔴';   // a nibble! near the end
+}
+function hideBobber() { if (!bobberEl) bobberEl = document.getElementById('bobber'); if (bobberEl) bobberEl.style.display = 'none'; }
+function updateFishButton() { const b = document.getElementById('btn-fish'); if (b) b.classList.toggle('on', !!fishing); }
+
 // --- Treasure shop: spend 💎 (mined + earned from goals) on fun unlocks ---
 const SHOP = [
   { id: 'pet', icon: '🐾', name: 'Pet Friend', cost: 5, desc: 'A cute cat that follows you around' },
@@ -652,6 +707,7 @@ function hurt(n) {
 }
 function knockout() {
   if (riding) dismount();
+  if (fishing) reelIn(false);
   showToast('💤 Oof! You got sleepy — back home, safe and sound.', 3400);
   night = false; updateNightButton();
   const om = worlds.over && worlds.over.mobs;
@@ -846,6 +902,7 @@ function wireUI() {
   });
 
   document.getElementById('btn-ride').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); toggleRide(); });
+  document.getElementById('btn-fish').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); castLine(); });
 
   document.getElementById('gem-bar').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); openShop(); });
   document.getElementById('shop-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeShop(); });
@@ -1010,6 +1067,13 @@ function frame(now) {
     }
   }
   mat4.multiply(pv, proj, view);
+
+  // Fishing: count down to a bite, keep the bobber on the water.
+  if (fishing) {
+    fishing.t -= dt;
+    if (fishing.t <= 0) reelIn(true);
+    else positionBobber(fishing);
+  }
 
   // Sparkle Trail (shop reward): drop little ✨ behind you while you move.
   if (goals.hasUnlock('sparkle')) {
@@ -1217,6 +1281,8 @@ function init() {
     toggleLever: (x, y, z) => toggleLever(x, y, z),
     riding: () => !!riding,
     toggleRide: () => toggleRide(),
+    fishing: () => !!fishing,
+    castLine: () => castLine(),
   };
 
   last = performance.now();
