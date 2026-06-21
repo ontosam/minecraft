@@ -2,7 +2,7 @@
 // controls, UI, rendering, and autosave together.
 
 import { mat4 } from './math.js';
-import { initGL, makeWorldProgram, makeAtlasTexture, GLMesh, blockPreview, cubeMesh, frameMesh } from './gfx.js';
+import { initGL, makeWorldProgram, makeAtlasTexture, GLMesh, blockPreview } from './gfx.js';
 import { World, BLOCKS, CATEGORIES, B, SX, SY, SZ } from './world.js';
 import { Player } from './player.js';
 import { Animals } from './animals.js';
@@ -26,8 +26,7 @@ window.addEventListener('error', (e) => showError(e.message || e.error || 'Unkno
 window.addEventListener('unhandledrejection', (e) => showError(e.reason && e.reason.message || e.reason || 'Promise error'));
 
 let gl, worldProg, atlas, world, player, animals, creepers, controls, sound, character, goals;
-let glowCube, buildFrame;
-let identity, proj, view, pv, scratch4, scratch4m;
+let identity, proj, view, pv, scratch4;
 let selected = B.GRASS;
 let lastTool = 'build', actionAnim = 0;
 let saveDirty = false, lastSave = 0;
@@ -36,7 +35,13 @@ const canvas = document.getElementById('game');
 
 // Third-person follow camera.
 let camYaw = 0, camPitch = 0.42;
-const CAM_DIST = 7.0, CAM_LOOK = 0.005;
+const CAM_LOOK = 0.005;
+// "Switch view" zoom: wide overview (default) → mid → zoomed-in close.
+const ZOOM_LEVELS = [7.0, 4.5, 3.0];
+let zoomIndex = 0;             // which level; remembered between sessions
+let camDist = ZOOM_LEVELS[0];  // target follow distance
+let camDistEased = camDist;    // smoothed toward camDist for a gentle zoom
+const REACH = 16;              // how far a build/dig tap can reach from the camera
 const camPos = [0, 0, 0], camDir = [0, 0, -1], camTarget = [0, 0, 0];
 
 function loadGame() {
@@ -52,6 +57,9 @@ function loadGame() {
           player.yaw = obj.player.yaw || 0;
         }
         if (typeof obj.sel === 'number' && BLOCKS[obj.sel]) selected = obj.sel;
+        if (typeof obj.zoom === 'number' && ZOOM_LEVELS[obj.zoom] !== undefined) {
+          zoomIndex = obj.zoom; camDist = camDistEased = ZOOM_LEVELS[zoomIndex];
+        }
         return true;
       }
     }
@@ -62,7 +70,7 @@ function loadGame() {
 function saveGame() {
   try {
     const obj = {
-      v: 2, world: world.serialize(), sel: selected,
+      v: 2, world: world.serialize(), sel: selected, zoom: zoomIndex,
       player: { pos: player.pos, yaw: player.yaw },
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(obj));
@@ -98,8 +106,8 @@ function computeCamera() {
   camTarget[1] = player.pos[1] + 1.35;
   camTarget[2] = player.pos[2];
   // Pull the camera in if there's terrain behind the character.
-  let dist = CAM_DIST;
-  for (let t = 0.4; t <= CAM_DIST; t += 0.3) {
+  let dist = camDistEased;
+  for (let t = 0.4; t <= camDistEased; t += 0.3) {
     const x = camTarget[0] - camDir[0] * t, y = camTarget[1] - camDir[1] * t, z = camTarget[2] - camDir[2] * t;
     if (world.solidAt(Math.floor(x), Math.floor(y), Math.floor(z))) { dist = Math.max(2.4, t - 0.3); break; }
   }
@@ -124,7 +132,7 @@ function screenRay(sx, sy) {
   const dl = Math.hypot(dx, dy, dz) || 1;
   return [dx / dl, dy / dl, dz / dl];
 }
-function rayHitAt(sx, sy) { return world.raycast(camPos, screenRay(sx, sy), CAM_DIST + 8); }
+function rayHitAt(sx, sy) { return world.raycast(camPos, screenRay(sx, sy), REACH); }
 function targetCells() { return rayHitAt(canvas.clientWidth / 2, canvas.clientHeight / 2); }
 
 function overlapsPlayer(x, y, z) {
@@ -294,6 +302,18 @@ function holdButton(id, fn, repeat) {
   el.addEventListener('pointercancel', end);
 }
 
+// --- "Switch view": cycle the camera from wide overview to zoomed-in close ---
+function cycleZoom() {
+  zoomIndex = (zoomIndex + 1) % ZOOM_LEVELS.length;
+  camDist = ZOOM_LEVELS[zoomIndex];
+  saveDirty = true;
+  updateViewButton();
+}
+function updateViewButton() {
+  const b = document.getElementById('btn-view');
+  if (b) b.textContent = zoomIndex < ZOOM_LEVELS.length - 1 ? '🔍' : '🗺️';
+}
+
 function wireUI() {
   buildPicker();
   refreshBlocksButton();
@@ -313,6 +333,8 @@ function wireUI() {
   jb.addEventListener('pointercancel', setJump(false));
 
   document.getElementById('btn-home').addEventListener('pointerdown', (e) => { e.preventDefault(); player.goHome(); });
+  document.getElementById('btn-view').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); cycleZoom(); });
+  updateViewButton();
 
   refreshGoalsButton();
   document.getElementById('btn-goals').addEventListener('pointerdown', (e) => { e.preventDefault(); buildGoals(); document.getElementById('goals').classList.remove('hidden'); });
@@ -352,13 +374,14 @@ function frame(now) {
 
   const aspect = canvas.width / Math.max(1, canvas.height);
   mat4.perspective(proj, 1.05, aspect, 0.08, 120);
+  camDistEased += (camDist - camDistEased) * Math.min(1, dt * 8); // smooth zoom
   computeCamera();
   if (controls.tapPending) {
     controls.tapPending = false;
     const dir = screenRay(controls.tapX, controls.tapY);
     const cr = creepers.pickRay(camPos, dir);
     if (cr) doDefend(cr);
-    else doAction(world.raycast(camPos, dir, CAM_DIST + 8));
+    else doAction(world.raycast(camPos, dir, REACH));
   }
   mat4.multiply(pv, proj, view);
 
@@ -379,39 +402,8 @@ function frame(now) {
   animals.draw(worldProg);
   creepers.draw(worldProg);
 
-  // Build/Dig guides: a translucent "ghost" of the block that will be placed,
-  // and a bold outline around the block that would be dug.
-  // Indicator at the spot under the finger/cursor (or screen centre at rest):
-  // a light outline where a block will go (build) or a glow on it (dig).
-  const ax = controls.aim.active ? controls.aim.x : canvas.clientWidth / 2;
-  const ay = controls.aim.active ? controls.aim.y : canvas.clientHeight / 2;
-  const hit = rayHitAt(ax, ay);
-  if (hit) {
-    gl.enable(gl.BLEND);
-    gl.disable(gl.DEPTH_TEST); // draw on top so the character never hides it
-    if (lastTool === 'build') {
-      const [qx, qy, qz] = hit.place;
-      if (qx >= 0 && qx < SX && qy >= 0 && qy < SY && qz >= 0 && qz < SZ &&
-        world.get(qx, qy, qz) === B.AIR && !overlapsPlayer(qx, qy, qz)) {
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-        mat4.model(scratch4m, qx - 0.01, qy - 0.01, qz - 0.01, 0, 1.02, 1.02, 1.02);
-        gl.uniformMatrix4fv(worldProg.u.uModel, false, scratch4m);
-        gl.uniform1f(worldProg.u.uAlpha, 0.9);
-        buildFrame.draw(worldProg);
-      }
-    } else {
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-      const pulse = 0.22 + 0.16 * (0.5 + 0.5 * Math.sin(now * 0.006));
-      mat4.model(scratch4m, hit.block[0] - 0.02, hit.block[1] - 0.02, hit.block[2] - 0.02, 0, 1.04, 1.04, 1.04);
-      gl.uniformMatrix4fv(worldProg.u.uModel, false, scratch4m);
-      gl.uniform1f(worldProg.u.uAlpha, pulse);
-      glowCube.draw(worldProg);
-    }
-    gl.enable(gl.DEPTH_TEST);
-    gl.disable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    gl.uniform1f(worldProg.u.uAlpha, 1.0);
-  }
+  // (No hover outline/glow indicator: you can tap anywhere to build or dig, so
+  // the floating guide was just in the way — removed at the dad's request.)
 
   // Autosave.
   if (saveDirty && now - lastSave > 6000) { saveGame(); lastSave = now; }
@@ -426,7 +418,7 @@ function init() {
 
   identity = mat4.identity(mat4.create());
   proj = mat4.create(); view = mat4.create(); pv = mat4.create();
-  scratch4 = new Float32Array(4); scratch4m = mat4.create();
+  scratch4 = new Float32Array(4);
 
   world = new World(gl);
   player = new Player(world);
@@ -447,8 +439,6 @@ function init() {
   prevX = player.pos[0]; prevZ = player.pos[2];
   world.rebuildAll();
   animals.spawn(10);
-  glowCube = cubeMesh(gl, BLOCKS[B.WHITE].tiles, [1, 1, 1], true);
-  buildFrame = frameMesh(gl, 0.028, [0.5, 0.95, 1.0]);
   wireUI();
 
   // Resume audio + hide the hint on first interaction.

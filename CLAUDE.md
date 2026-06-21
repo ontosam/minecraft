@@ -61,8 +61,9 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
 - `js/gfx.js` — WebGL init; **world shader** (textured · per-vertex tint · baked
   light · fog · `uAlpha`); procedural **texture atlas** (8×8 of 16px tiles,
   `TILE`); `getUV`, `blockPreview` (UI swatches), `GLMesh`, `cubeMesh`,
-  `frameMesh` (configurable wireframe). NOTE: `makeLineProgram` is currently
-  unused (safe to delete).
+  `frameMesh` (configurable wireframe). NOTE: `makeLineProgram`, `cubeMesh` and
+  `frameMesh` are now unused (the hover build/dig indicator was removed) — safe
+  to delete.
 - `js/world.js` — voxels (`SX=64,SY=32,SZ=64`), `B` ids, `BLOCKS` defs,
   `CATEGORIES`/`PALETTE`, terrain gen (gentle hills + pond + trees), **chunk
   mesher** (16×16 columns, face culling + baked ambient occlusion), `raycast`
@@ -93,27 +94,29 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
 - `js/goals.js` — `GOAL_DEFS` + `Goals` (counters incl. `defend`, stars,
   localStorage). Saves on every completion; throttled otherwise.
 - `js/main.js` — the glue: GL/program/atlas setup; **camera** (`camYaw/camPitch`,
-  `CAM_DIST=7`, `cameraFollow`, collision pull-in, `screenRay`/`rayHitAt`);
-  render loop; build/dig (`doBuild/doDig(hit)`, `doAction`, `lastTool`); **tap
-  routing**: a tap first tries `creepers.pickRay` (→`doDefend`, poof + ⭐),
-  else `doAction`; indicators (`buildFrame` cyan outline / `glowCube` additive
-  glow); UI wiring (picker, goals, buttons); hearts + `spawnPuffs` (creeper
-  poof); autosave; SW reg.
+  `cameraFollow`, collision pull-in, `screenRay`/`rayHitAt`); **zoom/"switch
+  view"** (`ZOOM_LEVELS=[7,4.5,3]`, `zoomIndex`, eased `camDistEased`, 🔍/🗺️
+  `btn-view`, saved); render loop; build/dig (`doBuild/doDig(hit)`, `doAction`,
+  `lastTool`); **tap routing**: a tap first tries `creepers.pickRay`
+  (→`doDefend`, poof + ⭐), else `doAction` (no hover indicator — tap anywhere);
+  UI wiring (picker, goals, buttons); hearts + `spawnPuffs` (creeper poof);
+  autosave; SW reg.
 - `scripts/serve.mjs`, `scripts/make-icons.mjs`, `sw.js` (offline, network-first,
   https only), `manifest.webmanifest`, `icons/`.
 
 ## Controls (current)
 - **iPad:** drag **left** = walk, drag **right** = look (camera auto-trails when
-  moving forward; backing up is a backpedal). **Press a spot** → light outline
-  preview → **lift to place** (build) / glow → lift to dig. **Drag = move/look**,
-  **tap = act**. Buttons: Build/Dig (also act in front + pick the tool, gold
-  ring = active), Jump, Pet; 🏠 home, ⭐ goals, block-picker button.
-- **Laptop:** **WASD/arrows** move, **drag mouse** to look, **hover** previews,
-  **click** builds/digs there.
+  moving forward; backing up is a backpedal). **Tap a spot** = build/dig there
+  (no hover outline anymore — tap-anywhere made it redundant/in-the-way). **Drag
+  = move/look**, **tap = act**. Tap a **creeper** to poof it. Buttons: Build/Dig
+  (also act in front + pick the tool, gold ring = active), Jump, Pet; 🏠 home,
+  ⭐ goals, 🔍/🗺️ **switch view** (zoom wide↔close), block-picker button.
+- **Laptop:** **WASD/arrows** move, **drag mouse** to look, **click** builds/digs
+  there.
 
 ## Debug & testing (no browser-in-the-loop otherwise)
-- `window.__ezra = { world, player, animals, cam(), target(), rayHit(x,y),
-  sel(), goals }` — exposed for support/automated demos.
+- `window.__ezra = { world, player, animals, creepers, cam(), target(),
+  rayHit(x,y), sel(), goals, spawnCreeper() }` — exposed for support/demos.
 - **Headless verification** (how every change this session was checked): drive
   the bundled Chromium via the **DevTools Protocol** over a WebSocket (Node 22
   has global `WebSocket`/`fetch`), dispatch real input, read `__ezra`, and
@@ -132,9 +135,10 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
   **16px** (authentic Minecraft look — do not "HD" them).
 - Keep it **non-scary and forgiving**: always daytime, no death, no fall damage,
   can't leave the world, no accidental world-wipe button.
-- Save keys: `ezrablocks.save.v2` (world+player+selected block),
-  `ezrablocks.goals.v1`. iOS clears localStorage for non-home-screen sites — tell
-  users to **Add to Home Screen** for durable progress.
+- Save keys: `ezrablocks.save.v2` (world bytes + `placed` set + player +
+  selected block + `zoom` level), `ezrablocks.goals.v1`. iOS clears localStorage
+  for non-home-screen sites — tell users to **Add to Home Screen** for durable
+  progress.
 
 ## Roadmap / backlog (priority order)
 1. ~~**Friendly creepers.**~~ ✅ **DONE (session 2)** — see Status above and
@@ -144,6 +148,16 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
    dad's playtest + deploy to `main`. Possible follow-ups if he wants more: a
    tiny telegraph "!" above a nibbling creeper, distinct creeper color so it
    pops against grass, sound-on/off toggle.
+1.5. **The Nether (Ezra's wishes #2 & #3 — NEXT, greenlit in concept).** Find a
+   **Nether portal** (obsidian frame + purple swirl) with help from a small
+   **minimap** (bottom of screen, top-down, marks the player + portal); through
+   it, meet **friendly ghasts** (big white floating cubey creatures, cute teary
+   face; in real MC they drift and shoot fireballs — here: gentle floaters that
+   make a soft sound, never harm) and **blazes** (floating creatures ringed by
+   glowing rods; here: warm glowy, harmless). Possibly **expand the world** for
+   room. Keep it non-scary/no-death. Sub-decisions to make with the dad: separate
+   Nether *dimension* vs. a nether-themed pocket; how big to expand (perf on iPad
+   — `SX*SY*SZ` bytes + chunk count); pettable or just findable. Plan in phases.
 2. **Giants** — big friendly creatures to find/pet (extend `animals.js`).
 3. **Villagers** — friendly quest-givers (problem-solving; supports "an hour
    without skipping a beat").
@@ -153,11 +167,15 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
    water transparency. Must not cost FPS; keep 16px textures.
 6. **Skeletons etc.** — only after he's hooked, still non-scary.
 
-## Open questions for the dad
-- **Ezra's third wish** — he had a third request he couldn't remember (creepers
-  + giants were the first two). Ask and slot it in.
-- **Feel tuning:** walk speed felt "slightly too fast"; confirm. Does
-  "press-to-preview, lift-to-place" feel right, or prefer a plain single tap?
+## Resolved with the dad (session 2)
+- **Ezra's three wishes are now known:** creepers (done), **ghasts**, and
+  **blaze** — both Nether mobs. The dad wants to **expand the world**, add a
+  small **minimap** (bottom) to help find a **Nether portal**, and meet friendly
+  ghasts + blazes through it. "Slightly challenging but not stressful." → the big
+  next feature (see roadmap #1.5). Make them non-scary/no-harm like everything else.
+- **Feel tuning:** movement now feels **great** (don't re-tune walk speed). The
+  old "press-to-preview, lift-to-place" is gone — **plain single tap** to build/
+  dig is the confirmed model, and the hover indicator was removed as in-the-way.
 
 ## Working style that's landed well
 Ship small, verified increments; show a screenshot each time; explain trade-offs

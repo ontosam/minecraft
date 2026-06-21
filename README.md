@@ -34,9 +34,11 @@ real app (and so progress is saved durably).
 - **Walk:** drag the **left** side of the screen. The camera follows behind.
   (Backing up is a gentle step-back.)
 - **Look around:** drag the **right** side.
-- **Build / Dig:** **press the spot** you want — a light outline (build) or glow
-  (dig) shows where — then **lift your finger**. The **Build** / **Dig** buttons
-  pick the tool (the active one has a gold ring) and also act right in front.
+- **Build / Dig:** just **tap the spot** you want. The **Build** / **Dig**
+  buttons pick the tool (the active one has a gold ring) and also act right in
+  front.
+- **Switch view:** tap **🔍 / 🗺️** (top bar) to zoom the camera in close or back
+  out to the wide overview — wide is the default so you can see where you are.
 - **Pick a block:** tap the **block button** (top-left) to open the picker.
 - **Pet an animal:** walk up and tap **Pet** 🐾.
 - **Bonk a creeper:** if a green creeper strolls up to nibble your blocks, **tap
@@ -45,7 +47,7 @@ real app (and so progress is saved durably).
   **Go home:** 🏠.
 
 **On a laptop:** **W A S D / arrow keys** to move, **drag the mouse** to look,
-**hover** to preview and **click** to build/dig.
+and **click** to build/dig.
 
 ## 👨‍👩‍👧 For grown-ups
 Runs entirely on the device, offline-capable, no ads/purchases/chat. Creations
