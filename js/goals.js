@@ -20,6 +20,7 @@ export const GOAL_DEFS = [
   { id: 'boom', icon: '💥', title: 'Demolition!', desc: 'Blow up some TNT', metric: 'boom', target: 1 },
   { id: 'night', icon: '🌙', title: 'Brave at night', desc: 'Turn on night-time', metric: 'night', target: 1 },
   { id: 'zombie', icon: '🧟', title: 'Zombie bonker', desc: 'Bonk a night zombie', metric: 'zombie', target: 1 },
+  { id: 'spider', icon: '🕷️', title: 'Spider shoo-er', desc: 'Shoo away a night spider', metric: 'spider', target: 1 },
   { id: 'diamond', icon: '💎', title: 'Diamond miner', desc: 'Mine 5 diamonds', metric: 'diamond', target: 5 },
   { id: 'builder2', icon: '🏗️', title: 'Master builder', desc: 'Place 75 blocks', metric: 'place', target: 75 },
   { id: 'decorator', icon: '🎨', title: 'Decorator', desc: 'Build with 8 different blocks', metric: 'variety', target: 8 },
@@ -36,7 +37,7 @@ const KEY = 'ezrablocks.goals.v1';
 
 export class Goals {
   constructor() {
-    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0, bought: 0 };
+    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0, bought: 0, spider: 0, lamp: 0 };
     this.usedTypes = new Set();
     this.done = {};
     this.stars = 0;

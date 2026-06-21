@@ -83,6 +83,9 @@ export class Sound {
       case 'groan': // low, slow zombie groan (more silly than scary)
         this.blip(150, 0.32, 'sawtooth', 0.07, 105);
         break;
+      case 'hiss': // soft, short spider skitter/hiss (gentle, not creepy)
+        this.blip(640, 0.10, 'sawtooth', 0.05, 880);
+        break;
     }
   }
 }

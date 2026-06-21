@@ -11,6 +11,7 @@ import { Animals } from './animals.js';
 import { Creepers } from './creepers.js';
 import { NetherMobs } from './nethermobs.js';
 import { Zombies } from './zombies.js';
+import { Spiders } from './spiders.js';
 import { Controls } from './input.js';
 import { Sound } from './audio.js';
 import { Character } from './character.js';
@@ -92,6 +93,12 @@ function makeMobs(kind, w) {
         if (type === 'hit') hurt(1);
         else if (type === 'groan') sound.play('groan');
       };
+    } else if (t === 'spiders') {
+      m.spiders = new Spiders(gl, w);
+      m.spiders.onEvent = (type, pos) => {
+        if (type === 'hit') hurt(0.5);          // spiders only nibble a half-heart
+        else if (type === 'hiss') sound.play('hiss');
+      };
     }
   }
   return m;
@@ -108,6 +115,7 @@ function updateMobs(m, dt) {
   if (m.nethermobs) m.nethermobs.update(dt, player, SX, SZ);
   if (m.ants) m.ants.update(dt, player);
   if (m.zombies) m.zombies.update(dt, player, night && dimension === 'over');
+  if (m.spiders) m.spiders.update(dt, player, night && dimension === 'over');
 }
 function drawMobs(m) {
   if (m.animals) m.animals.draw(worldProg);
@@ -115,6 +123,7 @@ function drawMobs(m) {
   if (m.nethermobs) m.nethermobs.draw(worldProg);
   if (m.ants) m.ants.draw(worldProg);
   if (m.zombies) m.zombies.draw(worldProg);
+  if (m.spiders) m.spiders.draw(worldProg);
 }
 
 // --- Worlds: created on first visit, then cached ---
@@ -456,6 +465,16 @@ function doBonkZombie(z) {
   if (defeated) goals.bump('zombie');
 }
 
+// Tap a spider to shoo it (two taps, or one with the sword → harmless poof).
+function doBonkSpider(s) {
+  const sp = mobs().spiders;
+  if (!sp) return;
+  const defeated = sp.bonk(s, swordDamage());
+  sound.play(defeated ? 'poof' : 'dig');
+  spawnPuffs([s.pos[0], s.pos[1] + 0.5, s.pos[2]]);
+  if (defeated) goals.bump('spider');
+}
+
 // --- Hearts: getting hurt, a gentle knock-out, slow regen ---
 function updateHearts() {
   const el = document.getElementById('hearts-bar');
@@ -569,7 +588,9 @@ function hurt(n) {
 function knockout() {
   showToast('💤 Oof! You got sleepy — back home, safe and sound.', 3400);
   night = false; updateNightButton();
-  const zb = worlds.over && worlds.over.mobs.zombies; if (zb) zb.list.length = 0;
+  const om = worlds.over && worlds.over.mobs;
+  if (om && om.zombies) om.zombies.list.length = 0;
+  if (om && om.spiders) om.spiders.list.length = 0;
   if (dimension !== 'over') setDimension('over');
   player.goHome(); player.vel = [0, 0, 0];
   hearts = maxHearts; invuln = 1.6; updateHearts();
@@ -907,8 +928,10 @@ function frame(now) {
     const dir = screenRay(controls.tapX, controls.tapY);
     const cr = m.creepers ? m.creepers.pickRay(camPos, dir) : null;
     const zb = (!cr && m.zombies) ? m.zombies.pickRay(camPos, dir) : null;
+    const sp = (!cr && !zb && m.spiders) ? m.spiders.pickRay(camPos, dir) : null;
     if (cr) doDefend(cr);
     else if (zb) doBonkZombie(zb);
+    else if (sp) doBonkSpider(sp);
     else {
       const hit = world.raycast(camPos, dir, REACH);
       const bid = hit ? world.get(hit.block[0], hit.block[1], hit.block[2]) : 0;
@@ -1094,6 +1117,7 @@ function init() {
     get nethermobs() { return mobs().nethermobs; },
     get ants() { return mobs().ants; },
     get zombies() { return mobs().zombies; },
+    get spiders() { return mobs().spiders; },
     cam: () => ({ yaw: camYaw, pitch: camPitch, pos: camPos.slice(), dir: camDir.slice() }),
     target: () => targetCells(),
     rayHit: (x, y) => rayHitAt(x, y),
