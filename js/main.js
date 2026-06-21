@@ -9,6 +9,7 @@ import { Animals } from './animals.js';
 import { Controls } from './input.js';
 import { Sound } from './audio.js';
 import { Character } from './character.js';
+import { Goals, GOAL_DEFS } from './goals.js';
 
 const SAVE_KEY = 'ezrablocks.save.v2';
 const SKY = [0.62, 0.82, 0.96];
@@ -23,10 +24,11 @@ function showError(msg) {
 window.addEventListener('error', (e) => showError(e.message || e.error || 'Unknown error'));
 window.addEventListener('unhandledrejection', (e) => showError(e.reason && e.reason.message || e.reason || 'Promise error'));
 
-let gl, worldProg, lineProg, atlas, world, player, animals, controls, sound, character;
+let gl, worldProg, lineProg, atlas, world, player, animals, controls, sound, character, goals;
 let highlight, identity, proj, view, pv, scratch4, scratch4m;
 let selected = B.GRASS;
 let saveDirty = false, lastSave = 0;
+let prevX = 0, prevZ = 0, goalToastTimer = 0;
 const canvas = document.getElementById('game');
 
 // Third-person follow camera.
@@ -134,6 +136,7 @@ function doBuild() {
   if (world.get(x, y, z) !== B.AIR || overlapsPlayer(x, y, z)) { sound.play('deny'); return; }
   world.set(x, y, z, selected);
   sound.play('place'); saveDirty = true;
+  goals.onBuild(selected);
 }
 
 function doDig() {
@@ -144,11 +147,12 @@ function doDig() {
   if (id === B.AIR || (BLOCKS[id] && BLOCKS[id].indestructible)) { sound.play('deny'); return; }
   world.set(x, y, z, B.AIR);
   sound.play('dig'); saveDirty = true;
+  goals.onDig();
 }
 
 function doPet() {
   const p = animals.petNearest(player);
-  if (p) { sound.play('pet'); spawnHearts(p); }
+  if (p) { sound.play('pet'); spawnHearts(p); goals.onPet(); }
 }
 
 // --- Floating hearts ---
@@ -214,6 +218,38 @@ function buildPicker() {
   }
 }
 
+function refreshGoalsButton() {
+  document.getElementById('btn-goals').textContent = '⭐' + goals.stars;
+}
+
+function buildGoals() {
+  const body = document.getElementById('goals-body');
+  body.innerHTML = '';
+  document.getElementById('goals-title').textContent = 'My Goals  ⭐' + goals.stars + '/' + GOAL_DEFS.length;
+  for (const g of GOAL_DEFS) {
+    const done = !!goals.done[g.id];
+    const prog = goals.progress(g);
+    const pct = Math.round(prog / g.target * 100);
+    const row = document.createElement('div');
+    row.className = 'goal-row' + (done ? ' done' : '');
+    row.innerHTML =
+      '<div class="gi">' + g.icon + '</div>' +
+      '<div class="gt"><b>' + g.title + '</b><small>' + g.desc + '</small>' +
+      '<div class="goal-bar"><i style="width:' + pct + '%"></i></div></div>' +
+      '<div class="gc">' + (done ? '✓' : prog + '/' + g.target) + '</div>';
+    body.appendChild(row);
+  }
+}
+
+function showGoalToast(g) {
+  const el = document.getElementById('goaltoast');
+  el.textContent = '⭐ Goal done: ' + g.title + '!';
+  el.classList.add('show');
+  sound.play('pet');
+  clearTimeout(goalToastTimer);
+  goalToastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
 function holdButton(id, fn, repeat) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -251,21 +287,10 @@ function wireUI() {
 
   document.getElementById('btn-home').addEventListener('pointerdown', (e) => { e.preventDefault(); player.goHome(); });
 
-  const sb = document.getElementById('btn-sound');
-  sb.addEventListener('pointerdown', (e) => {
-    e.preventDefault(); sound.enabled = !sound.enabled;
-    sb.textContent = sound.enabled ? '🔊' : '🔇';
-  });
-
-  document.getElementById('btn-new').addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    if (!confirm('Start a brand new world? This clears the current one.')) return;
-    localStorage.removeItem(SAVE_KEY);
-    world.generate(); world.rebuildAll(); world.dirty.clear();
-    player.goHome();
-    animals.list.length = 0; animals.spawn(10);
-    saveDirty = true;
-  });
+  refreshGoalsButton();
+  document.getElementById('btn-goals').addEventListener('pointerdown', (e) => { e.preventDefault(); buildGoals(); document.getElementById('goals').classList.remove('hidden'); });
+  document.getElementById('goals-close').addEventListener('pointerdown', (e) => { e.preventDefault(); document.getElementById('goals').classList.add('hidden'); });
+  document.getElementById('goals').addEventListener('pointerdown', (e) => { if (e.target.id === 'goals') document.getElementById('goals').classList.add('hidden'); });
 }
 
 // --- Render ---
@@ -284,6 +309,10 @@ function frame(now) {
   applyLook();
   player.update(dt, controls, camYaw);
   cameraFollow(dt);
+  const dxm = player.pos[0] - prevX, dzm = player.pos[2] - prevZ;
+  const dm = Math.hypot(dxm, dzm);
+  if (dm > 0.0005 && dm < 2) goals.onMove(dm);
+  prevX = player.pos[0]; prevZ = player.pos[2];
   animals.update(dt, player);
   world.flushDirty(2);
 
@@ -346,9 +375,12 @@ function init() {
   character = new Character(gl);
   controls = new Controls(canvas);
   sound = new Sound();
+  goals = new Goals();
+  goals.onComplete = (g) => { showGoalToast(g); refreshGoalsButton(); };
 
   if (!loadGame()) { world.generate(); player.goHome(); }
   camYaw = player.yaw;
+  prevX = player.pos[0]; prevZ = player.pos[2];
   world.rebuildAll();
   animals.spawn(10);
   buildHighlight();
@@ -365,8 +397,8 @@ function init() {
 
   document.addEventListener('contextmenu', (e) => e.preventDefault());
   document.addEventListener('gesturestart', (e) => e.preventDefault());
-  window.addEventListener('beforeunload', () => { if (saveDirty) saveGame(); });
-  document.addEventListener('visibilitychange', () => { if (document.hidden && saveDirty) saveGame(); });
+  window.addEventListener('beforeunload', () => { if (saveDirty) saveGame(); goals.save(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { if (saveDirty) saveGame(); goals.save(); } });
 
   // Only enable the offline service worker in production (HTTPS), so local
   // previews always load the latest files.
@@ -380,6 +412,7 @@ function init() {
     cam: () => ({ yaw: camYaw, pitch: camPitch, pos: camPos.slice(), dir: camDir.slice() }),
     target: () => targetCells(),
     sel: () => selected,
+    goals,
   };
 
   last = performance.now();
