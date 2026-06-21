@@ -82,13 +82,13 @@ varying float vLight;
 varying float vDist;
 uniform sampler2D uTex;
 uniform vec3 uFogColor;
-uniform float uFogNear, uFogFar;
+uniform float uFogNear, uFogFar, uAlpha;
 void main() {
   vec4 tex = texture2D(uTex, vUV);
   vec3 c = tex.rgb * vColor * vLight;
   float fog = clamp((vDist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
   c = mix(c, uFogColor, fog);
-  gl_FragColor = vec4(c, 1.0);
+  gl_FragColor = vec4(c, uAlpha);
 }`;
 
 // --- Line shader: solid color (block highlight) ---
@@ -105,7 +105,7 @@ void main() { gl_FragColor = uColor; }`;
 export function makeWorldProgram(gl) {
   return makeProgram(gl, WORLD_VS, WORLD_FS,
     ['aPos', 'aUV', 'aColor', 'aLight'],
-    ['uProj', 'uView', 'uModel', 'uTex', 'uFogColor', 'uFogNear', 'uFogFar']);
+    ['uProj', 'uView', 'uModel', 'uTex', 'uFogColor', 'uFogNear', 'uFogFar', 'uAlpha']);
 }
 
 export function makeLineProgram(gl) {
@@ -339,4 +339,56 @@ export class GLMesh {
     if (this.ibuf) gl.deleteBuffer(this.ibuf);
     this.attribs = {}; this.ibuf = null; this.count = 0;
   }
+}
+
+// --- Helper meshes for build/dig guides ---
+function pushBox(A, x0, y0, z0, x1, y1, z1, tTop, tSide, tBot, tint, flat) {
+  const faces = [
+    { s: 1.0, t: tTop, v: [[x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0]] },
+    { s: 0.5, t: tBot, v: [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]] },
+    { s: 0.7, t: tSide, v: [[x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0]] },
+    { s: 0.85, t: tSide, v: [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]] },
+    { s: 0.65, t: tSide, v: [[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]] },
+    { s: 0.8, t: tSide, v: [[x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1]] },
+  ];
+  for (const f of faces) {
+    const r = getUV(f.t);
+    const uvc = [[r.u0, r.v0], [r.u1, r.v0], [r.u1, r.v1], [r.u0, r.v1]];
+    const base = A.pos.length / 3;
+    for (let i = 0; i < 4; i++) {
+      A.pos.push(f.v[i][0], f.v[i][1], f.v[i][2]);
+      A.uv.push(uvc[i][0], uvc[i][1]);
+      A.col.push(tint[0], tint[1], tint[2]);
+      A.light.push(flat ? 1.0 : f.s);
+    }
+    A.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  }
+}
+
+function finishMesh(gl, A) {
+  const m = new GLMesh(gl);
+  m.setAttrib('aPos', new Float32Array(A.pos), 3);
+  m.setAttrib('aUV', new Float32Array(A.uv), 2);
+  m.setAttrib('aColor', new Float32Array(A.col), 3);
+  m.setAttrib('aLight', new Float32Array(A.light), 1);
+  m.setIndex(new Uint16Array(A.idx));
+  return m;
+}
+
+// A unit cube (0..1) textured for a block — used as the translucent build ghost.
+export function cubeMesh(gl, tiles, tint, flat) {
+  const A = { pos: [], uv: [], col: [], light: [] , idx: [] };
+  pushBox(A, 0, 0, 0, 1, 1, 1, tiles.top, tiles.side, tiles.bottom, tint, flat);
+  return finishMesh(gl, A);
+}
+
+// A thick wireframe (12 beams) used to outline the block being dug.
+export function frameMesh(gl) {
+  const A = { pos: [], uv: [], col: [], light: [], idx: [] };
+  const t = 0.055, tint = [0.05, 0.05, 0.08], N = TILE.NEUTRAL;
+  const beam = (x0, y0, z0, x1, y1, z1) => pushBox(A, x0, y0, z0, x1, y1, z1, N, N, N, tint, true);
+  for (const Y of [0, 1]) for (const Z of [0, 1]) beam(0, Y - t, Z - t, 1, Y + t, Z + t);
+  for (const X of [0, 1]) for (const Z of [0, 1]) beam(X - t, 0, Z - t, X + t, 1, Z + t);
+  for (const X of [0, 1]) for (const Y of [0, 1]) beam(X - t, Y - t, 0, X + t, Y + t, 1);
+  return finishMesh(gl, A);
 }

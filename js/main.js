@@ -2,7 +2,7 @@
 // controls, UI, rendering, and autosave together.
 
 import { mat4 } from './math.js';
-import { initGL, makeWorldProgram, makeLineProgram, makeAtlasTexture, GLMesh, blockPreview } from './gfx.js';
+import { initGL, makeWorldProgram, makeAtlasTexture, GLMesh, blockPreview, cubeMesh, frameMesh } from './gfx.js';
 import { World, BLOCKS, CATEGORIES, B, SX, SY, SZ } from './world.js';
 import { Player } from './player.js';
 import { Animals } from './animals.js';
@@ -24,8 +24,9 @@ function showError(msg) {
 window.addEventListener('error', (e) => showError(e.message || e.error || 'Unknown error'));
 window.addEventListener('unhandledrejection', (e) => showError(e.reason && e.reason.message || e.reason || 'Promise error'));
 
-let gl, worldProg, lineProg, atlas, world, player, animals, controls, sound, character, goals;
-let highlight, identity, proj, view, pv, scratch4, scratch4m;
+let gl, worldProg, atlas, world, player, animals, controls, sound, character, goals;
+let highlightFrame, ghostMesh = null, ghostFor = -1;
+let identity, proj, view, pv, scratch4, scratch4m;
 let selected = B.GRASS;
 let saveDirty = false, lastSave = 0;
 let prevX = 0, prevZ = 0, goalToastTimer = 0;
@@ -33,18 +34,8 @@ const canvas = document.getElementById('game');
 
 // Third-person follow camera.
 let camYaw = 0, camPitch = 0.42;
-const CAM_DIST = 5.0, CAM_LOOK = 0.005;
+const CAM_DIST = 7.0, CAM_LOOK = 0.005;
 const camPos = [0, 0, 0], camDir = [0, 0, -1], camTarget = [0, 0, 0];
-
-function buildHighlight() {
-  const a = -0.004, b = 1.004;
-  const pos = [];
-  for (let c = 0; c < 8; c++) pos.push((c & 1) ? b : a, (c & 2) ? b : a, (c & 4) ? b : a);
-  const idx = [0, 1, 2, 3, 4, 5, 6, 7, 0, 2, 1, 3, 4, 6, 5, 7, 0, 4, 1, 5, 2, 6, 3, 7];
-  highlight = new GLMesh(gl);
-  highlight.setAttrib('aPos', new Float32Array(pos), 3);
-  highlight.setIndex(new Uint16Array(idx));
-}
 
 function loadGame() {
   try {
@@ -102,13 +93,13 @@ function computeCamera() {
   camDir[1] = -sp;
   camDir[2] = -Math.cos(camYaw) * cp;
   camTarget[0] = player.pos[0];
-  camTarget[1] = player.pos[1] + 1.2;
+  camTarget[1] = player.pos[1] + 1.35;
   camTarget[2] = player.pos[2];
   // Pull the camera in if there's terrain behind the character.
   let dist = CAM_DIST;
   for (let t = 0.4; t <= CAM_DIST; t += 0.3) {
     const x = camTarget[0] - camDir[0] * t, y = camTarget[1] - camDir[1] * t, z = camTarget[2] - camDir[2] * t;
-    if (world.solidAt(Math.floor(x), Math.floor(y), Math.floor(z))) { dist = Math.max(1.4, t - 0.3); break; }
+    if (world.solidAt(Math.floor(x), Math.floor(y), Math.floor(z))) { dist = Math.max(2.4, t - 0.3); break; }
   }
   camPos[0] = camTarget[0] - camDir[0] * dist;
   camPos[1] = camTarget[1] - camDir[1] * dist;
@@ -333,6 +324,7 @@ function frame(now) {
   gl.uniform3f(worldProg.u.uFogColor, SKY[0], SKY[1], SKY[2]);
   gl.uniform1f(worldProg.u.uFogNear, 38);
   gl.uniform1f(worldProg.u.uFogFar, 78);
+  gl.uniform1f(worldProg.u.uAlpha, 1);
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, atlas);
   gl.uniform1i(worldProg.u.uTex, 0);
@@ -341,16 +333,36 @@ function frame(now) {
   character.draw(worldProg, player.pos[0], player.pos[1], player.pos[2], player.yaw, player.walkPhase, player.moveAmt);
   animals.draw(worldProg);
 
-  // Targeted-block highlight.
+  // Build/Dig guides: a translucent "ghost" of the block that will be placed,
+  // and a bold outline around the block that would be dug.
   const hit = targetCells();
   if (hit) {
-    const m = mat4.model(scratch4m, hit.block[0], hit.block[1], hit.block[2], 0, 1, 1, 1);
-    gl.useProgram(lineProg.program);
-    gl.uniformMatrix4fv(lineProg.u.uProj, false, proj);
-    gl.uniformMatrix4fv(lineProg.u.uView, false, view);
-    gl.uniformMatrix4fv(lineProg.u.uModel, false, m);
-    gl.uniform4f(lineProg.u.uColor, 0.1, 0.1, 0.12, 0.8);
-    highlight.draw(lineProg, gl.LINES);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.disable(gl.DEPTH_TEST); // draw guides on top so the character never hides them
+
+    const [qx, qy, qz] = hit.place;
+    if (qx >= 0 && qx < SX && qy >= 0 && qy < SY && qz >= 0 && qz < SZ &&
+      world.get(qx, qy, qz) === B.AIR && !overlapsPlayer(qx, qy, qz)) {
+      if (ghostFor !== selected) {
+        if (ghostMesh) ghostMesh.dispose();
+        ghostMesh = cubeMesh(gl, BLOCKS[selected].tiles, BLOCKS[selected].tint, false);
+        ghostFor = selected;
+      }
+      mat4.model(scratch4m, qx, qy, qz, 0, 1, 1, 1);
+      gl.uniformMatrix4fv(worldProg.u.uModel, false, scratch4m);
+      gl.uniform1f(worldProg.u.uAlpha, 0.55);
+      ghostMesh.draw(worldProg);
+    }
+
+    mat4.model(scratch4m, hit.block[0] - 0.012, hit.block[1] - 0.012, hit.block[2] - 0.012, 0, 1.024, 1.024, 1.024);
+    gl.uniformMatrix4fv(worldProg.u.uModel, false, scratch4m);
+    gl.uniform1f(worldProg.u.uAlpha, 1.0);
+    highlightFrame.draw(worldProg);
+
+    gl.enable(gl.DEPTH_TEST);
+    gl.disable(gl.BLEND);
+    gl.uniform1f(worldProg.u.uAlpha, 1.0);
   }
 
   // Autosave.
@@ -362,7 +374,6 @@ function frame(now) {
 function init() {
   gl = initGL(canvas);
   worldProg = makeWorldProgram(gl);
-  lineProg = makeLineProgram(gl);
   atlas = makeAtlasTexture(gl);
 
   identity = mat4.identity(mat4.create());
@@ -383,7 +394,7 @@ function init() {
   prevX = player.pos[0]; prevZ = player.pos[2];
   world.rebuildAll();
   animals.spawn(10);
-  buildHighlight();
+  highlightFrame = frameMesh(gl);
   wireUI();
 
   // Resume audio + hide the hint on first interaction.
@@ -398,6 +409,7 @@ function init() {
   document.addEventListener('contextmenu', (e) => e.preventDefault());
   document.addEventListener('gesturestart', (e) => e.preventDefault());
   window.addEventListener('beforeunload', () => { if (saveDirty) saveGame(); goals.save(); });
+  window.addEventListener('pagehide', () => { if (saveDirty) saveGame(); goals.save(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) { if (saveDirty) saveGame(); goals.save(); } });
 
   // Only enable the offline service worker in production (HTTPS), so local
