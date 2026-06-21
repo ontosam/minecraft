@@ -176,6 +176,9 @@ export class World {
 
   generate() {
     const rand = mulberry32(1337);
+    this.data.fill(B.AIR);
+    this.placed = new Set();
+    this.portals = [];
     // Gentle rolling hills of grass.
     for (let x = 0; x < SX; x++) {
       for (let z = 0; z < SZ; z++) {

@@ -139,7 +139,9 @@ body {
 
 #picker,
 #goals,
-#portalmenu {
+#portalmenu,
+#shop,
+#confirm {
   position: fixed;
   inset: 0;
   z-index: 30;
@@ -153,7 +155,9 @@ body {
 
 #picker.hidden,
 #goals.hidden,
-#portalmenu.hidden {
+#portalmenu.hidden,
+#shop.hidden,
+#confirm.hidden {
   display: none;
 }
 
@@ -241,6 +245,143 @@ body {
   pointer-events: none;
   text-shadow: 0 1px 3px rgba(0, 0, 0, .5);
   white-space: nowrap;
+}
+
+/* Diamonds (💎) counter — tap to open the shop. Top-left, under the topbar. */
+#gem-bar {
+  position: absolute;
+  top: calc(max(10px, env(safe-area-inset-top)) + 60px);
+  left: max(12px, env(safe-area-inset-left));
+  font-size: 18px;
+  font-weight: 800;
+  color: #1c6;
+  background: rgba(255, 255, 255, .85);
+  border-radius: 12px;
+  padding: 6px 12px;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, .18);
+  pointer-events: auto;
+}
+
+#gem-bar:active {
+  transform: translateY(2px);
+}
+
+/* Treasure shop */
+#shop-gems {
+  text-align: center;
+  font-weight: 800;
+  color: #1aa05a;
+  padding: 10px;
+  font-size: 17px;
+}
+
+#shop-body {
+  padding: 4px 16px 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.shop-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 3px solid #e4e4ea;
+  background: #fafafe;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.shop-item:active {
+  transform: translateY(2px);
+}
+
+.shop-item.owned {
+  opacity: .6;
+  border-color: #cde9cf;
+  background: #f1faf1;
+}
+
+.shop-item .si {
+  font-size: 34px;
+}
+
+.shop-item .st {
+  flex: 1;
+}
+
+.shop-item .st b {
+  font-size: 17px;
+  color: #2a2a33;
+}
+
+.shop-item .st small {
+  display: block;
+  color: #8a8a93;
+  font-size: 13px;
+}
+
+.shop-item .sc {
+  font-size: 17px;
+  font-weight: 800;
+  color: #1aa05a;
+  white-space: nowrap;
+}
+
+/* Confirm dialog (e.g. reset world) */
+.confirm-panel {
+  max-width: 380px;
+  padding: 22px;
+  text-align: center;
+}
+
+#confirm-msg {
+  font-size: 17px;
+  color: #2a2a33;
+  line-height: 1.5;
+  margin-bottom: 18px;
+}
+
+.confirm-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.confirm-row button {
+  flex: 1;
+  padding: 14px;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 800;
+  border: none;
+  background: #e8e8ee;
+  color: #333;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.danger-btn {
+  background: #ef5350 !important;
+  color: #fff !important;
+}
+
+/* Reset button inside the goals panel */
+#btn-reset {
+  margin: 4px 16px 16px;
+  padding: 12px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 800;
+  border: 2px dashed #f0a3a1;
+  background: #fff4f4;
+  color: #c0392b;
+  cursor: pointer;
+  touch-action: manipulation;
 }
 
 /* Red flash when hurt (set per-frame from JS) */

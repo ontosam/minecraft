@@ -123,6 +123,27 @@ All shipped + deployed to `main`:
    portals **auto-tidied into the row on load** (`tidyPortals`, v4 only — clears
    just the old obsidian/swirl, never builds).
 
+## Status (session 6)
+End-of-arc additions (reset + an incentive economy beyond stars). All deployed:
+- **Reset world (confirmed).** Goals panel → "🔄 Start this world fresh…" → a
+  confirm dialog (`askReset`) → `resetWorld()` regenerates the **current** world
+  (builds + `placed` cleared), keeps the standard + flint portals, and **never
+  touches ⭐ stars or 💎**. `World.generate()` now clears `data/placed/portals` like
+  the other generators.
+- **Mine diamonds + a 💎 economy.** Digging a *natural* diamond → **+2 💎** (gold
+  +1) and a new **Diamond miner** goal; **every goal also pays +2 💎**. A **💎
+  counter** sits top-left (tap → shop). Currency + unlocks live in the goals save
+  (`gems`, `unlocks`; `addGems`/`spend`/`hasUnlock`/`setUnlock`).
+- **💎 Treasure Shop** (`SHOP`, `buildShop`/`buyItem`): **Pet Friend** (a follower
+  cat — `Animals.spawnPet`, re-spawned each load by `ensurePet`), **Extra Heart**
+  (`maxHearts` 6→7 via `applyUnlocks`), **Mega TNT** (bigger `explodeRadius()`).
+- **More build incentives:** new goals Diamond miner, Master builder (75),
+  Decorator (8 kinds), Door maker (`placeDoor` bumps `doors`). Goals now total 25.
+  Verified: Node (gems/spend/unlocks/persist) + headless (mine→💎→shop→buy
+  pet+heart, reset clears builds but keeps ⭐/💎) with a shop screenshot.
+  Idea backlog: more shop items (speed boots, sparkle trail, new worlds), build
+  challenges that check structures, spend 💎 to instantly unlock the Nether.
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files

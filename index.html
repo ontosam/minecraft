@@ -39,6 +39,7 @@
     </div>
 
     <div id="hearts-bar"></div>
+    <button id="gem-bar" title="Treasure shop"></button>
 
     <div id="actions">
       <button id="btn-pet" class="act pet"><span>🐾</span><b>Pet</b></button>
@@ -62,6 +63,25 @@
     <div class="picker-panel">
       <div class="picker-head"><span id="goals-title">My Goals</span><button id="goals-close">✕</button></div>
       <div id="goals-body"></div>
+      <button id="btn-reset">🔄 Start this world fresh…</button>
+    </div>
+  </div>
+
+  <div id="shop" class="hidden">
+    <div class="picker-panel">
+      <div class="picker-head"><span>💎 Treasure Shop</span><button id="shop-close">✕</button></div>
+      <div id="shop-gems"></div>
+      <div id="shop-body"></div>
+    </div>
+  </div>
+
+  <div id="confirm" class="hidden">
+    <div class="picker-panel confirm-panel">
+      <div id="confirm-msg"></div>
+      <div class="confirm-row">
+        <button id="confirm-no">No, keep it</button>
+        <button id="confirm-yes" class="danger-btn">Yes, start fresh</button>
+      </div>
     </div>
   </div>
 

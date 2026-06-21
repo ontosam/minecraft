@@ -20,6 +20,10 @@ export const GOAL_DEFS = [
   { id: 'boom', icon: '💥', title: 'Demolition!', desc: 'Blow up some TNT', metric: 'boom', target: 1 },
   { id: 'night', icon: '🌙', title: 'Brave at night', desc: 'Turn on night-time', metric: 'night', target: 1 },
   { id: 'zombie', icon: '🧟', title: 'Zombie bonker', desc: 'Bonk a night zombie', metric: 'zombie', target: 1 },
+  { id: 'diamond', icon: '💎', title: 'Diamond miner', desc: 'Mine 5 diamonds', metric: 'diamond', target: 5 },
+  { id: 'builder2', icon: '🏗️', title: 'Master builder', desc: 'Place 75 blocks', metric: 'place', target: 75 },
+  { id: 'decorator', icon: '🎨', title: 'Decorator', desc: 'Build with 8 different blocks', metric: 'variety', target: 8 },
+  { id: 'doormaker', icon: '🚪', title: 'Door maker', desc: 'Build a door for your house', metric: 'doors', target: 1 },
   { id: 'meetghast', icon: '👻', title: 'Meet a ghast', desc: 'Find a friendly ghast', metric: 'ghast', target: 1 },
   { id: 'meetblaze', icon: '🔥', title: 'Meet a blaze', desc: 'Find a friendly blaze', metric: 'blaze', target: 1 },
   { id: 'explorer2', icon: '🗺️', title: 'Adventurer', desc: 'Walk a long way (250)', metric: 'dist', target: 250 },
@@ -29,10 +33,12 @@ const KEY = 'ezrablocks.goals.v1';
 
 export class Goals {
   constructor() {
-    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0 };
+    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0 };
     this.usedTypes = new Set();
     this.done = {};
     this.stars = 0;
+    this.gems = 0;            // 💎 spendable currency (mined + earned from goals)
+    this.unlocks = {};        // shop unlocks: { pet, heart, megatnt }
     this.onComplete = null;   // (def) => void
     this._lastSave = 0;
     this.load();
@@ -47,6 +53,7 @@ export class Goals {
       if (!this.done[g.id] && this.metricValue(g.metric) >= g.target) {
         this.done[g.id] = true;
         this.stars++;
+        this.gems += 2;            // every goal also pays out a couple of 💎
         changed = true;
         if (this.onComplete) this.onComplete(g);
       }
@@ -61,12 +68,18 @@ export class Goals {
   onDefend() { this.counts.defend++; this.check(); this.save(); }
   bump(metric) { if (metric in this.counts) { this.counts[metric]++; this.check(); this.save(); } }
 
+  // 💎 currency + shop unlocks.
+  addGems(n) { this.gems += n; this.save(); }
+  spend(n) { if (this.gems >= n) { this.gems -= n; this.save(); return true; } return false; }
+  hasUnlock(id) { return !!this.unlocks[id]; }
+  setUnlock(id) { this.unlocks[id] = true; this.save(); }
+
   maybeSave() { if (Date.now() - this._lastSave > 1500) this.save(); }
   save() {
     this._lastSave = Date.now();
     try {
       localStorage.setItem(KEY, JSON.stringify({
-        c: this.counts, t: [...this.usedTypes], d: this.done, s: this.stars,
+        c: this.counts, t: [...this.usedTypes], d: this.done, s: this.stars, g: this.gems, u: this.unlocks,
       }));
     } catch (e) { /* ignore */ }
   }
@@ -78,6 +91,8 @@ export class Goals {
         this.usedTypes = new Set(o.t || []);
         this.done = o.d || {};
         this.stars = o.s || 0;
+        this.gems = o.g || 0;
+        this.unlocks = o.u || {};
       }
     } catch (e) { /* ignore */ }
   }

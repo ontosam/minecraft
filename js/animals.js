@@ -194,6 +194,14 @@ export class Animals {
     }
   }
 
+  // Spawn a permanent pet (a cat) that follows the player — bought in the shop.
+  spawnPet(x, z) {
+    const a = new Animal('cat', this.meshes['cat'], x, this.groundY(x, z), z);
+    a.follower = true; a.isPet = true;
+    this.list.push(a);
+    return a;
+  }
+
   // Pet the closest animal within reach. Returns its head position for hearts.
   petNearest(player) {
     let best = null, bestD = 3.2;

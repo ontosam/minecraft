@@ -18,10 +18,11 @@ import { Goals, GOAL_DEFS } from './goals.js';
 
 const SAVE_KEY = 'ezrablocks.save.v2';
 const NETHER_STARS = 4;                   // stars needed to open the Nether portal
-const MAX_HEARTS = 6;
+const MAX_HEARTS = 6;                      // base hearts (a shop unlock can add one)
 const NIGHT_SKY = [0.05, 0.07, 0.15];     // dark, starry-feeling night
 
 let hearts = MAX_HEARTS;
+let maxHearts = MAX_HEARTS;
 let night = false;                        // night-time toggle (zombies come out)
 let nightAmt = 0;                         // eased 0..1 for the day↔night look
 let invuln = 0;                           // brief mercy window after taking damage
@@ -330,6 +331,8 @@ function doDig(hit) {
   // Buried treasure! Natural gold/diamond the player dug up (not their own block).
   if (!wasPlaced && (id === B.GOLD || id === B.DIAMOND)) {
     goals.bump('treasure'); sound.play('treasure'); spawnSparkles([x + 0.5, y + 0.6, z + 0.5]);
+    if (id === B.DIAMOND) { goals.bump('diamond'); goals.addGems(2); } else goals.addGems(1);
+    updateGems();
   }
 }
 
@@ -345,6 +348,7 @@ function placeDoor(hit) {
   world.placed.add(world.idx(x, y, z)); world.placed.add(world.idx(x, y + 1, z));
   sound.play('door'); saveDirty = true; actionAnim = 1; minimapDirty = true;
   goals.onBuild(B.DOOR);
+  goals.bump('doors');
 }
 function toggleDoor(x, y, z) {
   const by = doorBase(x, y, z);
@@ -370,7 +374,7 @@ function lightTNT(x, y, z) {
 function detonate(x, y, z) {
   world.set(x, y, z, B.AIR);
   world.placed.delete(world.idx(x, y, z));
-  const chain = world.explode(x + 0.5, y + 0.5, z + 0.5, 3.2);
+  const chain = world.explode(x + 0.5, y + 0.5, z + 0.5, explodeRadius());
   sound.play('boom');
   spawnBoom([x + 0.5, y + 0.6, z + 0.5]);
   shake = Math.min(0.7, shake + 0.5);
@@ -454,7 +458,79 @@ function doBonkZombie(z) {
 // --- Hearts: getting hurt, a gentle knock-out, slow regen ---
 function updateHearts() {
   const el = document.getElementById('hearts-bar');
-  if (el) el.textContent = '❤️'.repeat(hearts) + '🤍'.repeat(MAX_HEARTS - hearts);
+  if (el) el.textContent = '❤️'.repeat(hearts) + '🤍'.repeat(Math.max(0, maxHearts - hearts));
+}
+function updateGems() {
+  const el = document.getElementById('gem-bar');
+  if (el) el.textContent = '💎 ' + (goals ? goals.gems : 0);
+}
+function applyUnlocks() {
+  maxHearts = MAX_HEARTS + (goals.hasUnlock('heart') ? 1 : 0);
+  if (hearts > maxHearts) hearts = maxHearts;
+  updateHearts();
+}
+function explodeRadius() { return goals.hasUnlock('megatnt') ? 4.6 : 3.2; }
+function ensurePet() {
+  if (!goals.hasUnlock('pet')) return;
+  const am = worlds.over && worlds.over.mobs.animals;
+  if (!am || am.list.some((a) => a.isPet)) return;
+  const sp = worlds.over.world.spawn;
+  am.spawnPet(sp[0], sp[2]);
+}
+
+// --- Treasure shop: spend 💎 (mined + earned from goals) on fun unlocks ---
+const SHOP = [
+  { id: 'pet', icon: '🐾', name: 'Pet Friend', cost: 5, desc: 'A cute pet that follows you around' },
+  { id: 'heart', icon: '❤️', name: 'Extra Heart', cost: 8, desc: 'One more heart for night adventures' },
+  { id: 'megatnt', icon: '💥', name: 'Mega TNT', cost: 10, desc: 'Bigger, more powerful explosions!' },
+];
+function buildShop() {
+  document.getElementById('shop-gems').textContent = 'You have 💎 ' + goals.gems;
+  const body = document.getElementById('shop-body');
+  body.innerHTML = '';
+  for (const it of SHOP) {
+    const owned = goals.hasUnlock(it.id);
+    const btn = document.createElement('button');
+    btn.className = 'shop-item' + (owned ? ' owned' : '');
+    btn.innerHTML = '<span class="si">' + it.icon + '</span><div class="st"><b>' + it.name + '</b><small>' + it.desc + '</small></div>' +
+      '<div class="sc">' + (owned ? '✓ Got it!' : '💎 ' + it.cost) + '</div>';
+    if (!owned) btn.addEventListener('pointerdown', (e) => { e.preventDefault(); buyItem(it); });
+    body.appendChild(btn);
+  }
+}
+function openShop() { buildShop(); document.getElementById('shop').classList.remove('hidden'); }
+function closeShop() { document.getElementById('shop').classList.add('hidden'); }
+function buyItem(it) {
+  if (goals.hasUnlock(it.id)) return;
+  if (!goals.spend(it.cost)) { sound.play('deny'); showToast('Mine more 💎 first! (need ' + it.cost + ')'); return; }
+  goals.setUnlock(it.id);
+  applyUnlocks();
+  if (it.id === 'pet') { ensurePet(); if (dimension !== 'over') showToast('🐾 Your new pet is waiting at home — tap 🏠!'); }
+  if (it.id === 'heart') { hearts = maxHearts; updateHearts(); }
+  sound.play('treasure');
+  updateGems(); buildShop();
+  showToast('✨ Unlocked: ' + it.name + '!');
+}
+
+// --- Start the current world fresh (asked for, behind a confirmation) ---
+function resetWorld() {
+  const key = dimension, W = worlds[key].world, kind = WORLD_KINDS[key];
+  const hubDests = [...new Set(W.portals.filter((p) => HUB_DESTS.includes(p.dest)).map((p) => p.dest))];
+  W[kind.gen]();                         // regenerate fresh (clears builds + placed)
+  refreshSpawn(W);
+  ensurePortalsFor(key);                 // keep the standard portal(s)
+  for (const d of hubDests) placeHubPortal(W, kind, d);   // and re-lay any flint portals
+  W.rebuildAll();
+  player.world = W; player.goHome(); player.vel = [0, 0, 0];
+  positions[key] = W.spawn.slice();
+  minimapDirty = true; saveDirty = true;
+  showToast('✨ Fresh ' + kind.name + '! Your ⭐ and 💎 are safe.', 3200);
+}
+function askReset() {
+  document.getElementById('confirm-msg').innerHTML =
+    '🔄 <b>Start ' + WORLD_KINDS[dimension].name + ' fresh?</b><br>Everything you built here will be cleared.<br>Your ⭐ stars and 💎 diamonds are safe!';
+  document.getElementById('goals').classList.add('hidden');
+  document.getElementById('confirm').classList.remove('hidden');
 }
 function hurt(n) {
   if (invuln > 0 || hearts <= 0) return;
@@ -470,7 +546,7 @@ function knockout() {
   const zb = worlds.over && worlds.over.mobs.zombies; if (zb) zb.list.length = 0;
   if (dimension !== 'over') setDimension('over');
   player.goHome(); player.vel = [0, 0, 0];
-  hearts = MAX_HEARTS; invuln = 1.6; updateHearts();
+  hearts = maxHearts; invuln = 1.6; updateHearts();
 }
 function updateNightButton() {
   const b = document.getElementById('btn-night');
@@ -650,6 +726,13 @@ function wireUI() {
     if (night) goals.bump('night');
   });
 
+  document.getElementById('gem-bar').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); openShop(); });
+  document.getElementById('shop-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeShop(); });
+  document.getElementById('shop').addEventListener('pointerdown', (e) => { if (e.target.id === 'shop') closeShop(); });
+  document.getElementById('btn-reset').addEventListener('pointerdown', (e) => { e.preventDefault(); askReset(); });
+  document.getElementById('confirm-no').addEventListener('pointerdown', (e) => { e.preventDefault(); document.getElementById('confirm').classList.add('hidden'); });
+  document.getElementById('confirm-yes').addEventListener('pointerdown', (e) => { e.preventDefault(); document.getElementById('confirm').classList.add('hidden'); resetWorld(); });
+
   document.getElementById('btn-home').addEventListener('pointerdown', (e) => { e.preventDefault(); player.goHome(); });
   document.getElementById('btn-view').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); cycleZoom(); });
   updateViewButton();
@@ -732,7 +815,7 @@ function frame(now) {
   invuln = Math.max(0, invuln - dt);
   hurtFlash = Math.max(0, hurtFlash - dt);
   sinceHurt += dt;
-  if (hearts > 0 && hearts < MAX_HEARTS && sinceHurt > 5) { regenT += dt; if (regenT >= 3) { regenT = 0; hearts++; updateHearts(); } }
+  if (hearts > 0 && hearts < maxHearts && sinceHurt > 5) { regenT += dt; if (regenT >= 3) { regenT = 0; hearts++; updateHearts(); } }
   const nightTarget = (night && dimension === 'over') ? 1 : 0;
   nightAmt += (nightTarget - nightAmt) * Math.min(1, dt * 1.5);
   if (hurtEl) hurtEl.style.opacity = (hurtFlash * 0.9).toFixed(3);
@@ -920,7 +1003,7 @@ function init() {
 
   sound = new Sound();
   goals = new Goals();
-  goals.onComplete = (g) => { showGoalToast(g); refreshGoalsButton(); maybeUnlockNether(false); };
+  goals.onComplete = (g) => { showGoalToast(g); refreshGoalsButton(); maybeUnlockNether(false); updateGems(); };
   character = new Character(gl);
   controls = new Controls(canvas);
 
@@ -935,8 +1018,11 @@ function init() {
   initMinimap();
   wireUI();
   hurtEl = document.getElementById('hurt-flash');
+  applyUnlocks();
+  ensurePet();
   updateHearts();
   updateNightButton();
+  updateGems();
 
   // Resume audio on first interaction.
   const firstTouch = () => {
@@ -973,6 +1059,9 @@ function init() {
     portalOpen: () => portalUnlocked,
     hearts: () => hearts,
     night: () => night,
+    gems: () => goals.gems,
+    buy: (idd) => { const it = SHOP.find((s) => s.id === idd); if (it) buyItem(it); },
+    resetWorld: () => resetWorld(),
     travelTo: (k) => travelTo(k),
     lightPortal: (k) => lightPortal(k),
     enterPortal: () => travelTo(dimension === 'over' ? 'nether' : 'over'),
