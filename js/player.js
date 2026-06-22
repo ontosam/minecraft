@@ -141,8 +141,14 @@ export class Player {
         const supportY = Math.floor(ny);
         ny = supportY + 1;
         // Bouncy slime: spring back up instead of stopping (decays to a rest).
-        if (landingVy < -3.5 && this.world.get(Math.floor(this.pos[0]), supportY, Math.floor(this.pos[2])) === B.SLIME) {
-          this.vel[1] = Math.min(13, -landingVy * 0.85);
+        // Check the whole footprint so landing on an edge still bounces.
+        const onSlime =
+          this.world.get(Math.floor(this.pos[0] - HALF), supportY, Math.floor(this.pos[2] - HALF)) === B.SLIME ||
+          this.world.get(Math.floor(this.pos[0] + HALF), supportY, Math.floor(this.pos[2] - HALF)) === B.SLIME ||
+          this.world.get(Math.floor(this.pos[0] - HALF), supportY, Math.floor(this.pos[2] + HALF)) === B.SLIME ||
+          this.world.get(Math.floor(this.pos[0] + HALF), supportY, Math.floor(this.pos[2] + HALF)) === B.SLIME;
+        if (landingVy < -2.3 && onSlime) {
+          this.vel[1] = Math.min(14, -landingVy * 0.9);
           if (this.onBounce) this.onBounce([this.pos[0], ny, this.pos[2]]);
         } else { this.vel[1] = 0; this.onGround = true; }
       } else { ny = Math.ceil(ny + HEIGHT) - HEIGHT - EPS; this.vel[1] = 0; }

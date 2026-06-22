@@ -37,12 +37,12 @@ export const BLOCKS = {
   [B.STONE]: { tiles: { top: TILE.STONE, side: TILE.STONE, bottom: TILE.STONE }, tint: W, ui: '#8f8f97' },
   [B.SAND]: { tiles: { top: TILE.SAND, side: TILE.SAND, bottom: TILE.SAND }, tint: W, ui: '#e4d6a0' },
   [B.LOG]: { tiles: { top: TILE.LOG_TOP, side: TILE.LOG_SIDE, bottom: TILE.LOG_TOP }, tint: W, ui: '#9c7142' },
-  [B.LEAVES]: { tiles: { top: TILE.LEAVES, side: TILE.LEAVES, bottom: TILE.LEAVES }, tint: W, ui: '#4f9a3a' },
+  [B.LEAVES]: { tiles: { top: TILE.LEAVES, side: TILE.LEAVES, bottom: TILE.LEAVES }, tint: W, ui: '#4f9a3a', seethrough: true },
   [B.PLANKS]: { tiles: { top: TILE.PLANKS, side: TILE.PLANKS, bottom: TILE.PLANKS }, tint: W, ui: '#c99a5b' },
   [B.WATER]: { tiles: { top: TILE.WATER, side: TILE.WATER, bottom: TILE.WATER }, tint: W, ui: '#3a86d6', passable: true },
   [B.BEDROCK]: { tiles: { top: TILE.BEDROCK, side: TILE.BEDROCK, bottom: TILE.BEDROCK }, tint: W, ui: '#4a4a52', indestructible: true },
   [B.BRICK]: { tiles: { top: TILE.BRICK, side: TILE.BRICK, bottom: TILE.BRICK }, tint: W, ui: '#b05a44' },
-  [B.GLASS]: { tiles: { top: TILE.GLASS, side: TILE.GLASS, bottom: TILE.GLASS }, tint: W, ui: '#bfe6f2' },
+  [B.GLASS]: { tiles: { top: TILE.GLASS, side: TILE.GLASS, bottom: TILE.GLASS }, tint: W, ui: '#bfe6f2', seethrough: true },
   [B.RED]: colored(TILE.NEUTRAL, [0.85, 0.22, 0.22], '#d83838'),
   [B.ORANGE]: colored(TILE.NEUTRAL, [0.95, 0.55, 0.15], '#f28c26'),
   [B.YELLOW]: colored(TILE.NEUTRAL, [0.97, 0.85, 0.2], '#f7d934'),
@@ -153,7 +153,10 @@ export class World {
     if (y >= SY) return false;
     if (y < 0) return true;
     if (x < 0 || x >= SX || z < 0 || z >= SZ) return true;
-    return this.data[this.idx(x, y, z)] !== B.AIR;
+    const id = this.data[this.idx(x, y, z)];
+    if (id === B.AIR) return false;
+    const def = BLOCKS[id];
+    return !(def && def.seethrough);     // glass/leaves don't hide what's behind them
   }
 
   // For physics: borders act as walls. Passable blocks (the portal swirl) are
@@ -545,14 +548,55 @@ export class World {
     portal.active = !!active;
   }
 
-  // Which active portal's swirl is at this block? (for stepping through)
+  // Which active portal's swirl is at this block? (for stepping through). Works
+  // for any portal — the built obsidian frames and the auto ones — by finding the
+  // nearest active portal whenever you're standing in a PORTAL swirl block.
   portalAt(x, y, z) {
+    if (this.get(x, y, z) !== B.PORTAL) return null;
+    let best = null, bd = Infinity;
     for (const p of this.portals) {
       if (!p.active) continue;
-      const [ox, oy, oz] = p.f;
-      if (z === oz && x >= ox + 1 && x <= ox + 2 && y >= oy + 1 && y <= oy + 3) return p;
+      const dx = x - p.a[0], dy = y - p.a[1], dz = z - p.a[2], d = dx * dx + dy * dy + dz * dz;
+      if (d < bd) { bd = d; best = p; }
+    }
+    return best;
+  }
+
+  // Minecraft-style: is (x,y,z) an air cell inside a complete obsidian frame
+  // (a closed vertical rectangle)? Returns the interior air cells, or null.
+  findFrame(x, y, z) {
+    if (this.get(x, y, z) !== B.AIR) return null;
+    for (const ax of [0, 1]) {               // 0 = frame in the XY plane, 1 = ZY plane
+      const cells = [], seen = new Set(), stack = [[x, y, z]];
+      let ok = true;
+      while (stack.length) {
+        const [cx, cy, cz] = stack.pop();
+        const k = cx + ',' + cy + ',' + cz;
+        if (seen.has(k)) continue; seen.add(k);
+        if (cx < 0 || cx >= SX || cy < 0 || cy >= SY || cz < 0 || cz >= SZ) { ok = false; break; }
+        const id = this.get(cx, cy, cz);
+        if (id === B.OBSIDIAN) continue;       // frame wall — bounds the flood
+        if (id !== B.AIR) { ok = false; break; }   // leaky / not a clean frame
+        cells.push([cx, cy, cz]);
+        if (cells.length > 30) { ok = false; break; }  // open or too big
+        stack.push([cx, cy + 1, cz], [cx, cy - 1, cz]);
+        if (ax === 0) stack.push([cx + 1, cy, cz], [cx - 1, cy, cz]);
+        else stack.push([cx, cy, cz + 1], [cx, cy, cz - 1]);
+      }
+      if (ok && cells.length >= 2 && cells.length <= 30) return cells;
     }
     return null;
+  }
+
+  // Light a found frame: fill its interior with the portal swirl + register the
+  // gateway leading to `dest`. Returns the portal.
+  lightFrame(cells, dest) {
+    let minX = 1e9, minY = 1e9, minZ = 1e9;
+    for (const c of cells) { this.set(c[0], c[1], c[2], B.PORTAL); minX = Math.min(minX, c[0]); minY = Math.min(minY, c[1]); minZ = Math.min(minZ, c[2]); }
+    const bottom = cells.slice().sort((a, b) => a[1] - b[1])[0];
+    const portal = { f: [minX - 1, minY - 1, minZ], dest, a: [bottom[0] + 0.5, bottom[1], bottom[2] + 0.5], active: true };
+    this.portals.push(portal);
+    return portal;
   }
 
   // Is this block part of any portal (frame or swirl)? Such blocks are protected
@@ -636,7 +680,11 @@ export class World {
           if (base + 24 > 0xffff) break outer;
           const def = BLOCKS[id];
           for (const f of FACES) {
-            if (this.opaqueAt(x + f.n[0], y + f.n[1], z + f.n[2])) continue;
+            const nx = x + f.n[0], ny = y + f.n[1], nz = z + f.n[2];
+            if (this.opaqueAt(nx, ny, nz)) continue;
+            // Don't draw the face between two of the same see-through block (so a
+            // glass or leaf wall stays clean instead of double-faced).
+            if (def.seethrough && this.get(nx, ny, nz) === id) continue;
             const tile = def.tiles[f.slot];
             const r = getUV(tile);
             const t = def.tint;

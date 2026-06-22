@@ -1,11 +1,11 @@
 // Offline service worker for Ezra's Blocks. Bump CACHE to push an update.
-const CACHE = 'ezrablocks-v3';
+const CACHE = 'ezrablocks-v4';
 const CORE = [
   '', 'index.html', 'styles.css', 'manifest.webmanifest',
   'js/main.js', 'js/math.js', 'js/gfx.js', 'js/world.js', 'js/worlds.js',
   'js/player.js', 'js/input.js', 'js/audio.js', 'js/animals.js',
   'js/creepers.js', 'js/nethermobs.js', 'js/zombies.js', 'js/spiders.js',
-  'js/villagers.js', 'js/goals.js', 'js/character.js',
+  'js/skeletons.js', 'js/villagers.js', 'js/goals.js', 'js/character.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];
 

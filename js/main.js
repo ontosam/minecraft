@@ -60,6 +60,8 @@ let shadow, mShadow;     // soft blob-shadow mesh + a scratch matrix for it
 let selected = B.GRASS;
 let selectedChar = 'ezra';     // which character you're playing as
 let lastTool = 'build', actionAnim = 0;
+let flintMode = false;         // flint & steel tool active (tap to light TNT/portals)
+let pendingFrame = null;       // an obsidian frame waiting for a chosen destination
 let saveDirty = false, lastSave = 0;
 let prevX = 0, prevZ = 0, goalToastTimer = 0;
 let shake = 0;            // camera kick from explosions
@@ -70,6 +72,8 @@ let bobberEl = null;      // the on-screen bobber marker
 const saplings = [];      // planted saplings growing into trees: { world, x, y, z, t }
 let steveChar = null, stevePos = null, steveYaw = 0; // Steve at the Lava Chicken stand
 let mathQ = null;         // the current math question
+const MATH_POUCH_MAX = 6; // Steve only has so many 💎 to give before he runs out…
+let mathPouch = MATH_POUCH_MAX, mathRefillT = 0;  // …it refills slowly over time
 const fuses = [];         // lit TNT awaiting detonation: { x, y, z, t }
 const canvas = document.getElementById('game');
 
@@ -280,6 +284,46 @@ function lightPortal(dest) {
   portalCooldown = 0.8;
   sound.play('portal');
   showToast('🌀 ' + WORLD_KINDS[dest].emoji + ' Portal to ' + WORLD_KINDS[dest].name + ' is ready by your home — tap 🏠, then walk in!', 4000);
+}
+
+// --- Flint & steel (Minecraft-style): build an obsidian frame, then light it ---
+function updateFlintButton() {
+  const b = document.getElementById('btn-flint');
+  if (b) b.classList.toggle('on', flintMode);
+}
+// March the aim ray and return the interior cells of the first obsidian frame
+// the player is looking through (or null).
+function aimFrameCell(dir) {
+  for (let t = 0.5; t < REACH; t += 0.25) {
+    const bx = Math.floor(camPos[0] + dir[0] * t), by = Math.floor(camPos[1] + dir[1] * t), bz = Math.floor(camPos[2] + dir[2] * t);
+    const id = world.get(bx, by, bz);
+    if (id === B.AIR) { const cells = world.findFrame(bx, by, bz); if (cells) return cells; }
+    else if (id !== B.OBSIDIAN) break;     // hit a solid that isn't frame → stop
+  }
+  return null;
+}
+// After picking a destination for a freshly-tapped frame, light it.
+function lightChosenFrame(dest) {
+  if (!pendingFrame || !WORLD_KINDS[dest]) { pendingFrame = null; return; }
+  const cells = pendingFrame; pendingFrame = null;
+  const portal = world.lightFrame(cells, dest);
+  // Arrival = standing one block IN FRONT of the frame (the side you lit it from),
+  // not inside the swirl — so returning here never bounce-loops.
+  const swirl = portal.a.slice();
+  const sameZ = cells.every((c) => c[2] === cells[0][2]);
+  if (sameZ) { const fz = cells[0][2], side = player.pos[2] >= fz ? 1 : -1; portal.a = [swirl[0], swirl[1], fz + 0.5 + side]; }
+  else { const fx = cells[0][0], side = player.pos[0] >= fx ? 1 : -1; portal.a = [fx + 0.5 + side, swirl[1], swirl[2]]; }
+  minimapDirty = true; saveDirty = true; portalCooldown = 0.6;
+  sound.play('portal'); spawnParticles(swirl, '🔥', 'puff', 4, 30);
+  showToast('🔥✨ Portal lit! Walk into the swirl to visit ' + WORLD_KINDS[dest].emoji + ' ' + WORLD_KINDS[dest].name + '!', 4200);
+}
+// Flint tap: light TNT, or light an obsidian frame you're aiming through.
+function flintTap(dir) {
+  const hit = world.raycast(camPos, dir, REACH);
+  if (hit && world.get(hit.block[0], hit.block[1], hit.block[2]) === B.TNT) { lightTNT(hit.block[0], hit.block[1], hit.block[2]); return; }
+  const cells = aimFrameCell(dir);
+  if (cells) { pendingFrame = cells; openPortalMenu(); }
+  else showToast('🔥 Build an obsidian doorway (a closed frame), then tap inside it to light a portal!', 3600);
 }
 
 // Re-lay any flint portals in a world into the tidy row (cleans up older saves
@@ -916,7 +960,9 @@ function makeMath() {
   }
   const opts = new Set([ans]);
   while (opts.size < 3) { const d = ans + (ri(2) ? 1 : -1) * (1 + ri(3)); if (d >= 0) opts.add(d); }
-  return { prompt, ans, opts: [...opts].sort(() => Math.random() - 0.5) };
+  // Harder questions are worth more 💎 (counting/easy add = 1, the rest = 2).
+  const reward = (type === 'count' || (type === 'add' && lvl < 5)) ? 1 : 2;
+  return { prompt, ans, opts: [...opts].sort(() => Math.random() - 0.5), reward };
 }
 function showMath() {
   document.getElementById('math-q').innerHTML =
@@ -934,9 +980,11 @@ function closeMath() { document.getElementById('math').classList.add('hidden'); 
 function answerMath(v) {
   if (!mathQ) return;
   if (v === mathQ.ans) {
-    goals.bump('math'); goals.addGems(2); updateGems();
-    sound.play('treasure');
-    showToast('🍗 Correct! Lava chicken served! +💎2');
+    goals.bump('math');                       // always counts toward the math goals
+    const pay = Math.min(mathQ.reward || 1, mathPouch);   // …but 💎 are limited by Steve's pouch
+    mathPouch -= pay;
+    if (pay > 0) { goals.addGems(pay); updateGems(); sound.play('treasure'); showToast('🍗 Correct! Lava chicken + 💎' + pay + '!'); }
+    else { sound.play('pet'); showToast('🍗 Correct! Steve is out of 💎 for now — come back later! Enjoy a lava chicken 😋'); }
     mathQ = makeMath(); showMath();          // a fresh (gently harder) question
   } else {
     sound.play('deny');
@@ -1036,8 +1084,7 @@ function updateNightButton() {
 
 // --- UI wiring ---
 function blockIcon(id, size) {
-  const cv = blockPreview(BLOCKS[id].tiles.side, size);
-  return cv;
+  return blockPreview(BLOCKS[id].tiles.side, size, BLOCKS[id].tint);
 }
 
 function refreshBlocksButton() {
@@ -1121,7 +1168,7 @@ function buildPortalMenu() {
     const btn = document.createElement('button');
     btn.className = 'portal-choice';
     btn.innerHTML = '<span class="pe">' + kind.emoji + '</span><b>' + kind.name + '</b>';
-    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); closePortalMenu(); lightPortal(k); });
+    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); closePortalMenu(); lightChosenFrame(k); });
     body.appendChild(btn);
   }
 }
@@ -1237,7 +1284,11 @@ function wireUI() {
     if (player.flying) goals.bump('fly');
   });
 
-  document.getElementById('btn-flint').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); openPortalMenu(); });
+  document.getElementById('btn-flint').addEventListener('pointerdown', (e) => {
+    e.preventDefault(); sound.resume();
+    flintMode = !flintMode; updateFlintButton();
+    if (flintMode) tip('flint', '🔥 Flint & steel! Build an obsidian doorway (a closed frame), then tap inside it to light a portal. It also lights TNT. Tap 🔥 again to put it away.');
+  });
   document.getElementById('portalmenu-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closePortalMenu(); });
   document.getElementById('portalmenu').addEventListener('pointerdown', (e) => { if (e.target.id === 'portalmenu') closePortalMenu(); });
 
@@ -1366,6 +1417,8 @@ function frame(now) {
   if (hearts > 0 && hearts < maxHearts && sinceHurt > 4) { regenT += dt; if (regenT >= 2.2) { regenT = 0; hearts = Math.min(maxHearts, hearts + 0.5); updateHearts(); } }
   // Golden-Apple bonus hearts count down, then gently fade away.
   if (heartBuffT > 0) { heartBuffT -= dt; if (heartBuffT <= 0) { heartBuff = 0; hearts = Math.min(hearts, maxHearts); updateHearts(); } }
+  // Steve's math 💎 pouch refills slowly (caps how fast math earns diamonds).
+  if (mathPouch < MATH_POUCH_MAX) { mathRefillT += dt; if (mathRefillT >= 30) { mathRefillT = 0; mathPouch++; } }
   const nightTarget = (night && dimension === 'over') ? 1 : 0;
   nightAmt += (nightTarget - nightAmt) * Math.min(1, dt * 1.5);
   if (hurtEl) hurtEl.style.opacity = (hurtFlash * 0.9).toFixed(3);
@@ -1442,6 +1495,7 @@ function frame(now) {
     else if (sk) doBonkSkeleton(sk);
     else if (vl) talkToVillager(vl);
     else if (stv) openSteveMenu();
+    else if (flintMode) flintTap(dir);     // flint & steel: light TNT / a portal frame
     else {
       const hit = world.raycast(camPos, dir, REACH);
       const bid = hit ? world.get(hit.block[0], hit.block[1], hit.block[2]) : 0;
@@ -1680,6 +1734,10 @@ function init() {
     spawnCreeper: () => { const c = mobs().creepers; if (c) c.spawnNow(player); },
     lightTNT: (x, y, z) => lightTNT(x, y, z),
     toggleLever: (x, y, z) => toggleLever(x, y, z),
+    flint: () => flintMode,
+    toggleFlint: () => { flintMode = !flintMode; updateFlintButton(); },
+    findFrame: (x, y, z) => world.findFrame(x, y, z),
+    lightFrame: (x, y, z, dest) => { const c = world.findFrame(x, y, z); if (!c) return false; pendingFrame = c; lightChosenFrame(dest); return true; },
     riding: () => !!riding,
     toggleRide: () => toggleRide(),
     fishing: () => !!fishing,
@@ -1692,6 +1750,7 @@ function init() {
     character: () => selectedChar,
     openMath: () => openMath(),
     mathQ: () => mathQ,
+    mathPouch: () => mathPouch,
     steve: () => stevePos,
     openSteve: () => openSteveMenu(),
     plant: (x, y, z) => { world.set(x, y, z, B.SAPLING); saplings.push({ world, x, y, z, t: 14 + Math.random() * 14 }); goals.bump('plant'); },

@@ -88,6 +88,7 @@ uniform vec3 uFogColor;
 uniform float uFogNear, uFogFar, uAlpha, uDayLight;
 void main() {
   vec4 tex = texture2D(uTex, vUV);
+  if (tex.a < 0.5) discard;            // cutout transparency (glass, leaves)
   vec3 c = tex.rgb * vColor * vLight * uDayLight;
   float fog = clamp((vDist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
   c = mix(c, uFogColor, fog);
@@ -185,6 +186,8 @@ function buildAtlasCanvas() {
   ctx.fillStyle = shade(0x6f4e2c, 1);
   ctx.fillRect(p[0] + 6, p[1] + 6, 4, 4);
   p = at(TILE.LEAVES); noise(ctx, p[0], p[1], 0x4f9a3a, 0.34, 8);
+  // Punch see-through gaps so leaves read as leafy (cutout, like Minecraft).
+  { const r = rng(811); for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) if (r() < 0.22) ctx.clearRect(p[0] + x, p[1] + y, 1, 1); }
   p = at(TILE.PLANKS);
   noise(ctx, p[0], p[1], 0xc99a5b, 0.12, 9);
   ctx.fillStyle = shade(0x8a6a3a, 1);
@@ -203,10 +206,13 @@ function buildAtlasCanvas() {
   ctx.fillStyle = shade(0xe7d9c9, 1);
   for (let y = 0; y < T; y += 4) ctx.fillRect(p[0], p[1] + y, T, 1);
   for (let y = 0; y < T; y += 4) for (let x = (y % 8 === 0 ? 4 : 0); x < T; x += 8) ctx.fillRect(p[0] + x, p[1] + y, 1, 4);
+  // Glass: a clear (transparent) pane with a light-blue frame + a corner shine,
+  // so you can see through it like Minecraft.
   p = at(TILE.GLASS);
-  noise(ctx, p[0], p[1], 0xbfe6f2, 0.06, 13);
-  ctx.fillStyle = shade(0x9fd0e0, 1);
-  ctx.strokeRect && (ctx.fillRect(p[0], p[1], T, 1), ctx.fillRect(p[0], p[1] + T - 1, T, 1), ctx.fillRect(p[0], p[1], 1, T), ctx.fillRect(p[0] + T - 1, p[1], 1, T));
+  ctx.clearRect(p[0], p[1], T, T);
+  ctx.fillStyle = 'rgba(206,238,247,0.96)';
+  for (let i = 0; i < T; i++) { ctx.fillRect(p[0] + i, p[1], 1, 2); ctx.fillRect(p[0] + i, p[1] + T - 2, 1, 2); ctx.fillRect(p[0], p[1] + i, 2, 1); ctx.fillRect(p[0] + T - 2, p[1] + i, 2, 1); }
+  ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(p[0] + 4, p[1] + 4, 2, 6); ctx.fillRect(p[0] + 4, p[1] + 4, 5, 2);
 
   // --- extra building blocks ---
   // Cobblestone: lumpy grey stones
@@ -351,7 +357,9 @@ function buildAtlasCanvas() {
 let _atlasCanvas = null;
 
 // A small canvas showing one atlas tile, scaled up crisply (for the UI picker).
-export function blockPreview(tile, size) {
+// An optional tint [r,g,b] (0..1) multiplies the tile so colour blocks (which
+// share the neutral tile + a tint) show their real colour in the menu.
+export function blockPreview(tile, size, tint) {
   if (!_atlasCanvas) _atlasCanvas = buildAtlasCanvas();
   const t = ATLAS.tile;
   const col = tile % ATLAS.perRow, row = Math.floor(tile / ATLAS.perRow);
@@ -360,6 +368,13 @@ export function blockPreview(tile, size) {
   const ctx = c.getContext('2d');
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(_atlasCanvas, col * t, row * t, t, t, 0, 0, size, size);
+  if (tint && (tint[0] !== 1 || tint[1] !== 1 || tint[2] !== 1)) {
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = 'rgb(' + Math.round(tint[0] * 255) + ',' + Math.round(tint[1] * 255) + ',' + Math.round(tint[2] * 255) + ')';
+    ctx.fillRect(0, 0, size, size);
+    ctx.globalCompositeOperation = 'source-over';
+    // keep transparent pixels transparent (multiply leaves them be on most browsers)
+  }
   return c;
 }
 
