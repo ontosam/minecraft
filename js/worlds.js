@@ -54,7 +54,15 @@ export const WORLD_KINDS = {
     flint: true,                // appears in the flint menu…
     locked: 'skyworld',         // …but only after it's bought in the 💎 shop
   },
+  end: {
+    name: 'The End', emoji: '🐉',
+    sky: [0.17, 0.13, 0.26], fog: [40, 96],
+    gen: 'generateEnd', ground: B.END_STONE,
+    mobs: ['dragon'],
+    flint: true,                // appears in the flint menu…
+    locked: 'endworld',         // …after it's bought (the big adventure reward)
+  },
 };
 
 // Display order for menus/minimap.
-export const WORLD_ORDER = ['over', 'nether', 'gold', 'ant', 'tnt', 'sky'];
+export const WORLD_ORDER = ['over', 'nether', 'gold', 'ant', 'tnt', 'sky', 'end'];

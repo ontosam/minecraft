@@ -500,6 +500,33 @@ v4→v5**.
    Also unclear: his **"land with a water bucket in the sand"** remark — needs
    clarifying (likely the existing soft-landing water feature).
 
+## Status (session 19) — The End + a gentle dragon (dad picked the
+"gentle adventure-boss" via AskUserQuestion). Shipped on
+**`claude/store-portal-bugs-hzcr72`**. Now **53 block ids** (END_STONE id 52),
+**13 shop items**, **44 goals**, **sw cache v5→v6 (bump on deploy)**.
+1. **🐉 The End world + friendly Ender Dragon (`js/dragon.js`).** A new flint
+   world `WORLD_KINDS.end` (dark-indigo sky, `generateEnd()` = a pale END_STONE
+   island floating in the void, ringed by **6 obsidian pillars topped with
+   glowing magenta End Crystals**). Bought in the 💎 shop (`endworld`, 30💎 — the
+   big reward), then lit via flint like Sky World. The **dragon glides in a big
+   circle** above the island (harmless, never attacks). **Tap the crystals to pop
+   them** (harmless poofs, `goals.bump('crystal')`); once all are gone she's
+   **tamed** — **tap her for a celebration + 💎12** (first time only; re-taming
+   just says hi, no farming). `Dragon` class mirrors the nethermob pattern
+   (`pickRay` → crystal vs. dragon, `popCrystal`, `tame`, `onEvent`/`onTame`).
+   Crystal spots persist in the save (`world.crystalSpots` ↔ `cs` in serialize).
+   Tap routing checks the dragon first in the End. New goals **Crystal popper**
+   (3) + **Dragon tamer** (1). Debug: `__ezra.dragon/popCrystals()/tameDragon()`.
+   The dragon was darkened-against-dark-sky at first → lightened her body +
+   lifted the End sky a touch so a 6-yr-old can clearly see (and she's friendly,
+   not scary).
+   Verified headless: buy→travel→6 crystals→early dragon-tap refused→pop all→
+   tamed→tame pays +💎 once (not on revisit)→goals tick; 4s render soak + revisit
+   + full world-hop all green, zero errors; screenshot of the island/pillars/
+   crystals/portal. Tuning candidates: dragon is posed hard to frame in
+   third-person (big + circles high); could add wing-flap; Endermen + a desert
+   pyramid are the natural next End additions.
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files

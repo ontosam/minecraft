@@ -16,7 +16,7 @@ export const TILE = {
   DOOR: 32, DOOR_OPEN: 33, TNT_SIDE: 34, TNT_TOP: 35,
   RAINBOW: 36, LEVER: 37, LEVER_ON: 38, REDSTONE: 39, REDLAMP: 40, REDLAMP_ON: 41,
   SLIME: 42, SAPLING: 43,
-  MEGA_TNT_SIDE: 44, MEGA_TNT_TOP: 45, SANDSTONE: 46,
+  MEGA_TNT_SIDE: 44, MEGA_TNT_TOP: 45, SANDSTONE: 46, END_STONE: 47,
 };
 
 export function initGL(canvas) {
@@ -328,6 +328,10 @@ function buildAtlasCanvas() {
   p = at(TILE.SANDSTONE); noise(ctx, p[0], p[1], 0xe6d8a8, 0.08, 76);
   ctx.fillStyle = shade(0xcab984, 1); ctx.fillRect(p[0], p[1] + 4, T, 1); ctx.fillRect(p[0], p[1] + 10, T, 1);
   ctx.fillStyle = shade(0xf2e8c4, 1); ctx.fillRect(p[0], p[1] + 5, T, 1); ctx.fillRect(p[0], p[1] + 11, T, 1);
+
+  // --- End Stone (the pale, speckled ground of The End) ---
+  p = at(TILE.END_STONE); noise(ctx, p[0], p[1], 0xe6e6b0, 0.06, 77);
+  { const r = rng(960); for (let i = 0; i < 24; i++) { ctx.fillStyle = shade(i % 2 ? 0xcfcf86 : 0xf6f6d2, 1); ctx.fillRect(p[0] + Math.floor(r() * T), p[1] + Math.floor(r() * T), 1, 1); } }
 
   // --- Rainbow block (a sparkly shop reward) ---
   // Bright horizontal stripes of the rainbow, with a few twinkling sparkles.

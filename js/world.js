@@ -21,7 +21,7 @@ export const B = {
   NETHERRACK: 36, PORTAL: 37, LAVA: 38,
   DOOR: 39, DOOR_OPEN: 40, TNT: 41, RAINBOW: 42,
   LEVER: 43, LEVER_ON: 44, REDSTONE: 45, REDLAMP: 46, REDLAMP_ON: 47, SLIME: 48,
-  SAPLING: 49, MEGA_TNT: 50, SANDSTONE: 51,
+  SAPLING: 49, MEGA_TNT: 50, SANDSTONE: 51, END_STONE: 52,
 };
 
 const W = [1, 1, 1]; // white tint for textured blocks
@@ -87,6 +87,7 @@ export const BLOCKS = {
   [B.SAPLING]: { tiles: { top: TILE.SAPLING, side: TILE.SAPLING, bottom: TILE.SAPLING }, tint: W, ui: '#5bbf3a', passable: true },
   [B.MEGA_TNT]: nat3(TILE.MEGA_TNT_TOP, TILE.MEGA_TNT_SIDE, TILE.MEGA_TNT_TOP, '#8e1b12'),
   [B.SANDSTONE]: nat(TILE.SANDSTONE, '#e6d8a8'),
+  [B.END_STONE]: nat(TILE.END_STONE, '#e6e6b0'),
 };
 
 // Build blocks grouped into categories for the pop-up picker.
@@ -97,7 +98,7 @@ export const CATEGORIES = [
   { name: 'Boom 💥', blocks: [B.TNT] },
   // Tap a lever → it powers redstone wire → wired-up lamps light up.
   { name: 'Redstone ⚙️', blocks: [B.LEVER, B.REDSTONE, B.REDLAMP] },
-  { name: 'Stone', blocks: [B.STONE, B.COBBLE, B.STONE_BRICK, B.SANDSTONE, B.BRICK, B.OBSIDIAN, B.GLOWSTONE] },
+  { name: 'Stone', blocks: [B.STONE, B.COBBLE, B.STONE_BRICK, B.SANDSTONE, B.END_STONE, B.BRICK, B.OBSIDIAN, B.GLOWSTONE] },
   { name: 'Wood', blocks: [B.PLANKS, B.BIRCH_PLANKS, B.DARK_PLANKS, B.BOOKSHELF] },
   { name: 'Shiny', blocks: [B.GOLD, B.DIAMOND, B.ICE, B.GLASS] },
   { name: 'Fun', blocks: [B.PUMPKIN, B.SLIME] },
@@ -502,6 +503,36 @@ export class World {
     this.spawn[1] = this.heightAt(cxC, czC) + 2;
   }
 
+  // The End: a pale End-stone island floating in a dark sky, ringed by obsidian
+  // pillars topped with glowing End Crystals — home to the friendly dragon.
+  // The crystal spots are stored so the Dragon manager can put a crystal on each.
+  generateEnd() {
+    const rand = mulberry32(7777);
+    this.data.fill(B.AIR);
+    this.placed = new Set();
+    this.portals = [];
+    this.crystalSpots = [];
+    const cxC = Math.floor(SX / 2), czC = Math.floor(SZ / 2), top = 9;
+    // One big flat-topped End-stone island in the middle.
+    for (let dy = 0; dy < 7; dy++) {
+      const rr = 16 - dy * 1.6, y = top - dy;
+      if (rr < 1 || y < 1) break;
+      for (let x = Math.max(1, Math.floor(cxC - rr)); x <= Math.min(SX - 2, Math.ceil(cxC + rr)); x++)
+        for (let z = Math.max(1, Math.floor(czC - rr)); z <= Math.min(SZ - 2, Math.ceil(czC + rr)); z++)
+          if (Math.hypot(x - cxC, z - czC) <= rr) this.data[this.idx(x, y, z)] = B.END_STONE;
+    }
+    // A ring of obsidian pillars, each topped with an End Crystal.
+    const pillars = 6, ringR = 12;
+    for (let i = 0; i < pillars; i++) {
+      const a = (i / pillars) * Math.PI * 2;
+      const px = Math.round(cxC + Math.cos(a) * ringR), pz = Math.round(czC + Math.sin(a) * ringR);
+      const ph = top + 4 + (i % 3);                    // varied pillar heights
+      for (let y = top + 1; y <= ph; y++) this.data[this.idx(px, y, pz)] = B.OBSIDIAN;
+      this.crystalSpots.push([px, ph + 2, pz]);        // crystal floats just above the pillar
+    }
+    this.spawn = [cxC + 0.5, top + 2, czC + 0.5];
+  }
+
   // Boom! Clear destructible blocks within radius r of (cx,cy,cz). Returns the
   // positions of any *other* TNT caught in the blast (for chain reactions).
   explode(cx, cy, cz, r) {
@@ -763,7 +794,7 @@ export class World {
 
   // --- Save / load (raw bytes, base64 into localStorage) ---
   serialize() {
-    return { v: 2, w: bytesToBase64(this.data), p: [...this.placed], portals: this.portals };
+    return { v: 2, w: bytesToBase64(this.data), p: [...this.placed], portals: this.portals, cs: this.crystalSpots || null };
   }
   loadFrom(obj) {
     if (!obj || !obj.w) return false;
@@ -774,6 +805,7 @@ export class World {
     // v2 saves carry a portal list; older saves get their portals re-added by
     // the caller (the swirl blocks themselves live in the saved bytes).
     this.portals = (obj.portals || []).map((p) => ({ f: p.f.slice(), dest: p.dest, a: p.a.slice(), active: !!p.active }));
+    if (obj.cs) this.crystalSpots = obj.cs.map((c) => c.slice());   // End-world crystal pillars
     return true;
   }
 }

@@ -14,6 +14,7 @@ import { Zombies } from './zombies.js';
 import { Spiders } from './spiders.js';
 import { Skeletons } from './skeletons.js';
 import { Villagers } from './villagers.js';
+import { Dragon } from './dragon.js';
 import { Controls } from './input.js';
 import { Sound } from './audio.js';
 import { Character, CHARACTERS, charById, charPreview } from './character.js';
@@ -130,6 +131,22 @@ function makeMobs(kind, w) {
       };
     } else if (t === 'villagers') {
       m.villagers = new Villagers(gl, w);
+    } else if (t === 'dragon') {
+      m.dragon = new Dragon(gl, w);
+      m.dragon.onEvent = (type, pos) => {
+        if (type === 'crystal') { sound.play('poof'); spawnSparkles(pos); }
+        else if (type === 'tamed') { sound.play('coo'); showToast('✨ The crystals are gone! Tap the dragon to make friends! 🐉', 4200); }
+      };
+      m.dragon.onTame = () => {
+        const first = !goals.done['dragontamer'];   // big 💎 reward only the first time
+        goals.bump('dragon');
+        if (first) { goals.addGems(12); updateGems(); }
+        sound.play('portal');
+        const p = m.dragon.dragon ? m.dragon.dragon.pos : player.pos;
+        spawnParticles([p[0], p[1], p[2]], '🎉', 'puff', 12, 90);
+        spawnHearts([p[0], p[1], p[2]]);
+        showToast(first ? '🐉🎉 You tamed the friendly dragon! +💎12 — you\'re a hero!' : '🐉💜 The dragon is happy to see you again!', 5000);
+      };
     }
   }
   return m;
@@ -139,6 +156,7 @@ function populateMobs(m) {
   if (m.ants) m.ants.spawn(14);
   if (m.villagers) m.villagers.spawn(2);
   if (m.nethermobs) m.nethermobs.populate(SX, SZ);
+  if (m.dragon) m.dragon.populate();
   // creepers spawn lazily (paced) during update — no initial spawn
 }
 function updateMobs(m, dt) {
@@ -150,6 +168,7 @@ function updateMobs(m, dt) {
   if (m.spiders) m.spiders.update(dt, player, night && dimension === 'over');
   if (m.skeletons) m.skeletons.update(dt, player, night && dimension === 'over');
   if (m.villagers) m.villagers.update(dt, player);
+  if (m.dragon) m.dragon.update(dt, player);
 }
 function drawMobs(m) {
   if (m.animals) m.animals.draw(worldProg);
@@ -160,6 +179,7 @@ function drawMobs(m) {
   if (m.spiders) m.spiders.draw(worldProg);
   if (m.skeletons) m.skeletons.draw(worldProg);
   if (m.villagers) m.villagers.draw(worldProg);
+  if (m.dragon) m.dragon.draw(worldProg);
 }
 
 // Soft blob shadows under every creature (and the player) so nothing looks like
@@ -287,7 +307,7 @@ function recoverHome() {
 
 // Flint & steel portals line up in a tidy row right by home, one slot per
 // destination — so they never stack behind each other and are easy to find.
-const HUB_DESTS = ['gold', 'ant', 'tnt', 'sky'];
+const HUB_DESTS = ['gold', 'ant', 'tnt', 'sky', 'end'];
 function placeHubPortal(W, kind, dest) {
   const slot = Math.max(0, HUB_DESTS.indexOf(dest));
   const sp = W.spawn;
@@ -753,6 +773,18 @@ function spawnSparkles(worldPos) { spawnParticles(worldPos, '✨', 'puff', 7, 56
 function spawnSplash(worldPos) { spawnParticles([worldPos[0], worldPos[1] + 0.3, worldPos[2]], '💦', 'puff', 7, 60); }
 function spawnBoom(worldPos) { spawnParticles(worldPos, '💥', 'puff', 9, 72); }
 
+// The End: tap a glowing crystal to pop it; once they're all gone, tap the
+// dragon to tame her. (All harmless — pure adventure, never any danger.)
+function doDragonTap(dg) {
+  const dr = mobs().dragon;
+  if (!dr) return;
+  if (dg.kind === 'crystal') { dr.popCrystal(dg.c); goals.bump('crystal'); saveDirty = true; }
+  else if (dg.kind === 'dragon') {
+    if (!dr.tame()) {
+      if (!dr.tamed) showToast('🐉 Pop the glowing crystals on the pillars first to tame her!', 3400);
+    } else saveDirty = true;
+  }
+}
 // Tap a creeper to defend: it poofs harmlessly, your blocks pop back, +a star.
 function doDefend(cr) {
   const cz = mobs().creepers;
@@ -977,6 +1009,7 @@ const SHOP = [
   { id: 'rainbow', icon: '🌈', name: 'Rainbow Block', cost: 10, desc: 'A magic rainbow block to build with' },
   { id: 'crown', icon: '👑', name: 'Golden Crown', cost: 14, desc: 'Wear a royal crown — be the king!' },
   { id: 'skyworld', icon: '☁️', name: 'Sky World', cost: 20, desc: 'A whole new floating-islands world — best with Fly!' },
+  { id: 'endworld', icon: '🐉', name: 'The End', cost: 30, desc: 'A floating world with a friendly dragon to tame!' },
 ];
 function buildShop() {
   document.getElementById('shop-gems').textContent = 'You have 💎 ' + goals.gems;
@@ -1011,6 +1044,7 @@ function buyItem(it) {
     showToast('💣 Mega TNT is in your blocks! Place it, then tap it to light a HUGE boom!', 4200);
   }
   if (it.id === 'skyworld') showToast('☁️ Sky World unlocked! Tap 🔥, choose Sky World, then walk in!', 4200);
+  if (it.id === 'endworld') showToast('🐉 The End unlocked! Tap 🔥, choose The End, then walk in to meet the dragon!', 4600);
   sound.play('treasure');
   updateGems(); buildShop();
   showToast('✨ Unlocked: ' + it.name + '!');
@@ -1642,14 +1676,16 @@ function frame(now) {
   if (controls.tapPending) {
     controls.tapPending = false;
     const dir = screenRay(controls.tapX, controls.tapY);
-    const cr = m.creepers ? m.creepers.pickRay(camPos, dir) : null;
-    const zb = (!cr && m.zombies) ? m.zombies.pickRay(camPos, dir) : null;
-    const sp = (!cr && !zb && m.spiders) ? m.spiders.pickRay(camPos, dir) : null;
-    const sk = (!cr && !zb && !sp && m.skeletons) ? m.skeletons.pickRay(camPos, dir) : null;
-    const vl = (!cr && !zb && !sp && !sk && m.villagers) ? m.villagers.pickRay(camPos, dir) : null;
-    const stv = (!cr && !zb && !sp && !sk && !vl && stevePos && dimension === 'over') &&
+    const dg = m.dragon ? m.dragon.pickRay(camPos, dir) : null;   // The End: crystals + dragon
+    const cr = (!dg && m.creepers) ? m.creepers.pickRay(camPos, dir) : null;
+    const zb = (!dg && !cr && m.zombies) ? m.zombies.pickRay(camPos, dir) : null;
+    const sp = (!dg && !cr && !zb && m.spiders) ? m.spiders.pickRay(camPos, dir) : null;
+    const sk = (!dg && !cr && !zb && !sp && m.skeletons) ? m.skeletons.pickRay(camPos, dir) : null;
+    const vl = (!dg && !cr && !zb && !sp && !sk && m.villagers) ? m.villagers.pickRay(camPos, dir) : null;
+    const stv = (!dg && !cr && !zb && !sp && !sk && !vl && stevePos && dimension === 'over') &&
       rayHitsSphere(camPos, dir, stevePos[0], stevePos[1] + 0.9, stevePos[2], 1.2);
-    if (cr) doDefend(cr);
+    if (dg) doDragonTap(dg);
+    else if (cr) doDefend(cr);
     else if (zb) doBonkZombie(zb);
     else if (sp) doBonkSpider(sp);
     else if (sk) doBonkSkeleton(sk);
@@ -1873,6 +1909,9 @@ function init() {
     get spiders() { return mobs().spiders; },
     get skeletons() { return mobs().skeletons; },
     get villagers() { return mobs().villagers; },
+    get dragon() { return mobs().dragon; },
+    popCrystals: () => { const d = mobs().dragon; if (d) d.crystals.forEach((c) => doDragonTap({ kind: 'crystal', c })); },
+    tameDragon: () => { const d = mobs().dragon; if (d) doDragonTap({ kind: 'dragon' }); },
     cam: () => ({ yaw: camYaw, pitch: camPitch, pos: camPos.slice(), dir: camDir.slice() }),
     target: () => targetCells(),
     rayHit: (x, y) => rayHitAt(x, y),
