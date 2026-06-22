@@ -15,7 +15,7 @@ import { Spiders } from './spiders.js';
 import { Villagers } from './villagers.js';
 import { Controls } from './input.js';
 import { Sound } from './audio.js';
-import { Character, CHARACTERS, charById } from './character.js';
+import { Character, CHARACTERS, charById, charPreview } from './character.js';
 import { Goals, GOAL_DEFS } from './goals.js';
 
 const SAVE_KEY = 'ezrablocks.save.v2';
@@ -25,6 +25,9 @@ const NIGHT_SKY = [0.05, 0.07, 0.15];     // dark, starry-feeling night
 
 let hearts = MAX_HEARTS;
 let maxHearts = MAX_HEARTS;
+let heartBuff = 0;                         // temporary bonus hearts (Golden Apple)
+let heartBuffT = 0;                        // seconds left on the bonus
+const effMax = () => maxHearts + heartBuff; // total hearts right now (base + bonus)
 let night = false;                        // night-time toggle (zombies come out)
 let nightAmt = 0;                         // eased 0..1 for the day↔night look
 let invuln = 0;                           // brief mercy window after taking damage
@@ -579,10 +582,12 @@ function updateHearts() {
   const el = document.getElementById('hearts-bar');
   if (!el) return;
   // Render each heart as full / half / empty so damage can land in half-hearts.
+  // Bonus (Golden Apple) hearts beyond the normal max show as golden 💛.
   let html = '';
-  for (let i = 1; i <= maxHearts; i++) {
+  for (let i = 1; i <= effMax(); i++) {
     const cls = hearts >= i ? 'hf' : (hearts >= i - 0.5 ? 'hh' : 'he');
-    html += '<span class="hs ' + cls + '"></span>';
+    const buff = i > maxHearts ? ' hb' : '';
+    html += '<span class="hs ' + cls + buff + '"></span>';
   }
   el.innerHTML = html;
 }
@@ -592,7 +597,7 @@ function updateGems() {
 }
 function applyUnlocks() {
   maxHearts = MAX_HEARTS + (goals.hasUnlock('heart') ? 1 : 0);
-  if (hearts > maxHearts) hearts = maxHearts;
+  if (hearts > effMax()) hearts = effMax();
   if (player) {
     player.speedMul = goals.hasUnlock('boots') ? 1.55 : 1;
     player.jumpMul = goals.hasUnlock('superjump') ? 1.4 : 1;
@@ -833,19 +838,30 @@ function setupSteve() {
 function makeMath() {
   const lvl = goals.counts.math || 0;
   const ri = (n) => Math.floor(Math.random() * n);
-  let a, b, op, ans;
-  if (lvl < 5) { a = 1 + ri(5); b = 1 + ri(5); op = '+'; ans = a + b; }
-  else if (lvl < 12) { a = 2 + ri(9); b = 2 + ri(9); op = '+'; ans = a + b; }
-  else if (ri(2) === 0) { a = 6 + ri(12); b = 1 + ri(a - 1); op = '−'; ans = a - b; }   // subtraction
-  else { a = 5 + ri(12); b = 4 + ri(9); op = '+'; ans = a + b; }
+  // Mix of question types, easing in by how many he's answered.
+  const pool = lvl < 3 ? ['count', 'add'] : lvl < 8 ? ['count', 'add', 'add'] :
+    lvl < 14 ? ['add', 'add', 'sub', 'bond'] : ['add', 'sub', 'bond', 'count'];
+  const type = pool[ri(pool.length)];
+  let prompt, ans;
+  if (type === 'count') {
+    const n = 2 + ri(7), f = ['🍎', '🍗', '⭐', '🐟', '🌸', '🍓'][ri(6)];
+    prompt = 'How many ' + f + '?<span class="big">' + f.repeat(n) + '</span>'; ans = n;
+  } else if (type === 'bond') {
+    const total = lvl < 12 ? 10 : 10 + ri(6) * 0 + (ri(2) ? 0 : 10);  // 10 (or 20 later)
+    const a = 1 + ri(total - 1); prompt = '<span class="big">' + a + ' + ? = ' + total + '</span>'; ans = total - a;
+  } else if (type === 'sub') {
+    const a = 6 + ri(12), b = 1 + ri(a - 1); prompt = '<span class="big">' + a + ' − ' + b + ' = ?</span>'; ans = a - b;
+  } else {
+    const a = lvl < 5 ? 1 + ri(5) : 2 + ri(9), b = lvl < 5 ? 1 + ri(5) : 2 + ri(9);
+    prompt = '<span class="big">' + a + ' + ' + b + ' = ?</span>'; ans = a + b;
+  }
   const opts = new Set([ans]);
   while (opts.size < 3) { const d = ans + (ri(2) ? 1 : -1) * (1 + ri(3)); if (d >= 0) opts.add(d); }
-  return { a, b, op, ans, opts: [...opts].sort(() => Math.random() - 0.5) };
+  return { prompt, ans, opts: [...opts].sort(() => Math.random() - 0.5) };
 }
 function showMath() {
   document.getElementById('math-q').innerHTML =
-    '<div class="qface">🍗</div><b>Steve\'s Lava Chicken</b>' +
-    '<span class="big">' + mathQ.a + ' ' + mathQ.op + ' ' + mathQ.b + ' = ?</span>';
+    '<div class="qface">🍗</div><b>Steve\'s Lava Chicken</b>' + mathQ.prompt;
   const o = document.getElementById('math-opts'); o.innerHTML = '';
   for (const v of mathQ.opts) {
     const btn = document.createElement('button');
@@ -874,6 +890,7 @@ const SNACKS = [
   { icon: '🍎', name: 'Apple', cost: 1, heal: 1, desc: 'Restores 1 heart' },
   { icon: '🍗', name: 'Lava Chicken', cost: 2, heal: 2, desc: 'Restores 2 hearts' },
   { icon: '🍰', name: 'Cake', cost: 3, heal: 99, desc: 'Fills you all the way up!' },
+  { icon: '🍏', name: 'Golden Apple', cost: 5, buff: true, desc: 'Extra golden hearts for a while!' },
 ];
 function openSteveMenu() { buildSteveMenu(); document.getElementById('steve').classList.remove('hidden'); }
 function closeSteve() { document.getElementById('steve').classList.add('hidden'); }
@@ -898,13 +915,15 @@ function buildSteveMenu() {
   }
 }
 function buySnack(s) {
-  if (hearts >= maxHearts) { sound.play('deny'); showToast('You\'re already full of energy! 💪'); return; }
+  if (!s.buff && hearts >= effMax()) { sound.play('deny'); showToast('You\'re already full of energy! 💪'); return; }
   if (!goals.spend(s.cost)) { sound.play('deny'); showToast('Earn more 💎 first! (need ' + s.cost + ')'); return; }
-  hearts = Math.min(maxHearts, hearts + s.heal); updateHearts();
+  if (s.buff) { heartBuff = 2; heartBuffT = 90; hearts = effMax(); }   // golden bonus hearts for 90s
+  else hearts = Math.min(effMax(), hearts + s.heal);
+  updateHearts();
   goals.bump('snack');
   sound.play('pet'); spawnHearts([player.pos[0], player.pos[1] + 1.4, player.pos[2]]);
   updateGems(); buildSteveMenu();
-  showToast('Yum! ' + s.icon + ' Hearts filled!');
+  showToast(s.buff ? '🍏 Golden power! 💛 Extra hearts for a while!' : 'Yum! ' + s.icon + ' Hearts filled!');
 }
 
 // --- Start the current world fresh (asked for, behind a confirmation) ---
@@ -940,6 +959,7 @@ function hurt(n) {
 function knockout() {
   if (riding) dismount();
   if (fishing) reelIn(false);
+  heartBuff = 0; heartBuffT = 0;          // bonus hearts end on a knockout
   showToast('💤 Oof! You got sleepy — back home, safe and sound.', 3400);
   night = false; updateNightButton();
   const om = worlds.over && worlds.over.mobs;
@@ -979,7 +999,8 @@ function buildCharPicker() {
   for (const c of CHARACTERS) {
     const btn = document.createElement('button');
     btn.className = 'char-tile' + (c.id === selectedChar ? ' sel' : '');
-    btn.innerHTML = '<span class="ce">' + c.emoji + '</span><b>' + c.name + '</b>';
+    btn.appendChild(charPreview(c, 60));
+    const nm = document.createElement('b'); nm.textContent = c.name; btn.appendChild(nm);
     btn.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       selectedChar = c.id; applyCharacter(); saveDirty = true;
@@ -1085,6 +1106,14 @@ function showToast(text, ms) {
 }
 function showGoalToast(g) { showToast('⭐ Goal done: ' + g.title + '!'); sound.play('pet'); }
 
+// A friendly one-time "blurb" that explains a feature the first time it matters,
+// so a young player is never lost. Each id shows once (remembered in the save).
+function tip(id, text, ms) {
+  if (!goals || goals.seenTip(id)) return;
+  goals.markTip(id);
+  showToast(text, ms || 5200);
+}
+
 function holdButton(id, fn, repeat) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -1155,7 +1184,7 @@ function wireUI() {
   document.getElementById('btn-night').addEventListener('pointerdown', (e) => {
     e.preventDefault(); sound.resume();
     night = !night; updateNightButton();
-    if (night) goals.bump('night');
+    if (night) { goals.bump('night'); tip('night', '🌙 At night friendly monsters wander out. Tap to bonk them, or fly up high to stay safe — you always wake up at home, never losing anything!'); }
   });
 
   document.getElementById('btn-ride').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); toggleRide(); });
@@ -1262,6 +1291,8 @@ function frame(now) {
   // Gentle, fairly quick regen (in half-hearts) once you've been safe a moment —
   // so getting hurt stings but you always climb back. Keeps an anxious kid in it.
   if (hearts > 0 && hearts < maxHearts && sinceHurt > 4) { regenT += dt; if (regenT >= 2.2) { regenT = 0; hearts = Math.min(maxHearts, hearts + 0.5); updateHearts(); } }
+  // Golden-Apple bonus hearts count down, then gently fade away.
+  if (heartBuffT > 0) { heartBuffT -= dt; if (heartBuffT <= 0) { heartBuff = 0; hearts = Math.min(hearts, maxHearts); updateHearts(); } }
   const nightTarget = (night && dimension === 'over') ? 1 : 0;
   nightAmt += (nightTarget - nightAmt) * Math.min(1, dt * 1.5);
   if (hurtEl) hurtEl.style.opacity = (hurtFlash * 0.9).toFixed(3);
@@ -1274,6 +1305,13 @@ function frame(now) {
   const dm = Math.hypot(dxm, dzm);
   if (dm > 0.0005 && dm < 2) goals.onMove(dm);
   prevX = player.pos[0]; prevZ = player.pos[2];
+
+  // Friendly first-time blurbs when you wander near something new (overworld).
+  if (dimension === 'over') {
+    if (stevePos) { const dx = player.pos[0] - stevePos[0], dz = player.pos[2] - stevePos[2]; if (dx * dx + dz * dz < 30) tip('steve', '🍗 That\'s Steve! Tap him for a fun math game (earn 💎) and snacks that fill your hearts.'); }
+    const vs = mobs().villagers;
+    if (vs) for (const v of vs.list) { const dx = player.pos[0] - v.pos[0], dz = player.pos[2] - v.pos[2]; if (dx * dx + dz * dz < 16) { tip('villager', '🧑‍🌾 Villagers have little jobs for you — tap one for a job and earn 💎!'); break; } }
+  }
 
   // Step into a portal swirl → travel to its destination world.
   portalCooldown = Math.max(0, portalCooldown - dt);

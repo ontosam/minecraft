@@ -55,6 +55,7 @@ export class Goals {
     this.stars = 0;
     this.gems = 0;            // 💎 spendable currency (mined + earned from goals)
     this.unlocks = {};        // shop unlocks: { pet, heart, megatnt }
+    this.tips = {};           // which one-time friendly hint blurbs have been shown
     this.onComplete = null;   // (def) => void
     this._lastSave = 0;
     this.load();
@@ -89,13 +90,15 @@ export class Goals {
   spend(n) { if (this.gems >= n) { this.gems -= n; this.save(); return true; } return false; }
   hasUnlock(id) { return !!this.unlocks[id]; }
   setUnlock(id) { this.unlocks[id] = true; this.save(); }
+  seenTip(id) { return !!this.tips[id]; }
+  markTip(id) { this.tips[id] = true; this.save(); }
 
   maybeSave() { if (Date.now() - this._lastSave > 1500) this.save(); }
   save() {
     this._lastSave = Date.now();
     try {
       localStorage.setItem(KEY, JSON.stringify({
-        c: this.counts, t: [...this.usedTypes], d: this.done, s: this.stars, g: this.gems, u: this.unlocks,
+        c: this.counts, t: [...this.usedTypes], d: this.done, s: this.stars, g: this.gems, u: this.unlocks, p: this.tips,
       }));
     } catch (e) { /* ignore */ }
   }
@@ -109,6 +112,7 @@ export class Goals {
         this.stars = o.s || 0;
         this.gems = o.g || 0;
         this.unlocks = o.u || {};
+        this.tips = o.p || {};
       }
     } catch (e) { /* ignore */ }
   }

@@ -287,6 +287,12 @@ body {
   line-height: 1;
 }
 
+.char-tile canvas {
+  width: 56px;
+  height: 56px;
+  display: block;
+}
+
 .char-tile b {
   font-size: 15px;
   font-weight: 800;
@@ -446,6 +452,12 @@ body {
 .hs.hh::after {
   width: .52em;
   overflow: hidden;
+}
+
+/* Golden bonus hearts (Golden Apple) show as 💛 */
+.hs.hb.hf::after,
+.hs.hb.hh::after {
+  content: "💛";
 }
 
 /* Diamonds (💎) counter — tap to open the shop. Top-left, under the topbar. */

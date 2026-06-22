@@ -62,6 +62,29 @@ export const CHARACTERS = [
 const CHAR_ALIAS = { mama: 'chris', dada: 'vlad' };
 export const charById = (id) => CHARACTERS.find((c) => c.id === (CHAR_ALIAS[id] || id)) || CHARACTERS[0];
 
+// A little 2D "paper-doll" preview of a character (in their real colours) for
+// the picker — clearer than an emoji, and cheap (plain canvas rects).
+export function charPreview(def, size) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const ctx = c.getContext('2d'), S = size;
+  const col = (a) => 'rgb(' + Math.round(a[0] * 255) + ',' + Math.round(a[1] * 255) + ',' + Math.round(a[2] * 255) + ')';
+  const R = (x0, y0, x1, y1, a) => { ctx.fillStyle = col(a); ctx.fillRect(Math.round(x0 * S), Math.round(y0 * S), Math.round((x1 - x0) * S), Math.round((y1 - y0) * S)); };
+  if (def.cape) R(0.33, 0.40, 0.67, 0.80, def.capeColor || def.shirt);
+  if (def.long) { R(0.30, 0.14, 0.37, 0.62, def.hair); R(0.63, 0.14, 0.70, 0.62, def.hair); }
+  R(0.40, 0.66, 0.49, 0.90, def.pants); R(0.51, 0.66, 0.60, 0.90, def.pants);   // legs
+  R(0.40, 0.88, 0.49, 0.95, def.shoe); R(0.51, 0.88, 0.60, 0.95, def.shoe);     // shoes
+  R(0.27, 0.40, 0.36, 0.62, def.shirt); R(0.64, 0.40, 0.73, 0.62, def.shirt);   // arms
+  R(0.27, 0.59, 0.36, 0.65, def.skin); R(0.64, 0.59, 0.73, 0.65, def.skin);     // hands
+  R(0.36, 0.40, 0.64, 0.68, def.shirt);                                         // body
+  R(0.34, 0.13, 0.66, 0.40, def.skin);                                          // head
+  R(0.32, 0.09, 0.68, 0.20, def.hair);                                          // hair cap
+  if (def.long) { R(0.32, 0.13, 0.37, 0.30, def.hair); R(0.63, 0.13, 0.68, 0.30, def.hair); }
+  R(0.42, 0.25, 0.47, 0.30, EYE); R(0.53, 0.25, 0.58, 0.30, EYE);               // eyes
+  if (def.beard) R(0.37, 0.33, 0.63, 0.42, def.hair);
+  if (def.ball) { R(0.60, 0.82, 0.74, 0.96, [0.96, 0.96, 0.98]); R(0.63, 0.85, 0.69, 0.91, [0.1, 0.1, 0.12]); }
+  return c;
+}
+
 function buildLeg(d) { return (A) => { addBox(A, -0.09, -0.7, -0.1, 0.09, 0, 0.1, d.pants); addBox(A, -0.09, -0.7, -0.11, 0.09, -0.56, 0.12, d.shoe); }; }
 function buildArm(d) { return (A) => { addBox(A, -0.07, -0.55, -0.09, 0.07, 0, 0.09, d.shirt); addBox(A, -0.07, -0.55, -0.09, 0.07, -0.42, 0.09, d.skin); }; }
 function buildBody(d) {
