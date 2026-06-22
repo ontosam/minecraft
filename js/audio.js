@@ -89,6 +89,13 @@ export class Sound {
       case 'boing': // springy bounce off a slime block
         this.blip(300, 0.18, 'sine', 0.14, 720);
         break;
+      case 'bow': // a soft twang when a skeleton looses an arrow
+        this.blip(520, 0.12, 'triangle', 0.10, 180);
+        break;
+      case 'rattle': // gentle bony rattle (sillier than spooky)
+        this.blip(140, 0.10, 'square', 0.05, 90);
+        setTimeout(() => this.blip(120, 0.10, 'square', 0.045, 80), 70);
+        break;
       case 'neigh': // a cheerful little pony whinny (mount/dismount)
         this.blip(700, 0.10, 'sawtooth', 0.10, 900);
         setTimeout(() => this.blip(560, 0.18, 'sawtooth', 0.09, 420), 90);

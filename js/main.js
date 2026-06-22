@@ -12,6 +12,7 @@ import { Creepers } from './creepers.js';
 import { NetherMobs } from './nethermobs.js';
 import { Zombies } from './zombies.js';
 import { Spiders } from './spiders.js';
+import { Skeletons } from './skeletons.js';
 import { Villagers } from './villagers.js';
 import { Controls } from './input.js';
 import { Sound } from './audio.js';
@@ -110,6 +111,18 @@ function makeMobs(kind, w) {
       m.spiders.onEvent = (type, pos) => {
         if (type === 'hit') hurt(0.5);          // spiders only nibble a half-heart
         else if (type === 'hiss') sound.play('hiss');
+        else if (type === 'web') {              // a sticky web briefly slows you (no damage)
+          player.webT = 1.6; sound.play('hiss');
+          spawnParticles(pos, '🕸️', 'puff', 1, 14);
+          tip('web', '🕸️ A spider web! It slows you down for a moment — keep moving, it wears off fast.');
+        }
+      };
+    } else if (t === 'skeletons') {
+      m.skeletons = new Skeletons(gl, w);
+      m.skeletons.onEvent = (type, pos) => {
+        if (type === 'hit') hurt(0.5);
+        else if (type === 'shoot') { hurt(0.5); sound.play('bow'); spawnParticles([player.pos[0], player.pos[1] + 1.0, player.pos[2]], '🏹', 'puff', 1, 12); }
+        else if (type === 'rattle') sound.play('rattle');
       };
     } else if (t === 'villagers') {
       m.villagers = new Villagers(gl, w);
@@ -131,6 +144,7 @@ function updateMobs(m, dt) {
   if (m.ants) m.ants.update(dt, player);
   if (m.zombies) m.zombies.update(dt, player, night && dimension === 'over');
   if (m.spiders) m.spiders.update(dt, player, night && dimension === 'over');
+  if (m.skeletons) m.skeletons.update(dt, player, night && dimension === 'over');
   if (m.villagers) m.villagers.update(dt, player);
 }
 function drawMobs(m) {
@@ -140,6 +154,7 @@ function drawMobs(m) {
   if (m.ants) m.ants.draw(worldProg);
   if (m.zombies) m.zombies.draw(worldProg);
   if (m.spiders) m.spiders.draw(worldProg);
+  if (m.skeletons) m.skeletons.draw(worldProg);
   if (m.villagers) m.villagers.draw(worldProg);
 }
 
@@ -165,6 +180,7 @@ function drawShadows(m) {
     [m.creepers, () => 1.0],
     [m.zombies, () => 0.9],
     [m.spiders, () => 1.1],
+    [m.skeletons, () => 0.9],
     [m.ants, () => 0.55],
     [m.villagers, () => 0.85],
     [m.nethermobs, (a) => a.species === 'ghast' ? 1.7 : 1.0],
@@ -577,6 +593,21 @@ function doBonkSpider(s) {
   if (defeated) { goals.bump('spider'); goals.bump('monster'); }
 }
 
+// Tap a skeleton to bonk it — tougher (4 taps, or 2 with the sword), but it pays
+// out extra 💎 when defeated.
+function doBonkSkeleton(s) {
+  const sk = mobs().skeletons;
+  if (!sk) return;
+  const defeated = sk.bonk(s, swordDamage());
+  sound.play(defeated ? 'poof' : 'dig');
+  spawnPuffs([s.pos[0], s.pos[1] + 1.0, s.pos[2]]);
+  if (defeated) {
+    goals.bump('skeleton'); goals.bump('monster');
+    goals.addGems(3); updateGems();
+    showToast('💀 Skeleton defeated! +💎3');
+  }
+}
+
 // --- Hearts: getting hurt, a gentle knock-out, slow regen ---
 function updateHearts() {
   const el = document.getElementById('hearts-bar');
@@ -685,15 +716,43 @@ function castLine() {
   fishing = { wx: spot[0], wy: spot[1], wz: spot[2], t: 1.6 + Math.random() * 2.4 };
   sound.play('splash');
   updateFishButton();
+  tip('fishing', '🎣 Little ponds have little fish — find or build a BIG lake or ocean for bigger fish worth more 💎!');
+}
+// How big is the body of water at (x,y,z)? A flood-fill, capped — bigger water
+// has bigger fish worth more 💎 (so a 1-block puddle can't farm diamonds).
+function waterBodySize(x, y, z) {
+  x = Math.floor(x); y = Math.floor(y); z = Math.floor(z);   // bobber coords are floats
+  const seen = new Set(), stack = [[x, y, z]]; let n = 0; const CAP = 50;
+  while (stack.length && n < CAP) {
+    const [cx, cy, cz] = stack.pop();
+    if (cx < 0 || cx >= SX || cz < 0 || cz >= SZ || cy < 0 || cy >= SY) continue;
+    if (world.get(cx, cy, cz) !== B.WATER) continue;
+    const k = world.idx(cx, cy, cz); if (seen.has(k)) continue;
+    seen.add(k); n++;
+    stack.push([cx + 1, cy, cz], [cx - 1, cy, cz], [cx, cy, cz + 1], [cx, cy, cz - 1], [cx, cy - 1, cz], [cx, cy + 1, cz]);
+  }
+  return n;
 }
 function reelIn(caught) {
   const f = fishing; fishing = null; hideBobber(); updateFishButton();
   if (!f || !caught) { if (f) sound.play('splash'); return; }
+  const size = waterBodySize(f.wx, f.wy - 1, f.wz);
   const r = Math.random();
   let icon, msg, gems;
-  if (r < 0.12) { icon = '🥾'; msg = 'an old boot! Ha! Cast again 🎣'; gems = 0; }
-  else if (r < 0.32) { icon = '💎'; msg = 'sunken treasure! +2 💎'; gems = 2; goals.bump('treasure'); }
-  else { icon = '🐟'; msg = 'a fish! +1 💎'; gems = 1; }
+  if (size < 8) {                 // a tiny puddle — only little minnows, no 💎 here
+    if (r < 0.45) { icon = '🐟'; msg = 'a tiny minnow!'; }
+    else if (r < 0.8) { icon = '🌿'; msg = 'some seaweed!'; }
+    else { icon = '🥾'; msg = 'an old boot! Ha!'; }
+    gems = 0;
+  } else if (size < 32) {         // a decent pond
+    if (r < 0.18) { icon = '🥾'; msg = 'an old boot! Ha!'; gems = 0; }
+    else if (r < 0.38) { icon = '💎'; msg = 'sunken treasure! +2 💎'; gems = 2; goals.bump('treasure'); }
+    else { icon = '🐟'; msg = 'a fish! +1 💎'; gems = 1; }
+  } else {                        // a big lake or the ocean — BIG fish!
+    if (r < 0.5) { icon = '🐠'; msg = 'a BIG fish! +2 💎'; gems = 2; }
+    else if (r < 0.8) { icon = '💎'; msg = 'sunken treasure! +3 💎'; gems = 3; goals.bump('treasure'); }
+    else { icon = '🐡'; msg = 'a HUGE fish! +3 💎'; gems = 3; }
+  }
   goals.bump('fish');
   if (gems > 0) { goals.addGems(gems); updateGems(); }
   sound.play(gems > 0 ? 'treasure' : 'deny');
@@ -965,6 +1024,7 @@ function knockout() {
   const om = worlds.over && worlds.over.mobs;
   if (om && om.zombies) om.zombies.list.length = 0;
   if (om && om.spiders) om.spiders.list.length = 0;
+  if (om && om.skeletons) om.skeletons.list.length = 0;
   if (dimension !== 'over') setDimension('over');
   player.goHome(); player.vel = [0, 0, 0];
   hearts = maxHearts; invuln = 1.6; updateHearts();
@@ -1261,6 +1321,19 @@ function drawMinimap() {
     const ox = p.a[0] * s, oz = p.a[2] * s;
     mmCtx.beginPath(); mmCtx.arc(ox, oz, 4.5, 0, Math.PI * 2); mmCtx.fill(); mmCtx.stroke();
   }
+  // Steve's Lava Chicken stand (🍗 orange) + villagers (green) so they're easy
+  // to find in the overworld.
+  if (dimension === 'over') {
+    const vs = mobs().villagers;
+    if (vs) for (const v of vs.list) {
+      mmCtx.fillStyle = '#6fbf5a'; mmCtx.strokeStyle = '#2f5a22'; mmCtx.lineWidth = 1;
+      mmCtx.beginPath(); mmCtx.arc(v.pos[0] * s, v.pos[2] * s, 2.6, 0, Math.PI * 2); mmCtx.fill(); mmCtx.stroke();
+    }
+    if (stevePos) {
+      mmCtx.fillStyle = '#ff8c1a'; mmCtx.strokeStyle = '#5a2e00'; mmCtx.lineWidth = 1.5;
+      mmCtx.beginPath(); mmCtx.arc(stevePos[0] * s, stevePos[2] * s, 4, 0, Math.PI * 2); mmCtx.fill(); mmCtx.stroke();
+    }
+  }
   // player arrow (points the way you face)
   const px = player.pos[0] * s, pz = player.pos[2] * s;
   const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), rx = -fz, rz = fx;
@@ -1359,12 +1432,14 @@ function frame(now) {
     const cr = m.creepers ? m.creepers.pickRay(camPos, dir) : null;
     const zb = (!cr && m.zombies) ? m.zombies.pickRay(camPos, dir) : null;
     const sp = (!cr && !zb && m.spiders) ? m.spiders.pickRay(camPos, dir) : null;
-    const vl = (!cr && !zb && !sp && m.villagers) ? m.villagers.pickRay(camPos, dir) : null;
-    const stv = (!cr && !zb && !sp && !vl && stevePos && dimension === 'over') &&
+    const sk = (!cr && !zb && !sp && m.skeletons) ? m.skeletons.pickRay(camPos, dir) : null;
+    const vl = (!cr && !zb && !sp && !sk && m.villagers) ? m.villagers.pickRay(camPos, dir) : null;
+    const stv = (!cr && !zb && !sp && !sk && !vl && stevePos && dimension === 'over') &&
       rayHitsSphere(camPos, dir, stevePos[0], stevePos[1] + 0.9, stevePos[2], 1.2);
     if (cr) doDefend(cr);
     else if (zb) doBonkZombie(zb);
     else if (sp) doBonkSpider(sp);
+    else if (sk) doBonkSkeleton(sk);
     else if (vl) talkToVillager(vl);
     else if (stv) openSteveMenu();
     else {
@@ -1582,6 +1657,7 @@ function init() {
     get ants() { return mobs().ants; },
     get zombies() { return mobs().zombies; },
     get spiders() { return mobs().spiders; },
+    get skeletons() { return mobs().skeletons; },
     get villagers() { return mobs().villagers; },
     cam: () => ({ yaw: camYaw, pitch: camPitch, pos: camPos.slice(), dir: camDir.slice() }),
     target: () => targetCells(),
@@ -1608,6 +1684,8 @@ function init() {
     toggleRide: () => toggleRide(),
     fishing: () => !!fishing,
     castLine: () => castLine(),
+    reelNow: () => { if (fishing) reelIn(true); },
+    waterSize: (x, y, z) => waterBodySize(x, y, z),
     talkVillager: () => { const v = mobs().villagers; if (v && v.list.length) talkToVillager(v.list[0]); },
     questOk: () => questOk(),
     setCharacter: (id) => { selectedChar = id; applyCharacter(); saveDirty = true; },
