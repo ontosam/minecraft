@@ -277,6 +277,25 @@ beloved-game-inspired features on **`claude/gifted-gates-h9dzy2`**, mirrored to
    mid-progress across reloads (short enough that it's fine); villagers stand
    still (easy to find) — could let them stroll a little.
 
+## Status (session 11) — polish pass (dad feedback)
+Dad: "hearts are covering tiles up top… clean up; ghasts are just floating; make
+characters more cohesive." Shipped on **`claude/gifted-gates-h9dzy2`**, mirrored
+to `main`. No difficulty changes (purely look-and-feel).
+1. **Hearts overlap fixed.** The centered `#hearts-bar` sat at the very top and
+   covered the right-hand toolbar (now 8 minis + block). Moved it to its own row
+   just under the toolbar (`top: 72px`); verified no overlap at tablet + portrait.
+2. **Soft blob shadows for everyone (cohesion).** New `gfx.shadowMesh` (a flat
+   1×1 dark quad, NEUTRAL-centre UV, black, light 1) drawn in a **blended pass**
+   in main (`drawShadows`/`shadowAt`) between `world.draw()` and the characters:
+   `gl.enable(BLEND)` + `depthMask(false)` + `uAlpha 0.26`, one quad per creature
+   (+ the player, skipped while riding since the pony's covers it) sized per type,
+   at `heightAt(x,z)+1.02`. Grounds the whole cast — floaty ghasts included.
+3. **Nether floaters lowered** (`FLOAT` ghast 2.7→2.0, blaze 1.9→1.5) now that a
+   shadow sits beneath them. Verified headless (no errors): hearts clear, shadows
+   render in overworld + nether, world-hop + save/reload regression green.
+   Note: shadows use `heightAt` (topmost block), so under deep overhangs a shadow
+   lands on the roof — fine for this mostly-surface game.
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files
