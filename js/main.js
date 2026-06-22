@@ -861,7 +861,7 @@ function makeMath() {
 }
 function showMath() {
   document.getElementById('math-q').innerHTML =
-    '<div class="qface">🍗</div><b>Steve\'s Lava Chicken</b>' + mathQ.prompt;
+    '<div class="qface">🍗</div><b>Steve\'s Lava Chicken</b><br>' + mathQ.prompt;
   const o = document.getElementById('math-opts'); o.innerHTML = '';
   for (const v of mathQ.opts) {
     const btn = document.createElement('button');
