@@ -61,6 +61,7 @@ let trailT = 0;           // throttle for the "Sparkle Trail" shop reward
 let riding = null;        // the pony Animal you're currently riding (or null)
 let fishing = null;       // an active cast: { wx, wy, wz, t } while waiting for a bite
 let bobberEl = null;      // the on-screen bobber marker
+const saplings = [];      // planted saplings growing into trees: { world, x, y, z, t }
 const fuses = [];         // lit TNT awaiting detonation: { x, y, z, t }
 const canvas = document.getElementById('game');
 
@@ -145,6 +146,7 @@ function registerDim(key, w) {
   ensurePortalsFor(key);
   w.rebuildAll();
   w.updateRedstone();                    // light any saved lamps wired to on-levers
+  scanSaplings(w);                        // resume growing any saved saplings
   if (!positions[key]) positions[key] = w.spawn.slice();
   return worlds[key];
 }
@@ -331,11 +333,36 @@ function doBuild(hit) {
   if (x < 0 || x >= SX || y < 0 || y >= SY || z < 0 || z >= SZ) return;
   if (world.get(x, y, z) !== B.AIR || overlapsPlayer(x, y, z)) { sound.play('deny'); return; }
   world.set(x, y, z, selected);
-  // Water is for fun pools, not "your house" — keep creepers off it.
-  if (selected !== B.WATER) world.placed.add(world.idx(x, y, z));
+  // Water + nature plants aren't "your house" — keep creepers off them.
+  if (selected !== B.WATER && selected !== B.SAPLING) world.placed.add(world.idx(x, y, z));
   sound.play('place'); saveDirty = true; actionAnim = 1; minimapDirty = true;
   goals.onBuild(selected);
   if (isRedstone(selected)) world.updateRedstone();   // a new wire/lamp may light up
+  if (selected === B.SAPLING) { saplings.push({ world, x, y, z, t: 14 + Math.random() * 14 }); goals.bump('plant'); }
+}
+
+// Planted saplings sprout into full trees after a little while.
+function growSaplings(dt) {
+  for (let i = saplings.length - 1; i >= 0; i--) {
+    const s = saplings[i];
+    s.t -= dt;
+    if (s.t > 0) continue;
+    saplings.splice(i, 1);
+    if (s.world.get(s.x, s.y, s.z) !== B.SAPLING) continue;   // dug up before it grew
+    s.world.set(s.x, s.y, s.z, B.AIR);
+    s.world.placeTree(s.x, s.y, s.z, Math.random);
+    for (const [dx, dz] of [[0, 0], [2, 2], [-2, -2], [2, -2], [-2, 2]]) s.world.markDirty(s.x + dx, s.z + dz);
+    saveDirty = true;
+    if (s.world === world) { sound.play('place'); spawnSparkles([s.x + 0.5, s.y + 1.2, s.z + 0.5]); minimapDirty = true; }
+  }
+}
+// On load, find any saplings saved in a world and give them a fresh grow timer.
+function scanSaplings(w) {
+  for (let i = 0; i < w.data.length; i++) {
+    if (w.data[i] !== B.SAPLING) continue;
+    const x = i % SX, y = Math.floor(i / (SX * SZ)), z = Math.floor(i / SX) % SZ;
+    saplings.push({ world: w, x, y, z, t: 10 + Math.random() * 14 });
+  }
 }
 
 function doDig(hit) {
@@ -693,6 +720,7 @@ const QUEST_POOL = [
   { metric: 'treasure', n: 2, reward: 4, icon: '✨', label: 'dig up {n} buried treasures' },
   { metric: 'dig', n: 14, reward: 3, icon: '⛏️', label: 'dig up {n} blocks' },
   { metric: 'monster', n: 2, reward: 5, icon: '⚔️', label: 'defeat {n} night creatures' },
+  { metric: 'plant', n: 2, reward: 4, icon: '🌱', label: 'plant {n} saplings' },
 ];
 let questVillager = null;
 function makeQuest() {
@@ -739,6 +767,7 @@ function questOk() {
 function resetWorld() {
   const key = dimension, W = worlds[key].world, kind = WORLD_KINDS[key];
   const hubDests = [...new Set(W.portals.filter((p) => HUB_DESTS.includes(p.dest)).map((p) => p.dest))];
+  for (let i = saplings.length - 1; i >= 0; i--) if (saplings[i].world === W) saplings.splice(i, 1);
   W[kind.gen]();                         // regenerate fresh (clears builds + placed)
   refreshSpawn(W);
   ensurePortalsFor(key);                 // keep the standard portal(s)
@@ -1095,6 +1124,7 @@ function frame(now) {
 
   const m = mobs();
   updateMobs(m, dt);
+  growSaplings(dt);
   world.flushDirty(fuses.length ? 6 : 2);   // catch up faster while things are blowing up
 
   resize();
@@ -1348,6 +1378,9 @@ function init() {
     castLine: () => castLine(),
     talkVillager: () => { const v = mobs().villagers; if (v && v.list.length) talkToVillager(v.list[0]); },
     questOk: () => questOk(),
+    plant: (x, y, z) => { world.set(x, y, z, B.SAPLING); saplings.push({ world, x, y, z, t: 14 + Math.random() * 14 }); goals.bump('plant'); },
+    growNow: () => { for (const s of saplings) s.t = 0; },
+    saplingCount: () => saplings.length,
   };
 
   last = performance.now();

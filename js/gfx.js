@@ -15,7 +15,7 @@ export const TILE = {
   BIRCH_LOG: 28, NETHERRACK: 29, NETHER_PORTAL: 30, LAVA: 31,
   DOOR: 32, DOOR_OPEN: 33, TNT_SIDE: 34, TNT_TOP: 35,
   RAINBOW: 36, LEVER: 37, LEVER_ON: 38, REDSTONE: 39, REDLAMP: 40, REDLAMP_ON: 41,
-  SLIME: 42,
+  SLIME: 42, SAPLING: 43,
 };
 
 export function initGL(canvas) {
@@ -337,6 +337,13 @@ function buildAtlasCanvas() {
   p = at(TILE.SLIME); noise(ctx, p[0], p[1], 0x6fcf6a, 0.14, 95);
   ctx.fillStyle = shade(0x4aa849, 1); ctx.fillRect(p[0] + 3, p[1] + 3, 10, 10);   // inner gel square
   ctx.fillStyle = shade(0xbff0a8, 1); ctx.fillRect(p[0] + 2, p[1] + 2, 3, 1); ctx.fillRect(p[0] + 2, p[1] + 2, 1, 3); // shine
+
+  // Sapling: a little green sprout in soil (grows into a tree over time).
+  p = at(TILE.SAPLING); noise(ctx, p[0], p[1], 0x7a5a36, 0.18, 96);
+  ctx.fillStyle = shade(0x3f7a2e, 1); ctx.fillRect(p[0] + 7, p[1] + 5, 2, 8);            // stem
+  ctx.fillStyle = shade(0x5bbf3a, 1);
+  ctx.fillRect(p[0] + 4, p[1] + 6, 3, 2); ctx.fillRect(p[0] + 9, p[1] + 6, 3, 2);        // side leaves
+  ctx.fillRect(p[0] + 6, p[1] + 2, 4, 3);                                                // top bud
 
   return c;
 }

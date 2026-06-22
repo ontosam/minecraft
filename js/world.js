@@ -21,6 +21,7 @@ export const B = {
   NETHERRACK: 36, PORTAL: 37, LAVA: 38,
   DOOR: 39, DOOR_OPEN: 40, TNT: 41, RAINBOW: 42,
   LEVER: 43, LEVER_ON: 44, REDSTONE: 45, REDLAMP: 46, REDLAMP_ON: 47, SLIME: 48,
+  SAPLING: 49,
 };
 
 const W = [1, 1, 1]; // white tint for textured blocks
@@ -82,11 +83,13 @@ export const BLOCKS = {
   [B.REDLAMP]: nat(TILE.REDLAMP, '#7a6038'),
   [B.REDLAMP_ON]: nat(TILE.REDLAMP_ON, '#f2c24a'),
   [B.SLIME]: nat(TILE.SLIME, '#6fcf6a'),
+  // A sapling is a walk-through plant that grows into a tree after a while.
+  [B.SAPLING]: { tiles: { top: TILE.SAPLING, side: TILE.SAPLING, bottom: TILE.SAPLING }, tint: W, ui: '#5bbf3a', passable: true },
 };
 
 // Build blocks grouped into categories for the pop-up picker.
 export const CATEGORIES = [
-  { name: 'Nature', blocks: [B.GRASS, B.DIRT, B.SAND, B.GRAVEL, B.SNOW, B.LOG, B.BIRCH_LOG, B.LEAVES] },
+  { name: 'Nature', blocks: [B.GRASS, B.DIRT, B.SAND, B.GRAVEL, B.SNOW, B.SAPLING, B.LOG, B.BIRCH_LOG, B.LEAVES] },
   { name: 'Water 🪣', blocks: [B.WATER] },
   { name: 'House 🏠', blocks: [B.DOOR, B.GLASS, B.PLANKS, B.BRICK] },
   { name: 'Boom 💥', blocks: [B.TNT] },
