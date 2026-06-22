@@ -527,6 +527,21 @@ v4→v5**.
    third-person (big + circles high); could add wing-flap; Endermen + a desert
    pyramid are the natural next End additions.
 
+## Status (session 20) — one-tap world travel (dad: "how do we see the new
+worlds?"). Shipped on **`claude/store-portal-bugs-hzcr72`**, mirrored to `main`.
+**sw cache v6→v7.**
+- The only way to reach flint worlds was **build an obsidian frame + light it** —
+  far too hard for a 6-yr-old (hence the question). Added a **🌍 topbar button →
+  "Go to a world!" menu** (`#worldmenu`, reuses `.portal-choice`) that lists every
+  world and **travels there instantly on tap** (`travelTo`, the tested path). The
+  flint & steel "build your own portal" path still works for the full-Minecraft
+  experience. Locked worlds show dimmed with 🔒 + reason: **Nether** = "Earn ⭐4"
+  (tapping nudges), **Sky/End** = "Buy in 💎 shop" (tapping opens the shop).
+  One-time `tip('worlds', …)`. Verified headless: menu lists over/nether(locked)/
+  gold/ant/tnt/sky(locked)/end(locked); tap Gold→travels, Home→back, buy Sky+End→
+  they unlock, tap End→travels; zero errors; topbar still fits (right edge 668<
+  1024).
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files

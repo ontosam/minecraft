@@ -141,6 +141,7 @@ body {
 #goals,
 #portalmenu,
 #buildmenu,
+#worldmenu,
 #shop,
 #confirm,
 #quest,
@@ -162,6 +163,7 @@ body {
 #goals.hidden,
 #portalmenu.hidden,
 #buildmenu.hidden,
+#worldmenu.hidden,
 #shop.hidden,
 #confirm.hidden,
 #quest.hidden,
@@ -729,12 +731,19 @@ body {
 
 /* Flint & steel "Where to?" menu */
 #portalmenu-body,
-#buildmenu-body {
+#buildmenu-body,
+#worldmenu-body {
   padding: 14px 16px 18px;
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
   justify-content: center;
+}
+
+/* Locked worlds in the 🌍 menu look dimmed (tap = how to unlock). */
+.portal-choice.locked {
+  opacity: .55;
+  border-style: dashed;
 }
 
 /* The Big-Build cards carry a little hint line under the name. */

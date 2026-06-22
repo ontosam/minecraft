@@ -1361,6 +1361,33 @@ function buildPortalMenu() {
 function openPortalMenu() { buildPortalMenu(); document.getElementById('portalmenu').classList.remove('hidden'); }
 function closePortalMenu() { document.getElementById('portalmenu').classList.add('hidden'); }
 
+// --- 🌍 Worlds menu: one tap to hop straight to any world (the kid-friendly way
+// to travel — the flint & steel "build your own portal" path still works too). ---
+function buildWorldMenu() {
+  const body = document.getElementById('worldmenu-body');
+  body.innerHTML = '';
+  for (const k of WORLD_ORDER) {
+    if (k === dimension) continue;                 // you're already here
+    const kind = WORLD_KINDS[k];
+    let locked = false, reason = '';
+    if (k === 'nether' && !portalUnlocked) { locked = true; reason = 'Earn ⭐' + NETHER_STARS; }
+    else if (kind.locked && !goals.hasUnlock(kind.locked)) { locked = true; reason = 'Buy in 💎 shop'; }
+    const btn = document.createElement('button');
+    btn.className = 'portal-choice' + (locked ? ' locked' : '');
+    const name = k === 'over' ? 'Home' : kind.name;
+    btn.innerHTML = '<span class="pe">' + kind.emoji + '</span><b>' + name + '</b>' + (locked ? '<small>🔒 ' + reason + '</small>' : '');
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); closeWorldMenu();
+      if (!locked) { travelTo(k); return; }
+      if (k === 'nether') showToast('🌀 Earn ⭐' + NETHER_STARS + ' goals to open the Nether! (You have ⭐' + goals.stars + ')', 3600);
+      else openShop();                             // send him to buy the locked world
+    });
+    body.appendChild(btn);
+  }
+}
+function openWorldMenu() { buildWorldMenu(); document.getElementById('worldmenu').classList.remove('hidden'); }
+function closeWorldMenu() { document.getElementById('worldmenu').classList.add('hidden'); }
+
 function refreshGoalsButton() {
   document.getElementById('btn-goals').textContent = '⭐' + goals.stars;
 }
@@ -1477,6 +1504,14 @@ function wireUI() {
   });
   document.getElementById('portalmenu-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closePortalMenu(); });
   document.getElementById('portalmenu').addEventListener('pointerdown', (e) => { if (e.target.id === 'portalmenu') closePortalMenu(); });
+
+  document.getElementById('btn-worlds').addEventListener('pointerdown', (e) => {
+    e.preventDefault(); sound.resume();
+    tip('worlds', '🌍 Tap any world to zoom straight there! Locked ones (🔒) you buy in the 💎 shop or earn with ⭐.');
+    openWorldMenu();
+  });
+  document.getElementById('worldmenu-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeWorldMenu(); });
+  document.getElementById('worldmenu').addEventListener('pointerdown', (e) => { if (e.target.id === 'worldmenu') closeWorldMenu(); });
 
   document.getElementById('btn-buildkit').addEventListener('pointerdown', (e) => {
     e.preventDefault(); sound.resume();
