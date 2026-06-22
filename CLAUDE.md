@@ -296,6 +296,35 @@ to `main`. No difficulty changes (purely look-and-feel).
    Note: shadows use `heightAt` (topmost block), so under deep overhangs a shadow
    lands on the roof — fine for this mostly-surface game.
 
+## Status (session 12)
+Dad's wishlist: character selection (himself/family/friends/Cristiano/Steve),
+"Steve's lava chicken store" as a challenge, and "he loves math." Shipped both on
+**`claude/gifted-gates-h9dzy2`**, mirrored to `main`. Now **40 goals**.
+1. **🙂 Character selection.** The character rig is now **skinnable**:
+   `character.js` exports a `CHARACTERS` roster (per-character colours + style
+   flags `long`/`beard`/`cape`/`ball`) and `Character.setCharacter(def)` rebuilds
+   the kid's part meshes live (crown/sword/seated-riding still work; old meshes
+   `dispose()`d). New **🙂 topbar button** → "Who do you want to be?" picker with
+   8 friendly blocky options: Ezra, Mama (long hair), Dada (beard), Cora (long
+   hair), Jovi, Cristiano (red kit + a soccer ball), Steve (cyan), Super Hero
+   (blue suit + red cape). Choice saved as `char` and applied on load
+   (`applyCharacter`). `__ezra.setCharacter()/character()`.
+2. **🍗 Steve's Lava Chicken math challenge.** A second `Character` (Steve skin)
+   stands at a little stand near home (`setupSteve`/`buildLavaStand` — planks
+   counter, glowstone grill + ORANGE "lava", log posts, brick awning; placed
+   only into AIR so it never harms a build; rebuilt on reset). He turns to face
+   you + casts a shadow. Tapped via a ray/sphere test (`rayHitsSphere`, in the
+   tap routing after villagers, overworld only) → a **math dialog** (`#math`):
+   `makeMath` scales difficulty by `goals.counts.math` (sums →10, →20, then
+   subtraction), 3 answer buttons; right → +💎2 + 🍗 + next question, wrong →
+   gentle retry. Goals 'Math whiz' (5) + 'Number master' (20).
+   `__ezra.openMath()/mathQ()/steve()`. Verified headless: 8-char picker
+   applies+persists, topbar (9 minis+block) still fits; math opens with 3 opts,
+   correct pays +💎2 and advances, wrong doesn't; full regression green, zero
+   errors. Tuning candidates: Steve's stand sits at spawn+7 (could collide with a
+   pre-existing build on old saves since it only fills AIR — safe but may look
+   sparse); character previews are emoji (no live 3D thumbnail).
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files
