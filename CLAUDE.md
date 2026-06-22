@@ -372,6 +372,36 @@ so a 6-year-old is never lost. On **`claude/gifted-gates-h9dzy2`**, mirrored to
    once; full regression green, zero errors. Tuning: golden-apple buff is fixed
    at +2/90s (could scale); blurbs are proximity/event based (no full tutorial).
 
+## Status (session 15)
+Dad feedback: "can't find Steve; spiders too easy (give them webs); add
+skeletons (fewer, harder, more rewarding); fishing = unlimited diamonds — tell
+him bigger water = bigger fish; some features I'm not seeing." Shipped on
+**`claude/gifted-gates-h9dzy2`**, mirrored to `main`. Now **42 goals**, **51 block
+ids** unchanged.
+1. **Deploy/caching.** "Not seeing features" → bumped `sw.js` `CACHE` v1→**v3** and
+   completed `CORE` (all js/*). It's network-first already, but the bump forces
+   old caches to clear on the installed iPad PWA. (Tell the dad: fully close &
+   reopen the app once to pick it up.)
+2. **Findability.** Minimap now marks **Steve** (orange dot) + **villagers**
+   (green) in the overworld (`drawMinimap`).
+3. **Fishing economy.** `reelIn` now scales by `waterBodySize()` (capped flood
+   fill): size<8 → only minnows/boot (**0💎**), <32 → fish/treasure, ≥32 → BIG
+   fish (2–3💎). First-cast blurb: "little ponds have little fish — find/build a
+   big lake/ocean." **Bug fixed**: bobber coords are floats, so `world.get` read
+   undefined → every catch counted as tiny (0💎); `waterBodySize` now floors.
+4. **Spiders** tougher (HP 2→3) + **webs**: from ~2–6 blocks they `emit('web')`
+   → `player.webT` halves walk speed for 1.6s (harmless, fun). `hiss`+🕸️.
+5. **💀 Skeletons** (`js/skeletons.js`): rare (cap 2, ~9–15s), tough (HP 4 / 2
+   sword hits), **more rewarding** (+3💎 + 'Skeleton slayer' goal). Aim telegraph
+   (`AIM_TIME`) → slow **arrow** for half a heart, gated on `|dy|` so flying
+   dodges. `bow`/`rattle` sounds. Wired into over mobs, tap routing, shadows,
+   knockout cleanup, `__ezra.skeletons`.
+   Verified: Node logic (spider web/HP, skeleton HP/melee/aim-shoot/fly-dodge) +
+   headless (water-size: big lake ~97💎 vs puddle 0 over 40 casts; night spawns;
+   blurbs) + full regression — all green, zero errors. Tuning: night still gentle
+   (uDayLight≈0.4); skeleton arrow always lands after the telegraph if you didn't
+   leave range/height (no true projectile dodge); could add real arrow physics.
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files
