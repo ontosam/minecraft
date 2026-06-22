@@ -16,7 +16,7 @@ export const TILE = {
   DOOR: 32, DOOR_OPEN: 33, TNT_SIDE: 34, TNT_TOP: 35,
   RAINBOW: 36, LEVER: 37, LEVER_ON: 38, REDSTONE: 39, REDLAMP: 40, REDLAMP_ON: 41,
   SLIME: 42, SAPLING: 43,
-  MEGA_TNT_SIDE: 44, MEGA_TNT_TOP: 45,
+  MEGA_TNT_SIDE: 44, MEGA_TNT_TOP: 45, SANDSTONE: 46,
 };
 
 export function initGL(canvas) {
@@ -323,6 +323,11 @@ function buildAtlasCanvas() {
   ctx.fillStyle = shade(0x5a1009, 1); for (let i = 0; i < T; i += 4) ctx.fillRect(p[0] + i, p[1], 1, T);
   ctx.fillStyle = shade(0x3a2a12, 1); ctx.fillRect(p[0] + 6, p[1] + 6, 4, 4);
   ctx.fillStyle = shade(0xffd24a, 1); ctx.fillRect(p[0] + 7, p[1] + 7, 2, 2);       // glowing fuse top
+
+  // --- Sandstone (desert building block: pale tan with soft layered bands) ---
+  p = at(TILE.SANDSTONE); noise(ctx, p[0], p[1], 0xe6d8a8, 0.08, 76);
+  ctx.fillStyle = shade(0xcab984, 1); ctx.fillRect(p[0], p[1] + 4, T, 1); ctx.fillRect(p[0], p[1] + 10, T, 1);
+  ctx.fillStyle = shade(0xf2e8c4, 1); ctx.fillRect(p[0], p[1] + 5, T, 1); ctx.fillRect(p[0], p[1] + 11, T, 1);
 
   // --- Rainbow block (a sparkly shop reward) ---
   // Bright horizontal stripes of the rainbow, with a few twinkling sparkles.

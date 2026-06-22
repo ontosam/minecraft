@@ -466,6 +466,40 @@ Now **52 block ids**.
    portal next time it happens so we can pin the root cause.
    All verified headless (CDP) + Node logic; full world-hop regression green.
 
+## Status (session 18) — intuitive building (dad: one-block-at-a-time is too
+hard for Ezra; he wants whole-wall/whole-floor builds + a roomy house he can
+move around in and see). Shipped on **`claude/store-portal-bugs-hzcr72`**.
+Now **52 block ids** + sandstone (**53** including SANDSTONE id 51), **sw cache
+v4→v5**.
+1. **🏗️ Big Builds — one-tap structures (the headline).** New topbar 🏗️ button
+   opens a little "Build something big!" menu (`#buildmenu`, mirrors the portal
+   menu; reuses `.portal-choice` styling) with three one-tap builds that appear
+   a few steps **in front of where you're looking**, no aiming or block-by-block:
+   - **🏠 Cozy House** — a roomy 5×5 interior, 4-high ceiling (so the
+     third-person camera has room), a **door facing you**, **glass windows** on
+     every wall, a **glowstone ceiling lamp**, planks floor/roof. Verified you
+     can stand inside and see around.
+   - **🟫 Big Floor** / **🧱 Long Wall** — a 7×7 patio / a 7×4 wall of **your
+     currently-selected block**.
+   Core helpers: `bigSet(x,y,z,id,force)` (force punches a build's own
+   door/windows through walls it just placed; **never** overwrites *his* placed
+   blocks otherwise), `bigBuildSpot(dist)` (lands in front, center-ground height,
+   clamped in-world), `levelPad(cx,cz,rad,g,floor)` (**auto-flattens**: fills
+   dips below + clears bumps above so a house sits clean even on a hill).
+   `goals.onBuildMany(id,n)` credits every block (a house ≈194 → instant builder
+   stars, intentional). One-time `tip('buildkit', …)`.
+2. **🏜️ Sandstone block** (`B.SANDSTONE`, `TILE.SANDSTONE`) in the **Stone**
+   picker tab — a desert/End-themed building block (down payment on the
+   Ender-Dragon/Endermen/desert idea; in MC it's Enderman-proof).
+   Verified headless: menu shows House/Floor/Wall; house has door+glass+glow+
+   walkable interior and flattens on slopes; floor=+49, wall=+28; Stone tab now
+   7 tiles; full world-hop + build-anywhere regression green, zero errors.
+   **Open with the dad (asked via AskUserQuestion):** how gentle to make the
+   **End / Ender Dragon / Endermen** (friendly pet-dragon vs. a gentle
+   beat-the-crystals "boss" vs. hold) — it's a big feature so it's not built yet.
+   Also unclear: his **"land with a water bucket in the sand"** remark — needs
+   clarifying (likely the existing soft-landing water feature).
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files

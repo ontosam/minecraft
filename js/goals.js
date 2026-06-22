@@ -82,6 +82,8 @@ export class Goals {
   onMove(d) { this.counts.dist += d; this.check(); this.maybeSave(); }
   onPet() { this.counts.pet++; this.check(); this.save(); }
   onBuild(id) { this.counts.place++; this.usedTypes.add(id); this.check(); this.save(); }
+  // A whole structure placed at once (the one-tap Big Builds) — count every block.
+  onBuildMany(id, n) { this.counts.place += Math.max(0, n | 0); if (id != null) this.usedTypes.add(id); this.check(); this.save(); }
   onDig() { this.counts.dig++; this.check(); this.save(); }
   onDefend() { this.counts.defend++; this.check(); this.save(); }
   bump(metric) { if (metric in this.counts) { this.counts[metric]++; this.check(); this.save(); } }

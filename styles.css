@@ -140,6 +140,7 @@ body {
 #picker,
 #goals,
 #portalmenu,
+#buildmenu,
 #shop,
 #confirm,
 #quest,
@@ -160,6 +161,7 @@ body {
 #picker.hidden,
 #goals.hidden,
 #portalmenu.hidden,
+#buildmenu.hidden,
 #shop.hidden,
 #confirm.hidden,
 #quest.hidden,
@@ -726,12 +728,27 @@ body {
 }
 
 /* Flint & steel "Where to?" menu */
-#portalmenu-body {
+#portalmenu-body,
+#buildmenu-body {
   padding: 14px 16px 18px;
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
   justify-content: center;
+}
+
+/* The Big-Build cards carry a little hint line under the name. */
+.portal-choice small {
+  font-size: 11px;
+  color: #6a5fa0;
+  text-align: center;
+  line-height: 1.15;
+  padding: 0 6px;
+}
+.portal-choice {
+  height: auto;
+  min-height: 104px;
+  padding: 10px 4px;
 }
 
 .portal-choice {

@@ -559,6 +559,125 @@ function removeDoor(x, y, z) {
   sound.play('dig'); saveDirty = true; actionAnim = 1; minimapDirty = true; goals.onDig();
 }
 
+// --- Big Builds: one-tap structures so building isn't a one-block-at-a-time
+// chore for a 6-year-old. Each appears a few steps in front of where you're
+// looking, sits on the ground, and only fills empty space / natural terrain —
+// it never overwrites blocks you placed yourself. ---
+const sgn = (v) => (v >= 0 ? 1 : -1);
+// Pick a sensible solid material for floors/walls (fall back to brick for
+// passable picks like water, or the special door).
+function solidSelected() {
+  const def = BLOCKS[selected];
+  if (!def || def.passable || selected === B.DOOR) return B.BRICK;
+  return selected;
+}
+// Place one block of a big build. By default it skips your own placed blocks
+// (so a stamp can never wreck an existing creation) and tallies/owns each new
+// solid block. `force` carves through even placed blocks — used for a structure
+// to punch its own door/windows through the walls it just put up.
+function bigSet(x, y, z, id, force) {
+  if (x < 1 || x >= SX - 1 || y < 1 || y >= SY - 1 || z < 1 || z >= SZ - 1) return 0;
+  const k = world.idx(x, y, z);
+  if (!force && world.placed.has(k)) return 0;     // never touch his own builds
+  world.set(x, y, z, id);
+  if (id === B.AIR) { world.placed.delete(k); return 0; }
+  world.placed.add(k);
+  return 1;
+}
+// Where a big build lands: a few steps in front, level with the ground right
+// where you're standing (the door threshold), plus the facing axis.
+function bigBuildSpot(dist) {
+  const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
+  const cx = Math.max(4, Math.min(SX - 5, Math.round(player.pos[0] + fx * dist)));
+  const cz = Math.max(4, Math.min(SZ - 5, Math.round(player.pos[2] + fz * dist)));
+  const g = Math.max(1, world.heightAt(cx, cz));
+  return { cx, cz, g, fx, fz, horiz: Math.abs(fx) >= Math.abs(fz) };
+}
+// Make a clean, level pad at height g across the footprint: fill any dips below
+// so it never floats, and clear anything above (hills poking through) — without
+// ever disturbing blocks he placed himself.
+function levelPad(cx, cz, rad, g, floorId) {
+  let n = 0;
+  for (let dx = -rad; dx <= rad; dx++) for (let dz = -rad; dz <= rad; dz++) {
+    const x = cx + dx, z = cz + dz;
+    for (let yy = g + 1; yy <= g + 6; yy++) bigSet(x, yy, z, B.AIR);                 // clear bumps above
+    for (let yy = g - 1; yy > 0 && world.get(x, yy, z) === B.AIR; yy--) bigSet(x, yy, z, B.DIRT, true); // fill dips below
+    n += bigSet(x, g, z, floorId, true);                                            // the level floor
+  }
+  return n;
+}
+function finishBigBuild(n, cx, cy, cz, label) {
+  world.flushDirty(40);
+  goals.onBuildMany(selected, n);
+  saveDirty = true; minimapDirty = true; actionAnim = 1;
+  sound.play('place');
+  spawnSparkles([cx + 0.5, cy + 1.5, cz + 0.5]);
+  showToast(label, 2800);
+}
+// A roomy house you can walk around inside: 5×5 floor, tall walls, a door
+// facing you, big windows, and a glowstone ceiling lamp.
+function buildHouse() {
+  const { cx, cz, g, fx, fz, horiz } = bigBuildSpot(5);
+  const wall = solidSelected();
+  const y0 = g + 1, H = 4;                 // interior floor level + a tall ceiling
+  let n = levelPad(cx, cz, 3, g, B.PLANKS);  // a clean, flat floor even on a hill
+  for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) {
+    n += bigSet(cx + dx, y0 + H, cz + dz, B.PLANKS);       // roof
+    const edge = (Math.abs(dx) === 3 || Math.abs(dz) === 3);
+    for (let dy = 0; dy < H; dy++) {
+      if (edge) n += bigSet(cx + dx, y0 + dy, cz + dz, wall);   // walls
+      else bigSet(cx + dx, y0 + dy, cz + dz, B.AIR);            // keep the inside open
+    }
+  }
+  // Big windows midway up each wall so it's bright and you can see out (force —
+  // they replace the wall blocks we just put up).
+  for (let t = -1; t <= 1; t++) {
+    bigSet(cx + t, y0 + 2, cz - 3, B.GLASS, true); bigSet(cx + t, y0 + 2, cz + 3, B.GLASS, true);
+    bigSet(cx - 3, y0 + 2, cz + t, B.GLASS, true); bigSet(cx + 3, y0 + 2, cz + t, B.GLASS, true);
+  }
+  // A doorway on the wall facing you (so you walk straight in).
+  const dX = horiz ? cx - 3 * sgn(fx) : cx;
+  const dZ = horiz ? cz : cz - 3 * sgn(fz);
+  bigSet(dX, y0, dZ, B.DOOR, true); bigSet(dX, y0 + 1, dZ, B.DOOR, true); bigSet(dX, y0 + 2, dZ, B.GLASS, true);
+  goals.bump('doors');
+  bigSet(cx, y0 + H - 1, cz, B.GLOWSTONE, true);   // a cozy ceiling lamp
+  finishBigBuild(n, cx, y0, cz, '🏠 Your cozy house is ready — walk in the door!');
+}
+// A big flat floor of your chosen block — lay a whole patio in one tap.
+function stampFloor() {
+  const { cx, cz, g } = bigBuildSpot(5);
+  const n = levelPad(cx, cz, 3, g, solidSelected());
+  finishBigBuild(n, cx, g, cz, '🟫 A whole floor, done!');
+}
+// A long wall of your chosen block, standing across in front of you.
+function stampWall() {
+  const { cx, cz, g, horiz } = bigBuildSpot(4);
+  const id = solidSelected();
+  let n = 0;
+  for (let i = -3; i <= 3; i++) for (let dy = 1; dy <= 4; dy++) {
+    n += horiz ? bigSet(cx, g + dy, cz + i, id) : bigSet(cx + i, g + dy, cz, id);
+  }
+  finishBigBuild(n, cx, g + 2, cz, '🧱 A whole wall, done!');
+}
+const BIG_BUILDS = [
+  { emoji: '🏠', name: 'Cozy House', fn: buildHouse, hint: 'A whole house you can walk around inside' },
+  { emoji: '🟫', name: 'Big Floor', fn: stampFloor, hint: 'A big floor — pick the block first!' },
+  { emoji: '🧱', name: 'Long Wall', fn: stampWall, hint: 'A whole wall — pick the block first!' },
+];
+function buildBuildMenu() {
+  const body = document.getElementById('buildmenu-body');
+  body.innerHTML = '';
+  for (const b of BIG_BUILDS) {
+    const btn = document.createElement('button');
+    btn.className = 'portal-choice';
+    btn.innerHTML = '<span class="pe">' + b.emoji + '</span><b>' + b.name + '</b><small>' + b.hint + '</small>';
+    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); closeBuildMenu(); b.fn(); });
+    body.appendChild(btn);
+  }
+}
+function openBuildMenu() { buildBuildMenu(); document.getElementById('buildmenu').classList.remove('hidden'); }
+function closeBuildMenu() { document.getElementById('buildmenu').classList.add('hidden'); }
+
 // --- TNT: place it, tap to light it, then BOOM (it chain-reacts) ---
 // Mega TNT (the 💎-shop block) behaves the same but blows a much bigger crater.
 function isTNT(id) { return id === B.TNT || id === B.MEGA_TNT; }
@@ -1324,6 +1443,14 @@ function wireUI() {
   });
   document.getElementById('portalmenu-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closePortalMenu(); });
   document.getElementById('portalmenu').addEventListener('pointerdown', (e) => { if (e.target.id === 'portalmenu') closePortalMenu(); });
+
+  document.getElementById('btn-buildkit').addEventListener('pointerdown', (e) => {
+    e.preventDefault(); sound.resume();
+    tip('buildkit', '🏗️ Big builds! Pick a House, Floor or Wall and it appears right in front of you. Tip: choose a block first to pick what your Floor and Wall are made of.');
+    openBuildMenu();
+  });
+  document.getElementById('buildmenu-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeBuildMenu(); });
+  document.getElementById('buildmenu').addEventListener('pointerdown', (e) => { if (e.target.id === 'buildmenu') closeBuildMenu(); });
 
   document.getElementById('btn-night').addEventListener('pointerdown', (e) => {
     e.preventDefault(); sound.resume();

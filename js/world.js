@@ -21,7 +21,7 @@ export const B = {
   NETHERRACK: 36, PORTAL: 37, LAVA: 38,
   DOOR: 39, DOOR_OPEN: 40, TNT: 41, RAINBOW: 42,
   LEVER: 43, LEVER_ON: 44, REDSTONE: 45, REDLAMP: 46, REDLAMP_ON: 47, SLIME: 48,
-  SAPLING: 49, MEGA_TNT: 50,
+  SAPLING: 49, MEGA_TNT: 50, SANDSTONE: 51,
 };
 
 const W = [1, 1, 1]; // white tint for textured blocks
@@ -86,6 +86,7 @@ export const BLOCKS = {
   // A sapling is a walk-through plant that grows into a tree after a while.
   [B.SAPLING]: { tiles: { top: TILE.SAPLING, side: TILE.SAPLING, bottom: TILE.SAPLING }, tint: W, ui: '#5bbf3a', passable: true },
   [B.MEGA_TNT]: nat3(TILE.MEGA_TNT_TOP, TILE.MEGA_TNT_SIDE, TILE.MEGA_TNT_TOP, '#8e1b12'),
+  [B.SANDSTONE]: nat(TILE.SANDSTONE, '#e6d8a8'),
 };
 
 // Build blocks grouped into categories for the pop-up picker.
@@ -96,7 +97,7 @@ export const CATEGORIES = [
   { name: 'Boom 💥', blocks: [B.TNT] },
   // Tap a lever → it powers redstone wire → wired-up lamps light up.
   { name: 'Redstone ⚙️', blocks: [B.LEVER, B.REDSTONE, B.REDLAMP] },
-  { name: 'Stone', blocks: [B.STONE, B.COBBLE, B.STONE_BRICK, B.BRICK, B.OBSIDIAN, B.GLOWSTONE] },
+  { name: 'Stone', blocks: [B.STONE, B.COBBLE, B.STONE_BRICK, B.SANDSTONE, B.BRICK, B.OBSIDIAN, B.GLOWSTONE] },
   { name: 'Wood', blocks: [B.PLANKS, B.BIRCH_PLANKS, B.DARK_PLANKS, B.BOOKSHELF] },
   { name: 'Shiny', blocks: [B.GOLD, B.DIAMOND, B.ICE, B.GLASS] },
   { name: 'Fun', blocks: [B.PUMPKIN, B.SLIME] },
