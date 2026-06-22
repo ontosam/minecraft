@@ -12,6 +12,7 @@ import { Creepers } from './creepers.js';
 import { NetherMobs } from './nethermobs.js';
 import { Zombies } from './zombies.js';
 import { Spiders } from './spiders.js';
+import { Villagers } from './villagers.js';
 import { Controls } from './input.js';
 import { Sound } from './audio.js';
 import { Character } from './character.js';
@@ -102,6 +103,8 @@ function makeMobs(kind, w) {
         if (type === 'hit') hurt(0.5);          // spiders only nibble a half-heart
         else if (type === 'hiss') sound.play('hiss');
       };
+    } else if (t === 'villagers') {
+      m.villagers = new Villagers(gl, w);
     }
   }
   return m;
@@ -109,6 +112,7 @@ function makeMobs(kind, w) {
 function populateMobs(m) {
   if (m.animals) m.animals.spawn(10);
   if (m.ants) m.ants.spawn(14);
+  if (m.villagers) m.villagers.spawn(2);
   if (m.nethermobs) m.nethermobs.populate(SX, SZ);
   // creepers spawn lazily (paced) during update — no initial spawn
 }
@@ -119,6 +123,7 @@ function updateMobs(m, dt) {
   if (m.ants) m.ants.update(dt, player);
   if (m.zombies) m.zombies.update(dt, player, night && dimension === 'over');
   if (m.spiders) m.spiders.update(dt, player, night && dimension === 'over');
+  if (m.villagers) m.villagers.update(dt, player);
 }
 function drawMobs(m) {
   if (m.animals) m.animals.draw(worldProg);
@@ -127,6 +132,7 @@ function drawMobs(m) {
   if (m.ants) m.ants.draw(worldProg);
   if (m.zombies) m.zombies.draw(worldProg);
   if (m.spiders) m.spiders.draw(worldProg);
+  if (m.villagers) m.villagers.draw(worldProg);
 }
 
 // --- Worlds: created on first visit, then cached ---
@@ -677,6 +683,58 @@ function buyItem(it) {
   showToast('✨ Unlocked: ' + it.name + '!');
 }
 
+// --- Villager quests: tap a villager for a little task, finish it for 💎 ---
+// Each quest tracks a goals counter from a baseline, so it's "from now on".
+const QUEST_POOL = [
+  { metric: 'place', n: 10, reward: 3, icon: '🧱', label: 'place {n} blocks' },
+  { metric: 'pet', n: 3, reward: 3, icon: '🐾', label: 'pet {n} animals' },
+  { metric: 'fish', n: 3, reward: 4, icon: '🎣', label: 'catch {n} fish' },
+  { metric: 'diamond', n: 2, reward: 5, icon: '💎', label: 'mine {n} diamonds' },
+  { metric: 'treasure', n: 2, reward: 4, icon: '✨', label: 'dig up {n} buried treasures' },
+  { metric: 'dig', n: 14, reward: 3, icon: '⛏️', label: 'dig up {n} blocks' },
+  { metric: 'monster', n: 2, reward: 5, icon: '⚔️', label: 'defeat {n} night creatures' },
+];
+let questVillager = null;
+function makeQuest() {
+  const q = QUEST_POOL[Math.floor(Math.random() * QUEST_POOL.length)];
+  return { metric: q.metric, target: q.n, base: goals.counts[q.metric] || 0, reward: q.reward, icon: q.icon, label: q.label.replace('{n}', q.n) };
+}
+function questProgress(q) { return Math.max(0, Math.min(q.target, (goals.counts[q.metric] || 0) - q.base)); }
+function questDone(q) { return questProgress(q) >= q.target; }
+function talkToVillager(v) {
+  sound.play('pet');
+  if (!v.quest) { v.quest = makeQuest(); showQuest(v, 'offer'); }
+  else if (questDone(v.quest)) showQuest(v, 'done');
+  else showQuest(v, 'progress');
+}
+function showQuest(v, state) {
+  questVillager = v;
+  const q = v.quest, msg = document.getElementById('quest-msg'), btn = document.getElementById('quest-ok');
+  if (state === 'offer') {
+    msg.innerHTML = '<div class="qface">🧑‍🌾</div>Hello there! 👋<br>Can you <b>' + q.icon + ' ' + q.label + '</b> for me?<br>I\'ll give you <b>💎' + q.reward + '</b>!';
+    btn.textContent = 'Okay! 👍';
+  } else if (state === 'progress') {
+    msg.innerHTML = '<div class="qface">🧑‍🌾</div><b>' + q.icon + ' ' + q.label + '</b><br>You\'ve done <b>' + questProgress(q) + ' / ' + q.target + '</b> so far — keep going!';
+    btn.textContent = 'Okay';
+  } else {
+    msg.innerHTML = '<div class="qface">🥳</div>You did it! 🎉<br>Here\'s your reward: <b>💎' + q.reward + '</b><br>Thank you so much!';
+    btn.textContent = 'Yay! 🎉';
+  }
+  document.getElementById('quest').classList.remove('hidden');
+}
+function closeQuest() { document.getElementById('quest').classList.add('hidden'); }
+function questOk() {
+  const v = questVillager;
+  if (v && v.quest && questDone(v.quest)) {
+    goals.addGems(v.quest.reward); updateGems();
+    goals.bump('quest');
+    sound.play('treasure');
+    showToast('🎉 Quest done! +💎' + v.quest.reward);
+    v.quest = null;          // tapping again offers a fresh quest
+  }
+  closeQuest();
+}
+
 // --- Start the current world fresh (asked for, behind a confirmation) ---
 function resetWorld() {
   const key = dimension, W = worlds[key].world, kind = WORLD_KINDS[key];
@@ -907,6 +965,8 @@ function wireUI() {
   document.getElementById('gem-bar').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); openShop(); });
   document.getElementById('shop-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeShop(); });
   document.getElementById('shop').addEventListener('pointerdown', (e) => { if (e.target.id === 'shop') closeShop(); });
+  document.getElementById('quest-ok').addEventListener('pointerdown', (e) => { e.preventDefault(); questOk(); });
+  document.getElementById('quest').addEventListener('pointerdown', (e) => { if (e.target.id === 'quest') closeQuest(); });
   document.getElementById('btn-reset').addEventListener('pointerdown', (e) => { e.preventDefault(); askReset(); });
   document.getElementById('confirm-no').addEventListener('pointerdown', (e) => { e.preventDefault(); document.getElementById('confirm').classList.add('hidden'); });
   document.getElementById('confirm-yes').addEventListener('pointerdown', (e) => { e.preventDefault(); document.getElementById('confirm').classList.add('hidden'); resetWorld(); });
@@ -1054,9 +1114,11 @@ function frame(now) {
     const cr = m.creepers ? m.creepers.pickRay(camPos, dir) : null;
     const zb = (!cr && m.zombies) ? m.zombies.pickRay(camPos, dir) : null;
     const sp = (!cr && !zb && m.spiders) ? m.spiders.pickRay(camPos, dir) : null;
+    const vl = (!cr && !zb && !sp && m.villagers) ? m.villagers.pickRay(camPos, dir) : null;
     if (cr) doDefend(cr);
     else if (zb) doBonkZombie(zb);
     else if (sp) doBonkSpider(sp);
+    else if (vl) talkToVillager(vl);
     else {
       const hit = world.raycast(camPos, dir, REACH);
       const bid = hit ? world.get(hit.block[0], hit.block[1], hit.block[2]) : 0;
@@ -1258,6 +1320,7 @@ function init() {
     get ants() { return mobs().ants; },
     get zombies() { return mobs().zombies; },
     get spiders() { return mobs().spiders; },
+    get villagers() { return mobs().villagers; },
     cam: () => ({ yaw: camYaw, pitch: camPitch, pos: camPos.slice(), dir: camDir.slice() }),
     target: () => targetCells(),
     rayHit: (x, y) => rayHitAt(x, y),
@@ -1283,6 +1346,8 @@ function init() {
     toggleRide: () => toggleRide(),
     fishing: () => !!fishing,
     castLine: () => castLine(),
+    talkVillager: () => { const v = mobs().villagers; if (v && v.list.length) talkToVillager(v.list[0]); },
+    questOk: () => questOk(),
   };
 
   last = performance.now();

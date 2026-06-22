@@ -141,7 +141,8 @@ body {
 #goals,
 #portalmenu,
 #shop,
-#confirm {
+#confirm,
+#quest {
   position: fixed;
   inset: 0;
   z-index: 30;
@@ -157,8 +158,29 @@ body {
 #goals.hidden,
 #portalmenu.hidden,
 #shop.hidden,
-#confirm.hidden {
+#confirm.hidden,
+#quest.hidden {
   display: none;
+}
+
+/* Villager quest dialog */
+#quest-msg {
+  font-size: 17px;
+  color: #2a2a33;
+  line-height: 1.6;
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.qface {
+  font-size: 52px;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.happy-btn {
+  background: #57b85a !important;
+  color: #fff !important;
 }
 
 #btn-goals {
