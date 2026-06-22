@@ -325,6 +325,29 @@ Dad's wishlist: character selection (himself/family/friends/Cristiano/Steve),
    pre-existing build on old saves since it only fills AIR — safe but may look
    sparse); character previews are emoji (no live 3D thumbnail).
 
+## Status (session 13)
+Dad feedback: "Steve selling snacks is great — snacks could give hearts; Jovi is
+a girl; instead of dada/mama use Vlad and Chris." Shipped on
+**`claude/gifted-gates-h9dzy2`**, mirrored to `main`. Now **41 goals**.
+1. **🍎 Steve's snack stall (💎 → hearts).** Tapping Steve now opens a stall menu
+   (`#steve`, `openSteveMenu`/`buildSteveMenu`) with the 🧮 Math Challenge button
+   (earn 💎) **and** snacks that spend 💎 to restore hearts: `SNACKS` = Apple
+   (1💎,+1❤️), Lava Chicken (2💎,+2❤️), Cake (3💎, full). `buySnack` heals up to
+   `maxHearts`, refuses politely at full (no charge), bumps a `snack` counter
+   (new 'Snack time' goal). A renewable 💎 *sink* to balance all the income.
+2. **Character fixes.** `jovi` is now a girl (long hair, purple top, 👧). `mama`/
+   `dada` renamed to **`chris`**/**`vlad`** (Chris keeps long hair, Vlad the
+   beard). `CHAR_ALIAS` maps old saved ids (mama→chris, dada→vlad) in `charById`,
+   and the loader normalises `selectedChar = charById(obj.char).id` so a saved
+   pick survives the rename.
+   Verified headless: roster reads Ezra/Chris/Vlad/Cora/Jovi/Cristiano/Steve/
+   Super Hero; snack heals +charges +refuses-at-full; math still launches from the
+   stall; a `char:'mama'` save loads as `chris`; full world-hop + save/reload
+   regression green, zero errors. Note: snacks only help when you're below full
+   hearts (by design) — pairs with night combat. Idea backlog: a temporary
+   "golden apple" over-heal buff; live 3D character thumbnails; counting/number-
+   bonds math mode.
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files
