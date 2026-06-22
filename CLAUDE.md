@@ -348,6 +348,30 @@ a girl; instead of dada/mama use Vlad and Chris." Shipped on
    "golden apple" over-heal buff; live 3D character thumbnails; counting/number-
    bonds math mode.
 
+## Status (session 14)
+Dad: "go for it [on the backlog] — and will he keep up, or do you have cool
+blurbs?" So: shipped the three backlog ideas AND a friendly one-time hint system
+so a 6-year-old is never lost. On **`claude/gifted-gates-h9dzy2`**, mirrored to
+`main`. Still 41 goals (no new metrics needed).
+1. **🍏 Golden Apple (temporary bonus hearts).** 4th snack (5💎): sets
+   `heartBuff=2` + `heartBuffT=90s`, fills to `effMax()`; bonus hearts render as
+   golden 💛 (`.hs.hb`); buyable at full health (it's a buff, not a heal); ends on
+   knockout; frame loop counts it down. Hearts code now uses `effMax()=maxHearts+
+   heartBuff` everywhere (updateHearts/regen/applyUnlocks/buySnack).
+2. **Varied math.** `makeMath` now returns `{prompt(html), ans, opts}` and picks a
+   type by skill: **count** ("how many 🍎" + emoji row), **add**, **sub**, and
+   **number bonds** ("3 + ? = 10"). `showMath` renders `prompt`.
+3. **Character previews.** `charPreview(def,size)` draws a 2D blocky paper-doll in
+   the character's real colours (hair/beard/long-hair/cape/ball); the picker shows
+   these canvases instead of emoji.
+4. **Friendly blurbs (`goals.tips` + `tip(id,text)`).** One-time hints shown the
+   first time you're near **Steve** or a **villager**, and the first **night**.
+   Saved (`p` in the goals save) so each shows once, ever.
+   Verified headless: golden apple → 8 hearts incl. 2 gold; all 4 math types
+   appear with valid options; 8 avatar previews render; night+steve blurbs fire
+   once; full regression green, zero errors. Tuning: golden-apple buff is fixed
+   at +2/90s (could scale); blurbs are proximity/event based (no full tutorial).
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files
