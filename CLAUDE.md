@@ -402,6 +402,37 @@ ids** unchanged.
    (uDayLight≈0.4); skeleton arrow always lands after the telegraph if you didn't
    leave range/height (no true projectile dodge); could add real arrow physics.
 
+## Status (session 16)
+Dad feedback + two AskUserQuestion answers: flint "Full Minecraft: build your own
+frame, then light it"; blocks "make them functional like Minecraft." Also: cap
+math diamonds; springier slime. Shipped on **`claude/gifted-gates-h9dzy2`**,
+mirrored to `main`. 42 goals (no new metrics). **sw cache v3→v4.**
+1. **🔥 Flint & steel = a real tool.** The 🔥 button now **toggles flint mode**
+   (gold ring) instead of an instant menu. In flint mode a tap lights **TNT** or,
+   if you're aiming through a **closed obsidian frame**, opens the "Where to?"
+   menu and lights it. `World.findFrame(x,y,z)` planar-floods the interior air and
+   validates it's enclosed by obsidian (≤30 cells); `World.lightFrame(cells,dest)`
+   fills the swirl + registers the portal. `portalAt` rewritten: nearest active
+   portal while standing in a `B.PORTAL` block (works for any frame shape).
+   `lightChosenFrame` sets arrival **one block in front** of the frame (player's
+   side) so returning never bounce-loops. Existing hub/auto portals + 🏠 remain
+   (no one gets stuck). `flintTap`/`aimFrameCell`; `__ezra.flint/findFrame/lightFrame`.
+2. **Block fixes.** `blockPreview(tile,size,tint)` now multiplies the tint so the
+   **colour blocks show real colours** in the picker (were all grey). **Glass &
+   leaves are see-through**: shader `if (tex.a<0.5) discard;` (cutout), atlas
+   punches transparent texels (glass = clear pane + frame; leaves = leafy gaps),
+   `opaqueAt` returns false for `seethrough` blocks, and the mesher culls faces
+   between two of the same see-through block (clean panes).
+3. **Math 💎 cap.** Steve has a `MATH_POUCH_MAX=6` pouch that refills +1/30s; a
+   correct answer pays `min(reward, pouch)` (reward 1 for count/easy-add, 2 for
+   harder), then only lava chicken + praise when empty. `goals.bump('math')` still
+   fires so the math goals progress. (14 correct = ~8💎 instead of ~28.)
+4. **Slime** springier: bounce threshold −3.5→−2.3 and checks the whole footprint.
+   Verified: Node (frame light/reject, see-through opacity) + headless (build→light
+   →travel, auto-portal step still works, math cap, colour + glass screenshots) +
+   full regression — all green, zero errors. Note: built obsidian frames go to the
+   flint worlds (not the Nether — that stays the ⭐ reward with its own portal).
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files
