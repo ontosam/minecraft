@@ -64,6 +64,8 @@ let riding = null;        // the pony Animal you're currently riding (or null)
 let fishing = null;       // an active cast: { wx, wy, wz, t } while waiting for a bite
 let bobberEl = null;      // the on-screen bobber marker
 const saplings = [];      // planted saplings growing into trees: { world, x, y, z, t }
+let steveChar = null, stevePos = null, steveYaw = 0; // Steve at the Lava Chicken stand
+let mathQ = null;         // the current math question
 const fuses = [];         // lit TNT awaiting detonation: { x, y, z, t }
 const canvas = document.getElementById('game');
 
@@ -154,6 +156,7 @@ function drawShadows(m) {
   gl.depthMask(false);
   gl.uniform1f(worldProg.u.uAlpha, 0.26);
   if (!riding) shadowAt(player.pos[0], player.pos[2], 0.9);
+  if (stevePos && dimension === 'over') shadowAt(stevePos[0], stevePos[2], 0.9);
   const groups = [
     [m.animals, (a) => a.isPony ? 1.7 : (a.isPet ? 0.8 : 1.0)],
     [m.creepers, () => 1.0],
@@ -353,6 +356,13 @@ function screenRay(sx, sy) {
   return [dx / dl, dy / dl, dz / dl];
 }
 function rayHitAt(sx, sy) { return world.raycast(camPos, screenRay(sx, sy), REACH); }
+// Does a ray pass within radius r of a point? (used to tap Steve at his stand)
+function rayHitsSphere(o, d, cx, cy, cz, r) {
+  const ax = cx - o[0], ay = cy - o[1], az = cz - o[2];
+  const tca = ax * d[0] + ay * d[1] + az * d[2];
+  if (tca < 0) return false;
+  return (ax * ax + ay * ay + az * az - tca * tca) <= r * r;
+}
 function targetCells() { return rayHitAt(canvas.clientWidth / 2, canvas.clientHeight / 2); }
 
 function overlapsPlayer(x, y, z) {
@@ -799,6 +809,66 @@ function questOk() {
   closeQuest();
 }
 
+// --- Steve's Lava Chicken stand: a math challenge that pays 💎 + 🍗 ---
+// Build a cute little stand (only into empty space, so it never wrecks a build).
+function buildLavaStand(w, sx, gy, sz) {
+  const put = (x, y, z, id) => { if (w.get(x, y, z) === B.AIR) w.set(x, y, z, id); };
+  for (let dx = -1; dx <= 1; dx++) put(sx + dx, gy + 1, sz - 1, B.PLANKS);      // counter
+  put(sx - 1, gy + 2, sz - 1, B.ORANGE); put(sx + 1, gy + 2, sz - 1, B.ORANGE); // "lava" fire
+  put(sx, gy + 2, sz - 1, B.GLOWSTONE);                                         // grill glow
+  for (const px of [sx - 2, sx + 2]) for (let dy = 1; dy <= 3; dy++) put(px, gy + dy, sz - 1, B.LOG); // posts
+  for (let dx = -2; dx <= 2; dx++) put(sx + dx, gy + 4, sz - 1, B.BRICK);       // roof awning
+  for (let i = 0; i < 6; i++) w.markDirty(sx - 2 + i, sz - 1);
+}
+function setupSteve() {
+  const ov = worlds.over && worlds.over.world;
+  if (!ov || !steveChar) return;
+  const sp = ov.spawn;
+  const sx = Math.max(3, Math.min(SX - 4, Math.floor(sp[0]) + 7));
+  const sz = Math.max(3, Math.min(SZ - 4, Math.floor(sp[2])));
+  const gy = ov.heightAt(sx, sz);
+  stevePos = [sx + 0.5, gy + 1, sz + 0.5];
+  buildLavaStand(ov, sx, gy, sz);
+}
+function makeMath() {
+  const lvl = goals.counts.math || 0;
+  const ri = (n) => Math.floor(Math.random() * n);
+  let a, b, op, ans;
+  if (lvl < 5) { a = 1 + ri(5); b = 1 + ri(5); op = '+'; ans = a + b; }
+  else if (lvl < 12) { a = 2 + ri(9); b = 2 + ri(9); op = '+'; ans = a + b; }
+  else if (ri(2) === 0) { a = 6 + ri(12); b = 1 + ri(a - 1); op = '−'; ans = a - b; }   // subtraction
+  else { a = 5 + ri(12); b = 4 + ri(9); op = '+'; ans = a + b; }
+  const opts = new Set([ans]);
+  while (opts.size < 3) { const d = ans + (ri(2) ? 1 : -1) * (1 + ri(3)); if (d >= 0) opts.add(d); }
+  return { a, b, op, ans, opts: [...opts].sort(() => Math.random() - 0.5) };
+}
+function showMath() {
+  document.getElementById('math-q').innerHTML =
+    '<div class="qface">🍗</div><b>Steve\'s Lava Chicken</b>' +
+    '<span class="big">' + mathQ.a + ' ' + mathQ.op + ' ' + mathQ.b + ' = ?</span>';
+  const o = document.getElementById('math-opts'); o.innerHTML = '';
+  for (const v of mathQ.opts) {
+    const btn = document.createElement('button');
+    btn.className = 'math-opt'; btn.textContent = v;
+    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); answerMath(v); });
+    o.appendChild(btn);
+  }
+}
+function openMath() { mathQ = makeMath(); showMath(); document.getElementById('math').classList.remove('hidden'); }
+function closeMath() { document.getElementById('math').classList.add('hidden'); }
+function answerMath(v) {
+  if (!mathQ) return;
+  if (v === mathQ.ans) {
+    goals.bump('math'); goals.addGems(2); updateGems();
+    sound.play('treasure');
+    showToast('🍗 Correct! Lava chicken served! +💎2');
+    mathQ = makeMath(); showMath();          // a fresh (gently harder) question
+  } else {
+    sound.play('deny');
+    showToast('Oops — not quite! Try again 😊');
+  }
+}
+
 // --- Start the current world fresh (asked for, behind a confirmation) ---
 function resetWorld() {
   const key = dimension, W = worlds[key].world, kind = WORLD_KINDS[key];
@@ -809,6 +879,7 @@ function resetWorld() {
   ensurePortalsFor(key);                 // keep the standard portal(s)
   for (const d of hubDests) placeHubPortal(W, kind, d);   // and re-lay any flint portals
   W.rebuildAll();
+  if (key === 'over') setupSteve();      // re-place Steve's stand after a fresh start
   player.world = W; player.goHome(); player.vel = [0, 0, 0];
   positions[key] = W.spawn.slice();
   minimapDirty = true; saveDirty = true;
@@ -1054,6 +1125,8 @@ function wireUI() {
   document.getElementById('btn-char').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); openChars(); });
   document.getElementById('chars-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeChars(); });
   document.getElementById('chars').addEventListener('pointerdown', (e) => { if (e.target.id === 'chars') closeChars(); });
+  document.getElementById('math-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeMath(); });
+  document.getElementById('math').addEventListener('pointerdown', (e) => { if (e.target.id === 'math') closeMath(); });
 
   document.getElementById('gem-bar').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); openShop(); });
   document.getElementById('shop-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeShop(); });
@@ -1209,10 +1282,13 @@ function frame(now) {
     const zb = (!cr && m.zombies) ? m.zombies.pickRay(camPos, dir) : null;
     const sp = (!cr && !zb && m.spiders) ? m.spiders.pickRay(camPos, dir) : null;
     const vl = (!cr && !zb && !sp && m.villagers) ? m.villagers.pickRay(camPos, dir) : null;
+    const stv = (!cr && !zb && !sp && !vl && stevePos && dimension === 'over') &&
+      rayHitsSphere(camPos, dir, stevePos[0], stevePos[1] + 0.9, stevePos[2], 1.2);
     if (cr) doDefend(cr);
     else if (zb) doBonkZombie(zb);
     else if (sp) doBonkSpider(sp);
     else if (vl) talkToVillager(vl);
+    else if (stv) openMath();
     else {
       const hit = world.raycast(camPos, dir, REACH);
       const bid = hit ? world.get(hit.block[0], hit.block[1], hit.block[2]) : 0;
@@ -1263,6 +1339,14 @@ function frame(now) {
   drawShadows(m);
   character.draw(worldProg, player.pos[0], player.pos[1] + (riding ? 0.62 : 0), player.pos[2], player.yaw, player.walkPhase, player.moveAmt, actionAnim, !!riding);
   drawMobs(m);
+  // Steve mans his Lava Chicken stand in the overworld, turning to face you.
+  if (stevePos && dimension === 'over') {
+    let dd = Math.atan2(-(player.pos[0] - stevePos[0]), -(player.pos[2] - stevePos[2])) - steveYaw;
+    while (dd > Math.PI) dd -= Math.PI * 2;
+    while (dd < -Math.PI) dd += Math.PI * 2;
+    steveYaw += dd * Math.min(1, dt * 4);
+    steveChar.draw(worldProg, stevePos[0], stevePos[1], stevePos[2], steveYaw, 0, 0, 0, false);
+  }
 
   drawMinimap();
 
@@ -1368,6 +1452,7 @@ function init() {
   goals = new Goals();
   goals.onComplete = (g) => { showGoalToast(g); refreshGoalsButton(); maybeUnlockNether(false); updateGems(); };
   character = new Character(gl);
+  steveChar = new Character(gl); steveChar.setCharacter(charById('steve'));
   controls = new Controls(canvas);
 
   if (!loadGame()) freshStart();
@@ -1386,6 +1471,7 @@ function init() {
   applyCharacter();
   ensurePet();
   ensurePony();
+  setupSteve();
   updateHearts();
   updateNightButton();
   updateGems();
@@ -1448,6 +1534,9 @@ function init() {
     questOk: () => questOk(),
     setCharacter: (id) => { selectedChar = id; applyCharacter(); saveDirty = true; },
     character: () => selectedChar,
+    openMath: () => openMath(),
+    mathQ: () => mathQ,
+    steve: () => stevePos,
     plant: (x, y, z) => { world.set(x, y, z, B.SAPLING); saplings.push({ world, x, y, z, t: 14 + Math.random() * 14 }); goals.bump('plant'); },
     growNow: () => { for (const s of saplings) s.t = 0; },
     saplingCount: () => saplings.length,
