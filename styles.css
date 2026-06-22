@@ -144,7 +144,8 @@ body {
 #confirm,
 #quest,
 #chars,
-#math {
+#math,
+#steve {
   position: fixed;
   inset: 0;
   z-index: 30;
@@ -163,8 +164,56 @@ body {
 #confirm.hidden,
 #quest.hidden,
 #chars.hidden,
-#math.hidden {
+#math.hidden,
+#steve.hidden {
   display: none;
+}
+
+/* Steve's stall menu */
+#steve-body {
+  padding: 6px 16px 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#steve-gems {
+  text-align: center;
+  font-weight: 800;
+  color: #1aa05a;
+  padding: 8px;
+  font-size: 17px;
+}
+
+.steve-math {
+  padding: 14px;
+  border-radius: 16px;
+  border: none;
+  background: linear-gradient(135deg, #ffd23f, #ff9f1c);
+  color: #5a3a00;
+  font-size: 19px;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.steve-math small {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: .8;
+}
+
+.steve-math:active {
+  transform: translateY(2px);
+}
+
+.snack-label {
+  font-weight: 800;
+  color: #7a7a86;
+  font-size: 14px;
+  margin: 6px 2px 0;
 }
 
 /* Steve's Lava Chicken math challenge */

@@ -869,6 +869,44 @@ function answerMath(v) {
   }
 }
 
+// --- Steve's stall menu: a math challenge (earn 💎) + snacks (spend 💎 → ❤️) ---
+const SNACKS = [
+  { icon: '🍎', name: 'Apple', cost: 1, heal: 1, desc: 'Restores 1 heart' },
+  { icon: '🍗', name: 'Lava Chicken', cost: 2, heal: 2, desc: 'Restores 2 hearts' },
+  { icon: '🍰', name: 'Cake', cost: 3, heal: 99, desc: 'Fills you all the way up!' },
+];
+function openSteveMenu() { buildSteveMenu(); document.getElementById('steve').classList.remove('hidden'); }
+function closeSteve() { document.getElementById('steve').classList.add('hidden'); }
+function buildSteveMenu() {
+  const body = document.getElementById('steve-body');
+  body.innerHTML = '';
+  const g = document.createElement('div'); g.id = 'steve-gems';
+  g.textContent = 'You have 💎 ' + goals.gems;
+  body.appendChild(g);
+  const mb = document.createElement('button'); mb.className = 'steve-math';
+  mb.innerHTML = '🧮 Math Challenge! <small>answer to earn 💎</small>';
+  mb.addEventListener('pointerdown', (e) => { e.preventDefault(); closeSteve(); openMath(); });
+  body.appendChild(mb);
+  const lbl = document.createElement('div'); lbl.className = 'snack-label';
+  lbl.textContent = '🍎 Snacks — spend 💎 to fill up hearts:';
+  body.appendChild(lbl);
+  for (const s of SNACKS) {
+    const btn = document.createElement('button'); btn.className = 'shop-item';
+    btn.innerHTML = '<span class="si">' + s.icon + '</span><div class="st"><b>' + s.name + '</b><small>' + s.desc + '</small></div><div class="sc">💎 ' + s.cost + '</div>';
+    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); buySnack(s); });
+    body.appendChild(btn);
+  }
+}
+function buySnack(s) {
+  if (hearts >= maxHearts) { sound.play('deny'); showToast('You\'re already full of energy! 💪'); return; }
+  if (!goals.spend(s.cost)) { sound.play('deny'); showToast('Earn more 💎 first! (need ' + s.cost + ')'); return; }
+  hearts = Math.min(maxHearts, hearts + s.heal); updateHearts();
+  goals.bump('snack');
+  sound.play('pet'); spawnHearts([player.pos[0], player.pos[1] + 1.4, player.pos[2]]);
+  updateGems(); buildSteveMenu();
+  showToast('Yum! ' + s.icon + ' Hearts filled!');
+}
+
 // --- Start the current world fresh (asked for, behind a confirmation) ---
 function resetWorld() {
   const key = dimension, W = worlds[key].world, kind = WORLD_KINDS[key];
@@ -1127,6 +1165,8 @@ function wireUI() {
   document.getElementById('chars').addEventListener('pointerdown', (e) => { if (e.target.id === 'chars') closeChars(); });
   document.getElementById('math-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeMath(); });
   document.getElementById('math').addEventListener('pointerdown', (e) => { if (e.target.id === 'math') closeMath(); });
+  document.getElementById('steve-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeSteve(); });
+  document.getElementById('steve').addEventListener('pointerdown', (e) => { if (e.target.id === 'steve') closeSteve(); });
 
   document.getElementById('gem-bar').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); openShop(); });
   document.getElementById('shop-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeShop(); });
@@ -1288,7 +1328,7 @@ function frame(now) {
     else if (zb) doBonkZombie(zb);
     else if (sp) doBonkSpider(sp);
     else if (vl) talkToVillager(vl);
-    else if (stv) openMath();
+    else if (stv) openSteveMenu();
     else {
       const hit = world.raycast(camPos, dir, REACH);
       const bid = hit ? world.get(hit.block[0], hit.block[1], hit.block[2]) : 0;
@@ -1376,7 +1416,7 @@ function loadGame() {
   try { obj = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { return false; }
   if (!obj) return false;
   if (typeof obj.sel === 'number' && BLOCKS[obj.sel]) selected = obj.sel;
-  if (typeof obj.char === 'string' && charById(obj.char).id === obj.char) selectedChar = obj.char;
+  if (typeof obj.char === 'string') selectedChar = charById(obj.char).id;   // resolves old ids too
   if (typeof obj.zoom === 'number' && ZOOM_LEVELS[obj.zoom] !== undefined) {
     zoomIndex = obj.zoom; camDist = camDistEased = ZOOM_LEVELS[zoomIndex];
   }
@@ -1537,6 +1577,7 @@ function init() {
     openMath: () => openMath(),
     mathQ: () => mathQ,
     steve: () => stevePos,
+    openSteve: () => openSteveMenu(),
     plant: (x, y, z) => { world.set(x, y, z, B.SAPLING); saplings.push({ world, x, y, z, t: 14 + Math.random() * 14 }); goals.bump('plant'); },
     growNow: () => { for (const s of saplings) s.t = 0; },
     saplingCount: () => saplings.length,

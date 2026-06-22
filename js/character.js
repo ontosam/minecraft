@@ -50,15 +50,17 @@ const STEEL = [0.55, 0.86, 0.95], GRIP = [0.32, 0.20, 0.12], GUARD = [0.86, 0.70
 // --- Who you can be (blocky, friendly, recoloured — not photo likenesses) ---
 export const CHARACTERS = [
   { id: 'ezra', name: 'Ezra', emoji: '🧒', skin: [0.97, 0.80, 0.67], shirt: [0.30, 0.62, 0.88], pants: [0.33, 0.36, 0.55], shoe: [0.25, 0.22, 0.24], hair: [0.34, 0.22, 0.13] },
-  { id: 'mama', name: 'Mama', emoji: '👩', skin: [0.98, 0.82, 0.70], shirt: [0.82, 0.40, 0.62], pants: [0.40, 0.30, 0.50], shoe: [0.55, 0.32, 0.42], hair: [0.28, 0.16, 0.10], long: true },
-  { id: 'dada', name: 'Dada', emoji: '👨', skin: [0.95, 0.76, 0.62], shirt: [0.24, 0.55, 0.38], pants: [0.28, 0.28, 0.34], shoe: [0.20, 0.18, 0.20], hair: [0.22, 0.15, 0.10], beard: true },
+  { id: 'chris', name: 'Chris', emoji: '👩', skin: [0.98, 0.82, 0.70], shirt: [0.82, 0.40, 0.62], pants: [0.40, 0.30, 0.50], shoe: [0.55, 0.32, 0.42], hair: [0.28, 0.16, 0.10], long: true },
+  { id: 'vlad', name: 'Vlad', emoji: '👨', skin: [0.95, 0.76, 0.62], shirt: [0.24, 0.55, 0.38], pants: [0.28, 0.28, 0.34], shoe: [0.20, 0.18, 0.20], hair: [0.22, 0.15, 0.10], beard: true },
   { id: 'cora', name: 'Cora', emoji: '👧', skin: [0.99, 0.86, 0.74], shirt: [0.96, 0.82, 0.32], pants: [0.55, 0.35, 0.65], shoe: [0.92, 0.55, 0.62], hair: [0.85, 0.68, 0.32], long: true },
-  { id: 'jovi', name: 'Jovi', emoji: '🧒', skin: [0.80, 0.60, 0.45], shirt: [0.85, 0.30, 0.30], pants: [0.30, 0.30, 0.40], shoe: [0.20, 0.20, 0.25], hair: [0.12, 0.10, 0.10] },
+  { id: 'jovi', name: 'Jovi', emoji: '👧', skin: [0.86, 0.66, 0.50], shirt: [0.50, 0.35, 0.78], pants: [0.45, 0.30, 0.55], shoe: [0.30, 0.22, 0.35], hair: [0.16, 0.12, 0.10], long: true },
   { id: 'cristiano', name: 'Cristiano', emoji: '⚽', skin: [0.82, 0.62, 0.46], shirt: [0.86, 0.16, 0.16], pants: [0.95, 0.95, 0.96], shoe: [0.10, 0.10, 0.12], hair: [0.15, 0.12, 0.10], ball: true },
   { id: 'steve', name: 'Steve', emoji: '⛏️', skin: [0.78, 0.60, 0.46], shirt: [0.18, 0.66, 0.66], pants: [0.30, 0.32, 0.62], shoe: [0.40, 0.40, 0.45], hair: [0.30, 0.20, 0.12], beard: true },
   { id: 'hero', name: 'Super Hero', emoji: '🦸', skin: [0.97, 0.80, 0.67], shirt: [0.20, 0.42, 0.85], pants: [0.20, 0.25, 0.60], shoe: [0.75, 0.62, 0.20], hair: [0.20, 0.15, 0.10], cape: true, capeColor: [0.88, 0.18, 0.20] },
 ];
-export const charById = (id) => CHARACTERS.find((c) => c.id === id) || CHARACTERS[0];
+// Older saves may still hold the previous ids — map them so a saved pick sticks.
+const CHAR_ALIAS = { mama: 'chris', dada: 'vlad' };
+export const charById = (id) => CHARACTERS.find((c) => c.id === (CHAR_ALIAS[id] || id)) || CHARACTERS[0];
 
 function buildLeg(d) { return (A) => { addBox(A, -0.09, -0.7, -0.1, 0.09, 0, 0.1, d.pants); addBox(A, -0.09, -0.7, -0.11, 0.09, -0.56, 0.12, d.shoe); }; }
 function buildArm(d) { return (A) => { addBox(A, -0.07, -0.55, -0.09, 0.07, 0, 0.09, d.shirt); addBox(A, -0.07, -0.55, -0.09, 0.07, -0.42, 0.09, d.skin); }; }
