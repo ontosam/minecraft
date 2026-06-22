@@ -250,6 +250,33 @@ creativity"). Shipped two delightful, beloved-game-inspired features on
    topbar is now 8 minis + block (fits tablet/laptop; a tools sub-menu later if it
    ever feels busy on small phones).
 
+## Status (session 10)
+Dad said simply "keep going" (full creative freedom continues). Shipped two more
+beloved-game-inspired features on **`claude/gifted-gates-h9dzy2`**, mirrored to
+`main`. Now **38 goals**, **11 shop items**, **50 block ids**.
+1. **🧑‍🌾 Villagers + quests (a living world with purpose).** New
+   `js/villagers.js`: two calm, cute townsfolk (big nose, robe) stand near the
+   home spawn, turn to face you, bob gently. **Tap one to talk** (added to the tap
+   routing after the hostile-mob picks). A quest system in main.js offers a simple
+   task from `QUEST_POOL` (place/pet/fish/diamond/treasure/dig/monster/plant);
+   progress tracks a goals counter **from a baseline**, so it's "from now on".
+   Finish it, tap again, **claim 💎**, get a fresh one — an endless rewarding loop.
+   Kid-friendly `#quest` dialog (villager + task + green button). New 'Village
+   helper' goal. `__ezra.talkVillager()/questOk()`. Spawned via the over `mobs`
+   list (`'villagers'`), re-spawned each load; quest state is transient.
+2. **🌱 Planting (saplings grow into trees).** New walk-through `B.SAPLING`
+   (Nature tab). Plant it and after ~15–30s it sprouts into a full tree
+   (`World.placeTree`). Growth ticks per-sapling in the frame loop (`saplings`
+   list with a `world` ref so it's correct across dimensions); on load each world
+   is scanned (`scanSaplings`) so saved saplings keep growing. Sparkle+chime on
+   grow. New 'Green thumb' goal + a 'plant saplings' quest. `__ezra.plant/growNow`.
+   Verified headless: villager talk→offer→do→claim pays the exact reward + ticks
+   the goal + re-offers; sapling → full tree (trunk + 57 leaves), list clears,
+   saved sapling re-scanned after reload; world-hop + build-everything save/reload
+   regression all green, zero errors. Tuning candidates: quests don't persist
+   mid-progress across reloads (short enough that it's fine); villagers stand
+   still (easy to find) — could let them stroll a little.
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files
