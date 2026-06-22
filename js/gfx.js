@@ -376,6 +376,25 @@ export function makeAtlasTexture(gl) {
   return tex;
 }
 
+// A flat 1×1 dark quad laid in the ground plane — a soft blob shadow drawn
+// under each creature (with uAlpha + blending) so they feel planted in the
+// world instead of floating. Sample the NEUTRAL tile centre for a flat colour.
+export function shadowMesh(gl) {
+  const r = getUV(TILE.NEUTRAL);
+  const u = (r.u0 + r.u1) / 2, v = (r.v0 + r.v1) / 2;
+  const verts = [[-0.5, 0, 0.5], [0.5, 0, 0.5], [0.5, 0, -0.5], [-0.5, 0, -0.5]];
+  const A = { pos: [], uv: [], col: [], light: [], idx: [] };
+  for (const p of verts) { A.pos.push(p[0], p[1], p[2]); A.uv.push(u, v); A.col.push(0, 0, 0); A.light.push(1); }
+  A.idx.push(0, 1, 2, 0, 2, 3);
+  const m = new GLMesh(gl);
+  m.setAttrib('aPos', new Float32Array(A.pos), 3);
+  m.setAttrib('aUV', new Float32Array(A.uv), 2);
+  m.setAttrib('aColor', new Float32Array(A.col), 3);
+  m.setAttrib('aLight', new Float32Array(A.light), 1);
+  m.setIndex(new Uint16Array(A.idx));
+  return m;
+}
+
 // A simple mesh: named float attribute buffers plus a uint16 index buffer.
 export class GLMesh {
   constructor(gl) {

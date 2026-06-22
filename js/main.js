@@ -3,7 +3,7 @@
 // (see worlds.js): adding a new place is a recipe, not a rewrite.
 
 import { mat4 } from './math.js';
-import { initGL, makeWorldProgram, makeAtlasTexture, GLMesh, blockPreview } from './gfx.js';
+import { initGL, makeWorldProgram, makeAtlasTexture, GLMesh, blockPreview, shadowMesh } from './gfx.js';
 import { World, BLOCKS, CATEGORIES, B, SX, SY, SZ } from './world.js';
 import { WORLD_KINDS, WORLD_ORDER } from './worlds.js';
 import { Player } from './player.js';
@@ -52,6 +52,7 @@ let minimapDirty = true;                 // redraw the minimap's terrain layer w
 let portalUnlocked = false;              // the Nether portal opens once enough stars are earned
 let portalHintTimer = 0;                 // throttle the "earn more stars" nudge
 let identity, proj, view, pv, scratch4;
+let shadow, mShadow;     // soft blob-shadow mesh + a scratch matrix for it
 let selected = B.GRASS;
 let lastTool = 'build', actionAnim = 0;
 let saveDirty = false, lastSave = 0;
@@ -134,6 +135,40 @@ function drawMobs(m) {
   if (m.zombies) m.zombies.draw(worldProg);
   if (m.spiders) m.spiders.draw(worldProg);
   if (m.villagers) m.villagers.draw(worldProg);
+}
+
+// Soft blob shadows under every creature (and the player) so nothing looks like
+// it's just floating — grounds the whole cast in the world. A blended pass
+// drawn between the terrain and the characters.
+function shadowAt(x, z, diam) {
+  const gy = world.heightAt(Math.floor(x), Math.floor(z));
+  if (gy < 0) return;
+  mat4.model(mShadow, x, gy + 1.02, z, 0, diam, 1, diam);
+  gl.uniformMatrix4fv(worldProg.u.uModel, false, mShadow);
+  shadow.draw(worldProg);
+}
+function drawShadows(m) {
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  gl.depthMask(false);
+  gl.uniform1f(worldProg.u.uAlpha, 0.26);
+  if (!riding) shadowAt(player.pos[0], player.pos[2], 0.9);
+  const groups = [
+    [m.animals, (a) => a.isPony ? 1.7 : (a.isPet ? 0.8 : 1.0)],
+    [m.creepers, () => 1.0],
+    [m.zombies, () => 0.9],
+    [m.spiders, () => 1.1],
+    [m.ants, () => 0.55],
+    [m.villagers, () => 0.85],
+    [m.nethermobs, (a) => a.species === 'ghast' ? 1.7 : 1.0],
+  ];
+  for (const [grp, diamf] of groups) {
+    if (!grp) continue;
+    for (const a of grp.list) { if (a.state === 'poof') continue; shadowAt(a.pos[0], a.pos[2], diamf(a)); }
+  }
+  gl.depthMask(true);
+  gl.disable(gl.BLEND);
+  gl.uniform1f(worldProg.u.uAlpha, 1);
 }
 
 // --- Worlds: created on first visit, then cached ---
@@ -1196,6 +1231,7 @@ function frame(now) {
     riding.pos[0] = player.pos[0]; riding.pos[1] = player.pos[1]; riding.pos[2] = player.pos[2];
     riding.yaw = player.yaw; riding.walking = player.moving;
   }
+  drawShadows(m);
   character.draw(worldProg, player.pos[0], player.pos[1] + (riding ? 0.62 : 0), player.pos[2], player.yaw, player.walkPhase, player.moveAmt, actionAnim, !!riding);
   drawMobs(m);
 
@@ -1296,6 +1332,7 @@ function init() {
   identity = mat4.identity(mat4.create());
   proj = mat4.create(); view = mat4.create(); pv = mat4.create();
   scratch4 = new Float32Array(4);
+  shadow = shadowMesh(gl); mShadow = mat4.create();
 
   sound = new Sound();
   goals = new Goals();

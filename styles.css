@@ -269,7 +269,7 @@ body {
    damage can land in half-hearts (the red overlay is clipped for a half). */
 #hearts-bar {
   position: absolute;
-  top: max(12px, env(safe-area-inset-top));
+  top: 72px;
   left: 50%;
   transform: translateX(-50%);
   font-size: 22px;

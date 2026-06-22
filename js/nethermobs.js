@@ -89,7 +89,8 @@ function meshFrom(gl, build) {
   return mesh;
 }
 
-const FLOAT = { ghast: 2.7, blaze: 1.9 };   // hover height above the ground
+const FLOAT = { ghast: 2.0, blaze: 1.5 };   // hover height above the ground (a
+                                            // soft shadow below grounds them)
 const SPEED = { ghast: 0.9, blaze: 1.2 };
 
 class Mob {
