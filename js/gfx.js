@@ -16,6 +16,7 @@ export const TILE = {
   DOOR: 32, DOOR_OPEN: 33, TNT_SIDE: 34, TNT_TOP: 35,
   RAINBOW: 36, LEVER: 37, LEVER_ON: 38, REDSTONE: 39, REDLAMP: 40, REDLAMP_ON: 41,
   SLIME: 42, SAPLING: 43,
+  MEGA_TNT_SIDE: 44, MEGA_TNT_TOP: 45,
 };
 
 export function initGL(canvas) {
@@ -305,6 +306,23 @@ function buildAtlasCanvas() {
   p = at(TILE.TNT_TOP); noise(ctx, p[0], p[1], 0xc0392b, 0.10, 73);
   ctx.fillStyle = shade(0x7a2018, 1); for (let i = 0; i < T; i += 4) ctx.fillRect(p[0] + i, p[1], 1, T);
   ctx.fillStyle = shade(0x3a2a12, 1); ctx.fillRect(p[0] + 7, p[1] + 7, 2, 2);
+
+  // --- Mega TNT (the 💎-shop block: a bigger, scarier-looking dynamite) ---
+  // Darker, angrier red than normal TNT, a fatter band, a bold white "M", and
+  // little spark dots so it clearly reads as the "mega" version Ezra bought.
+  p = at(TILE.MEGA_TNT_SIDE); noise(ctx, p[0], p[1], 0x8e1b12, 0.12, 74);
+  ctx.fillStyle = shade(0xf7efd0, 1); ctx.fillRect(p[0], p[1] + 5, T, 6);          // fat label band
+  ctx.fillStyle = shade(0x8e1b12, 1);                                               // a chunky "M"
+  ctx.fillRect(p[0] + 3, p[1] + 6, 1, 4); ctx.fillRect(p[0] + 12, p[1] + 6, 1, 4);
+  ctx.fillRect(p[0] + 5, p[1] + 7, 1, 1); ctx.fillRect(p[0] + 10, p[1] + 7, 1, 1);
+  ctx.fillRect(p[0] + 7, p[1] + 8, 2, 1);
+  ctx.fillStyle = shade(0x3a2a12, 1);
+  ctx.fillRect(p[0] + 1, p[1] + 1, 2, 2); ctx.fillRect(p[0] + 13, p[1] + 1, 2, 2);  // fuse roots
+  ctx.fillStyle = shade(0xffd24a, 1); ctx.fillRect(p[0] + 1, p[1], 1, 1); ctx.fillRect(p[0] + 14, p[1], 1, 1); // sparks
+  p = at(TILE.MEGA_TNT_TOP); noise(ctx, p[0], p[1], 0x8e1b12, 0.12, 75);
+  ctx.fillStyle = shade(0x5a1009, 1); for (let i = 0; i < T; i += 4) ctx.fillRect(p[0] + i, p[1], 1, T);
+  ctx.fillStyle = shade(0x3a2a12, 1); ctx.fillRect(p[0] + 6, p[1] + 6, 4, 4);
+  ctx.fillStyle = shade(0xffd24a, 1); ctx.fillRect(p[0] + 7, p[1] + 7, 2, 2);       // glowing fuse top
 
   // --- Rainbow block (a sparkly shop reward) ---
   // Bright horizontal stripes of the rainbow, with a few twinkling sparkles.

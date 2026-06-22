@@ -245,23 +245,44 @@ function setDimension(key) {
 // Travel through a gateway to another world, arriving at the matching portal.
 function travelTo(dest) {
   if (!WORLD_KINDS[dest]) return;
-  if (fishing) reelIn(false);               // reel in before leaving
-  if (riding) dismount();                   // the pony stays home in the overworld
-  fuses.length = 0;                         // cancel any fuses lit in the world we're leaving
-  positions[dimension] = player.pos.slice();
-  const from = dimension;
-  ensureDim(dest);
-  setDimension(dest);
-  const match = world.portals.find((p) => p.dest === from) || world.portals[0];
-  const a = match ? match.a : world.spawn;
-  player.pos = [a[0], a[1] + 0.3, a[2]];
+  try {
+    if (fishing) reelIn(false);               // reel in before leaving
+    if (riding) dismount();                   // the pony stays home in the overworld
+    fuses.length = 0;                         // cancel any fuses lit in the world we're leaving
+    positions[dimension] = player.pos.slice();
+    const from = dimension;
+    ensureDim(dest);
+    setDimension(dest);
+    const match = world.portals.find((p) => p.dest === from) || world.portals[0];
+    const a = match ? match.a : world.spawn;
+    player.pos = [a[0], a[1] + 0.3, a[2]];
+    player.vel = [0, 0, 0];
+    camYaw = player.yaw;
+    portalCooldown = 1.3;
+    saveDirty = true;
+    sound.play('portal');
+    if (dest === 'nether') goals.bump('nether'); // first trip completes "Find the portal"
+    goals.bump('travel');
+  } catch (e) {
+    // A portal should never strand Ezra on the scary "Oops" screen. If anything
+    // goes wrong mid-trip, log it for us and pop him safely back home instead.
+    console.error('travelTo failed', dest, e);
+    try { recoverHome(); } catch (e2) { console.error('recoverHome failed', e2); }
+    showToast('🏠 Whoops — the portal hiccuped, so I brought you home safe!', 3600);
+  }
+}
+
+// Safety net: get the player back to a known-good spot in the overworld.
+function recoverHome() {
+  ensureDim('over');
+  setDimension('over');
+  player.world = world;
+  player.goHome();
   player.vel = [0, 0, 0];
-  camYaw = player.yaw;
   portalCooldown = 1.3;
-  saveDirty = true;
-  sound.play('portal');
-  if (dest === 'nether') goals.bump('nether'); // first trip completes "Find the portal"
-  goals.bump('travel');
+  camYaw = player.yaw;
+  positions.over = player.pos.slice();
+  minimapDirty = true; saveDirty = true;
 }
 
 // Flint & steel portals line up in a tidy row right by home, one slot per
@@ -320,7 +341,7 @@ function lightChosenFrame(dest) {
 // Flint tap: light TNT, or light an obsidian frame you're aiming through.
 function flintTap(dir) {
   const hit = world.raycast(camPos, dir, REACH);
-  if (hit && world.get(hit.block[0], hit.block[1], hit.block[2]) === B.TNT) { lightTNT(hit.block[0], hit.block[1], hit.block[2]); return; }
+  if (hit && isTNT(world.get(hit.block[0], hit.block[1], hit.block[2]))) { lightTNT(hit.block[0], hit.block[1], hit.block[2]); return; }
   const cells = aimFrameCell(dir);
   if (cells) { pendingFrame = cells; openPortalMenu(); }
   else showToast('🔥 Build an obsidian doorway (a closed frame), then tap inside it to light a portal!', 3600);
@@ -446,7 +467,10 @@ function doBuild(hit) {
   if (selected !== B.WATER && selected !== B.SAPLING) world.placed.add(world.idx(x, y, z));
   sound.play('place'); saveDirty = true; actionAnim = 1; minimapDirty = true;
   goals.onBuild(selected);
-  if (isRedstone(selected)) world.updateRedstone();   // a new wire/lamp may light up
+  if (isRedstone(selected)) {
+    world.updateRedstone();   // a new wire/lamp may light up
+    tip('redstone', '⚙️ Redstone! Put a Lamp next to a Lever (or join them with Redstone wire), then tap the Lever to switch the light on and off!');
+  }
   if (selected === B.SAPLING) { saplings.push({ world, x, y, z, t: 14 + Math.random() * 14 }); goals.bump('plant'); }
 }
 
@@ -536,20 +560,24 @@ function removeDoor(x, y, z) {
 }
 
 // --- TNT: place it, tap to light it, then BOOM (it chain-reacts) ---
+// Mega TNT (the 💎-shop block) behaves the same but blows a much bigger crater.
+function isTNT(id) { return id === B.TNT || id === B.MEGA_TNT; }
 function lightTNT(x, y, z) {
-  if (world.get(x, y, z) !== B.TNT) return;
+  if (!isTNT(world.get(x, y, z))) return;
   if (fuses.some((f) => f.x === x && f.y === y && f.z === z)) return;
   fuses.push({ x, y, z, t: 1.1 });
   sound.play('fuse');
   spawnParticles([x + 0.5, y + 1.0, z + 0.5], '🧨', 'puff', 1, 6);
 }
 function detonate(x, y, z) {
+  const mega = world.get(x, y, z) === B.MEGA_TNT;
   world.set(x, y, z, B.AIR);
   world.placed.delete(world.idx(x, y, z));
-  const chain = world.explode(x + 0.5, y + 0.5, z + 0.5, explodeRadius());
+  const chain = world.explode(x + 0.5, y + 0.5, z + 0.5, mega ? MEGA_TNT_RADIUS : TNT_RADIUS);
   sound.play('boom');
   spawnBoom([x + 0.5, y + 0.6, z + 0.5]);
-  shake = Math.min(0.7, shake + 0.5);
+  if (mega) spawnParticles([x + 0.5, y + 0.8, z + 0.5], '💥', 'puff', 9, 110);  // an extra-big flash
+  shake = Math.min(0.9, shake + (mega ? 0.75 : 0.5));
   saveDirty = true; minimapDirty = true;
   goals.bump('boom');
   // gentle knockback away from the blast — a thrill, never harmful
@@ -683,7 +711,8 @@ function applyUnlocks() {
   }
   updateHearts();
 }
-function explodeRadius() { return goals.hasUnlock('megatnt') ? 4.6 : 3.2; }
+// Regular TNT vs. the Mega TNT block (bought in the 💎 shop) — a much bigger boom.
+const TNT_RADIUS = 3.2, MEGA_TNT_RADIUS = 5.2;
 // How much a single tap-bonk hurts an enemy — the Diamond Sword hits much harder.
 function swordDamage() { return goals.hasUnlock('sword') ? 3 : 1; }
 function ensurePet() {
@@ -825,7 +854,7 @@ const SHOP = [
   { id: 'heart', icon: '❤️', name: 'Extra Heart', cost: 8, desc: 'One more heart for night adventures' },
   { id: 'sparkle', icon: '✨', name: 'Sparkle Trail', cost: 8, desc: 'Leave a trail of sparkles as you run' },
   { id: 'sword', icon: '⚔️', name: 'Diamond Sword', cost: 12, desc: 'Defeat zombies & spiders in one hit!' },
-  { id: 'megatnt', icon: '💥', name: 'Mega TNT', cost: 10, desc: 'Bigger, more powerful explosions!' },
+  { id: 'megatnt', icon: '💥', name: 'Mega TNT', cost: 10, desc: 'A giant TNT block — find it in the Mega 💣 blocks!' },
   { id: 'rainbow', icon: '🌈', name: 'Rainbow Block', cost: 10, desc: 'A magic rainbow block to build with' },
   { id: 'crown', icon: '👑', name: 'Golden Crown', cost: 14, desc: 'Wear a royal crown — be the king!' },
   { id: 'skyworld', icon: '☁️', name: 'Sky World', cost: 20, desc: 'A whole new floating-islands world — best with Fly!' },
@@ -857,6 +886,10 @@ function buyItem(it) {
   if (it.id === 'heart') { hearts = maxHearts; updateHearts(); }
   if (it.id === 'rainbow') {             // reveal it in the picker + select it right away
     buildPicker(); selected = B.RAINBOW; refreshBlocksButton(); saveDirty = true;
+  }
+  if (it.id === 'megatnt') {             // reveal the new Mega TNT block + hand it to him
+    buildPicker(); selected = B.MEGA_TNT; refreshBlocksButton(); saveDirty = true;
+    showToast('💣 Mega TNT is in your blocks! Place it, then tap it to light a HUGE boom!', 4200);
   }
   if (it.id === 'skyworld') showToast('☁️ Sky World unlocked! Tap 🔥, choose Sky World, then walk in!', 4200);
   sound.play('treasure');
@@ -1460,7 +1493,7 @@ function frame(now) {
     fuses[i].t -= dt;
     if (fuses[i].t > 0) continue;
     const f = fuses.splice(i, 1)[0];
-    if (world.get(f.x, f.y, f.z) === B.TNT) detonate(f.x, f.y, f.z);
+    if (isTNT(world.get(f.x, f.y, f.z))) detonate(f.x, f.y, f.z);
   }
 
   const m = mobs();
@@ -1501,7 +1534,7 @@ function frame(now) {
       const bid = hit ? world.get(hit.block[0], hit.block[1], hit.block[2]) : 0;
       if (hit && isDoor(bid)) toggleDoor(hit.block[0], hit.block[1], hit.block[2]);
       else if (hit && (bid === B.LEVER || bid === B.LEVER_ON)) toggleLever(hit.block[0], hit.block[1], hit.block[2]);
-      else if (hit && bid === B.TNT) lightTNT(hit.block[0], hit.block[1], hit.block[2]);
+      else if (hit && isTNT(bid)) lightTNT(hit.block[0], hit.block[1], hit.block[2]);
       else doAction(hit);
     }
   }

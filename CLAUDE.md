@@ -433,6 +433,39 @@ mirrored to `main`. 42 goals (no new metrics). **sw cache v3→v4.**
    full regression — all green, zero errors. Note: built obsidian frames go to the
    flint worlds (not the Nether — that stays the ⭐ reward with its own portal).
 
+## Status (session 17) — bug-hunt pass (dad: lever? can't see his Mega TNT; a
+portal shows an error). Shipped on **`claude/store-portal-bugs-hzcr72`**.
+Now **52 block ids**.
+1. **💣 Mega TNT is now a real, visible block (the headline fix).** It used to be
+   an *invisible* shop upgrade — buying it only widened `explodeRadius()` on
+   ordinary TNT, so Ezra "couldn't see his Mega TNT." It's now a proper block:
+   new `B.MEGA_TNT` (id 50) with its own angry-red `TILE.MEGA_TNT_SIDE/TOP`
+   (fat label, bold "M", spark dots), shown in a new **"Mega 💣"** picker tab
+   **gated by the `megatnt` unlock** (same pattern as Rainbow). Buying it now
+   reveals the tab, **auto-selects the block**, and toasts how to use it. Lighting
+   it (tap, or flint & steel) blows a much bigger crater: `TNT_RADIUS=3.2` vs
+   `MEGA_TNT_RADIUS=5.2` (decided per-block in `detonate`, not by a global
+   unlock), with a bigger flash + shake. `isTNT(id)` now covers both everywhere
+   (tap routing, flint tap, fuse tick, `World.explode` chain). Verified headless:
+   buy→tab appears→block selected; mega crater (~44 cleared) ≫ regular (~21);
+   chain reaction catches a mega in the middle; save/load round-trips id 50.
+2. **Lever — works; made it *obvious* it works.** Logic was fine (toggles
+   43↔44, powers wire→lamp, verified). But a lone lever gives almost no visible
+   feedback, so it "looked broken." Added a one-time **`tip('redstone', …)`** the
+   first time you place any redstone block, explaining: put a Lamp next to a
+   Lever (or wire them up), then tap the Lever to switch the light.
+3. **Portal "shows an error" — couldn't reproduce, so made it impossible to
+   strand him.** Extensively black-box tested every world both ways (debug travel,
+   real swirl step-through, flint-built frames, Nether reward, repeated in/out,
+   night, TNT-by-portal, 4s render soaks) — **zero errors** in any path. As a
+   safety net (and matching the "non-scary, never stuck" rule) `travelTo` is now
+   wrapped in try/catch: any hiccup mid-trip is logged to the console for us and
+   **pops Ezra safely back home** (`recoverHome`) with a friendly toast — never
+   the scary "Oops" screen. Confirmed by forcing an exception mid-travel: lands
+   in the overworld, no overlay. **Ask the dad** for the exact "Oops" text / which
+   portal next time it happens so we can pin the root cause.
+   All verified headless (CDP) + Node logic; full world-hop regression green.
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files

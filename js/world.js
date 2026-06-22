@@ -21,7 +21,7 @@ export const B = {
   NETHERRACK: 36, PORTAL: 37, LAVA: 38,
   DOOR: 39, DOOR_OPEN: 40, TNT: 41, RAINBOW: 42,
   LEVER: 43, LEVER_ON: 44, REDSTONE: 45, REDLAMP: 46, REDLAMP_ON: 47, SLIME: 48,
-  SAPLING: 49,
+  SAPLING: 49, MEGA_TNT: 50,
 };
 
 const W = [1, 1, 1]; // white tint for textured blocks
@@ -85,6 +85,7 @@ export const BLOCKS = {
   [B.SLIME]: nat(TILE.SLIME, '#6fcf6a'),
   // A sapling is a walk-through plant that grows into a tree after a while.
   [B.SAPLING]: { tiles: { top: TILE.SAPLING, side: TILE.SAPLING, bottom: TILE.SAPLING }, tint: W, ui: '#5bbf3a', passable: true },
+  [B.MEGA_TNT]: nat3(TILE.MEGA_TNT_TOP, TILE.MEGA_TNT_SIDE, TILE.MEGA_TNT_TOP, '#8e1b12'),
 };
 
 // Build blocks grouped into categories for the pop-up picker.
@@ -101,6 +102,8 @@ export const CATEGORIES = [
   { name: 'Fun', blocks: [B.PUMPKIN, B.SLIME] },
   // Shown in the picker only after it's bought in the 💎 shop.
   { name: 'Special ✨', blocks: [B.RAINBOW], locked: 'rainbow' },
+  // Shown only once the Mega TNT upgrade is bought in the 💎 shop.
+  { name: 'Mega 💣', blocks: [B.MEGA_TNT], locked: 'megatnt' },
   { name: 'Nether', blocks: [B.NETHERRACK, B.LAVA] },
   { name: 'Colours', blocks: [B.RED, B.ORANGE, B.YELLOW, B.GREEN, B.CYAN, B.BLUE, B.PURPLE, B.PINK, B.WHITE, B.BLACK] },
 ];
@@ -513,7 +516,7 @@ export class World {
       const def = BLOCKS[id];
       if (def && def.indestructible) continue;       // bedrock + portal survive
       if (this.isPortalBlock(x, y, z)) continue;     // portal frames survive blasts
-      if (id === B.TNT) { chain.push([x, y, z]); continue; }
+      if (id === B.TNT || id === B.MEGA_TNT) { chain.push([x, y, z]); continue; }
       this.set(x, y, z, B.AIR);
       this.placed.delete(this.idx(x, y, z));
     }
