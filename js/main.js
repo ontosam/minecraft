@@ -15,7 +15,7 @@ import { Spiders } from './spiders.js';
 import { Villagers } from './villagers.js';
 import { Controls } from './input.js';
 import { Sound } from './audio.js';
-import { Character } from './character.js';
+import { Character, CHARACTERS, charById } from './character.js';
 import { Goals, GOAL_DEFS } from './goals.js';
 
 const SAVE_KEY = 'ezrablocks.save.v2';
@@ -54,6 +54,7 @@ let portalHintTimer = 0;                 // throttle the "earn more stars" nudge
 let identity, proj, view, pv, scratch4;
 let shadow, mShadow;     // soft blob-shadow mesh + a scratch matrix for it
 let selected = B.GRASS;
+let selectedChar = 'ezra';     // which character you're playing as
 let lastTool = 'build', actionAnim = 0;
 let saveDirty = false, lastSave = 0;
 let prevX = 0, prevZ = 0, goalToastTimer = 0;
@@ -859,6 +860,31 @@ function refreshBlocksButton() {
 function openPicker() { document.getElementById('picker').classList.remove('hidden'); }
 function closePicker() { document.getElementById('picker').classList.add('hidden'); }
 
+// --- Character picker: choose who you want to be (Ezra, Mama, Dada, …) ---
+function applyCharacter() {
+  if (character) character.setCharacter(charById(selectedChar));
+}
+function buildCharPicker() {
+  const body = document.getElementById('chars-body');
+  body.innerHTML = '';
+  for (const c of CHARACTERS) {
+    const btn = document.createElement('button');
+    btn.className = 'char-tile' + (c.id === selectedChar ? ' sel' : '');
+    btn.innerHTML = '<span class="ce">' + c.emoji + '</span><b>' + c.name + '</b>';
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      selectedChar = c.id; applyCharacter(); saveDirty = true;
+      body.querySelectorAll('.char-tile').forEach((t) => t.classList.remove('sel'));
+      btn.classList.add('sel');
+      sound.play('pet');
+      setTimeout(closeChars, 220);
+    });
+    body.appendChild(btn);
+  }
+}
+function openChars() { buildCharPicker(); document.getElementById('chars').classList.remove('hidden'); }
+function closeChars() { document.getElementById('chars').classList.add('hidden'); }
+
 function buildPicker() {
   const body = document.getElementById('picker-body');
   body.innerHTML = '';
@@ -1025,6 +1051,9 @@ function wireUI() {
 
   document.getElementById('btn-ride').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); toggleRide(); });
   document.getElementById('btn-fish').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); castLine(); });
+  document.getElementById('btn-char').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); openChars(); });
+  document.getElementById('chars-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeChars(); });
+  document.getElementById('chars').addEventListener('pointerdown', (e) => { if (e.target.id === 'chars') closeChars(); });
 
   document.getElementById('gem-bar').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); openShop(); });
   document.getElementById('shop-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeShop(); });
@@ -1251,7 +1280,7 @@ function saveGame() {
     for (const k of Object.keys(worlds)) ws[k] = worlds[k].world.serialize();
     const obj = {
       v: 4, dim: dimension, sel: selected, zoom: zoomIndex, yaw: player.yaw, pu: portalUnlocked,
-      worlds: ws, pos: positions,
+      char: selectedChar, worlds: ws, pos: positions,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(obj));
     saveDirty = false;
@@ -1263,6 +1292,7 @@ function loadGame() {
   try { obj = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { return false; }
   if (!obj) return false;
   if (typeof obj.sel === 'number' && BLOCKS[obj.sel]) selected = obj.sel;
+  if (typeof obj.char === 'string' && charById(obj.char).id === obj.char) selectedChar = obj.char;
   if (typeof obj.zoom === 'number' && ZOOM_LEVELS[obj.zoom] !== undefined) {
     zoomIndex = obj.zoom; camDist = camDistEased = ZOOM_LEVELS[zoomIndex];
   }
@@ -1353,6 +1383,7 @@ function init() {
   wireUI();
   hurtEl = document.getElementById('hurt-flash');
   applyUnlocks();
+  applyCharacter();
   ensurePet();
   ensurePony();
   updateHearts();
@@ -1415,6 +1446,8 @@ function init() {
     castLine: () => castLine(),
     talkVillager: () => { const v = mobs().villagers; if (v && v.list.length) talkToVillager(v.list[0]); },
     questOk: () => questOk(),
+    setCharacter: (id) => { selectedChar = id; applyCharacter(); saveDirty = true; },
+    character: () => selectedChar,
     plant: (x, y, z) => { world.set(x, y, z, B.SAPLING); saplings.push({ world, x, y, z, t: 14 + Math.random() * 14 }); goals.bump('plant'); },
     growNow: () => { for (const s of saplings) s.t = 0; },
     saplingCount: () => saplings.length,
