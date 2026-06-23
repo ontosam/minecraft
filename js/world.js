@@ -722,7 +722,7 @@ export class World {
         const depth = Math.round((1 - d / r) * 2);
         for (let k = 0; k < depth; k++) { const top = this.heightAt(x, z); if (top > 1) this.data[this.idx(x, top, z)] = B.AIR; }
         const nt = this.heightAt(x, z);
-        if (nt > 0) this.data[this.idx(x, nt, z)] = (rand() < 0.3) ? B.CRYSTAL_ORE : B.MOON_ROCK;
+        if (nt > 0) this.data[this.idx(x, nt, z)] = (rand() < 0.06) ? B.CRYSTAL_ORE : B.MOON_ROCK;
       }
     }
     // Scatter meteor boulders, sticky alien-goo puddles, gem ore + glow stones.
@@ -733,8 +733,19 @@ export class World {
       const r = rand();
       if (r < 0.16) { this.data[this.idx(x, h, z)] = B.METEOR; this.data[this.idx(x, h + 1, z)] = B.METEOR; }
       else if (r < 0.32) this.data[this.idx(x, h, z)] = B.ALIEN_GOO;
-      else if (r < 0.46) this.data[this.idx(x, h, z)] = B.GLOW_CRYSTAL;
-      else if (r < 0.56) this.data[this.idx(x, h, z)] = B.CRYSTAL_ORE;
+      else if (r < 0.50) this.data[this.idx(x, h, z)] = B.GLOW_CRYSTAL;   // pure decor/light (not minable 💎)
+    }
+    // Buried crystal veins inside the moon — drive around, dig down, and mine
+    // them for 💎 (a reason to explore the big moon with the rover).
+    for (let i = 0; i < 12; i++) {
+      const cx = 6 + (rand() * (SX - 12) | 0), cz = 6 + (rand() * (SZ - 12) | 0);
+      const top = this.heightAt(cx, cz); if (top < 4) continue;
+      const n = 3 + (rand() * 4 | 0);
+      for (let k = 0; k < n; k++) {
+        const x = cx + ((rand() * 3 | 0) - 1), z = cz + ((rand() * 3 | 0) - 1);
+        const y = top - 1 - (rand() * 3 | 0);
+        if (y > 1 && this.get(x, y, z) !== B.AIR && this.get(x, y, z) !== B.BEDROCK) this.data[this.idx(x, y, z)] = B.CRYSTAL_ORE;
+      }
     }
     // Black holes: dark round pits punched straight through the moon into the
     // void. Hard to spot while you zoom around — fall in and *whoosh*, you pop

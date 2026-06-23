@@ -87,6 +87,7 @@ let rover = null;         // the Space Rover mesh (created on first space visit)
 let roving = false;       // currently driving the rover
 let roverSpeedIdx = 0;    // index into ROVER_SPEEDS (0 = parked/off)
 let roverT = 0;           // little timer for the rover's bob/wobble
+let engineLevel = 0;      // current rover engine-hum level (so we only change it on change)
 let ride = null;          // an active fun-park ride: { att, t, dur, returnPos }
 let pendingRide = null;   // a ride waiting on the "Ride for 💎?" prompt
 let fishing = null;       // an active cast: { wx, wy, wz, t } while waiting for a bite
@@ -619,6 +620,12 @@ function doDig(hit) {
     goals.bump('treasure'); sound.play('treasure'); spawnSparkles([x + 0.5, y + 0.6, z + 0.5]);
     if (id === B.DIAMOND) { goals.bump('diamond'); goals.addGems(2); } else goals.addGems(1);
     updateGems();
+  }
+  // Space crystals: mine a natural glowing crystal on the moon for a 💎.
+  if (!wasPlaced && id === B.CRYSTAL_ORE) {
+    goals.bump('spacegem'); sound.play('treasure'); spawnSparkles([x + 0.5, y + 0.6, z + 0.5]);
+    goals.addGems(1); updateGems();
+    tip('spacegem', '🔷 Space crystals are treasure! Dig them for 💎. Drive around to find more!');
   }
 }
 
@@ -2477,6 +2484,9 @@ function frameBody(now) {
   drawBuildPreview();                                      // green "build here" footprint
   // The Space Rover sits at the player's feet; the kid is drawn seated on top.
   if (roving) { roverT += dt; ensureRover(); rover.draw(worldProg, player.pos[0], player.pos[1], player.pos[2], player.yaw, player.moveAmt, roverT); }
+  // Engine hum: idles when seated, revs up as you drive. Only touch it on change.
+  const wantEngine = roving ? (player.moveAmt > 0.15 ? roverSpeedIdx + 1 : 1) : 0;
+  if (wantEngine !== engineLevel) { engineLevel = wantEngine; sound.engine(engineLevel); }
   const seatRide = ride && ride.att.id !== 'balloon';     // sit in the gondola/carousel
   const seated = !!riding || !!seatRide || roving;
   character.draw(worldProg, player.pos[0], player.pos[1] + (seated ? 0.62 : 0), player.pos[2], player.yaw, player.walkPhase, player.moveAmt, actionAnim, seated);

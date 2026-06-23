@@ -989,6 +989,19 @@ sticky + rock ones. Go crazy."). Shipped on **`claude/dreamy-mccarthy-g6wgjr`** 
    box-mesh buggy (no wheel spin); cops always patrol (could nap when you're slow);
    the black-hole rim is subtle on purpose (a kid learns to spot them);
    anti-gravity is still open if the dad wants the literal flip.
+6. **Follow-up increment (same session, "keep going naturally"): the moon now has
+   a purpose + the rover hums.** Made Space World a place to **earn** 💎 (not just
+   spend): `generateSpace` buries **CRYSTAL_ORE veins** inside the moon (~50 buried
+   + ~48 sparse surface "tells"); digging a *natural* crystal → **+1💎** + sparkle
+   + chime + a new **🔷 Space miner** goal (`spacegem`, mirrors the gold/diamond
+   dig reward in `doDig`) + a first-time tip — so the rover has somewhere to
+   prospect. Tuned the crater crystal chance 0.30→0.06 so it's real digging work,
+   not free 💎. Plus a soft **looping engine hum** for the rover (`Sound.engine
+   (level)` in audio.js: two oscillators, pitch rises with gear; driven once-per-
+   change from the frame loop via `engineLevel`; idles when seated, revs when
+   moving, stops on park/leave). **sw v24→v25.** Verified headless: 98 natural
+   crystals; a real Dig-button mine pays +1💎 + ticks Space miner + removes the
+   ore; rover drive (engine on) + park + world-hop all **zero errors**.
 
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world

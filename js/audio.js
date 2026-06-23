@@ -5,6 +5,41 @@ export class Sound {
   constructor() {
     this.ctx = null;
     this.enabled = true;
+    this._eng = null;          // the Space Rover's looping engine hum
+  }
+
+  // A soft, continuous engine hum for the Space Rover. level 0 = off; 1..4 rises
+  // in pitch with speed. Starts the oscillators once, then just ramps the pitch.
+  engine(level) {
+    if (!this.enabled || !this.ctx) return;
+    if (level <= 0) {
+      if (this._eng) {
+        const t = this.ctx.currentTime;
+        try {
+          this._eng.g.gain.cancelScheduledValues(t);
+          this._eng.g.gain.setValueAtTime(Math.max(0.0001, this._eng.g.gain.value), t);
+          this._eng.g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+          this._eng.osc.stop(t + 0.26); this._eng.sub.stop(t + 0.26);
+        } catch (e) { /* already stopped */ }
+        this._eng = null;
+      }
+      return;
+    }
+    const freq = 58 + level * 22;          // low rumble; higher gear → higher pitch
+    const t = this.ctx.currentTime;
+    if (!this._eng) {
+      const osc = this.ctx.createOscillator(); osc.type = 'sawtooth';
+      const sub = this.ctx.createOscillator(); sub.type = 'square';
+      const g = this.ctx.createGain(); g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.045, t + 0.18);
+      osc.frequency.setValueAtTime(freq, t); sub.frequency.setValueAtTime(freq * 0.5, t);
+      osc.connect(g); sub.connect(g); g.connect(this.ctx.destination);
+      osc.start(t); sub.start(t);
+      this._eng = { osc, sub, g };
+    } else {
+      this._eng.osc.frequency.linearRampToValueAtTime(freq, t + 0.12);
+      this._eng.sub.frequency.linearRampToValueAtTime(freq * 0.5, t + 0.12);
+    }
   }
 
   resume() {

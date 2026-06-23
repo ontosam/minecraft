@@ -54,13 +54,14 @@ export const GOAL_DEFS = [
   { id: 'astronaut', icon: '🚀', title: 'Astronaut', desc: 'Blast off to Space World!', metric: 'space', target: 1 },
   { id: 'rover', icon: '🛸', title: 'Space driver', desc: 'Drive the Space Rover on the moon', metric: 'rover', target: 1 },
   { id: 'blackhole', icon: '🕳️', title: 'Black hole!', desc: 'Fall into a hidden space black hole', metric: 'blackhole', target: 1 },
+  { id: 'spacegem', icon: '🔷', title: 'Space miner', desc: 'Mine 6 glowing space crystals', metric: 'spacegem', target: 6 },
 ];
 
 const KEY = 'ezrablocks.goals.v1';
 
 export class Goals {
   constructor() {
-    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0, bought: 0, spider: 0, lamp: 0, monster: 0, lever: 0, bounce: 0, ride: 0, fish: 0, quest: 0, plant: 0, math: 0, snack: 0, skeleton: 0, crystal: 0, dragon: 0, story: 0, sleep: 0, funride: 0, treat: 0, space: 0, rover: 0, blackhole: 0 };
+    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0, bought: 0, spider: 0, lamp: 0, monster: 0, lever: 0, bounce: 0, ride: 0, fish: 0, quest: 0, plant: 0, math: 0, snack: 0, skeleton: 0, crystal: 0, dragon: 0, story: 0, sleep: 0, funride: 0, treat: 0, space: 0, rover: 0, blackhole: 0, spacegem: 0 };
     this.usedTypes = new Set();
     this.done = {};
     this.stars = 0;
