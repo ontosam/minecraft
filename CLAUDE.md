@@ -694,7 +694,54 @@ NPCs + dazzle) but asked to **scope it to its own session**. So this turn added
 effect) and the **"NEXT SESSION" spec below**. No behaviour changed; nothing new
 shipped to players. Next session: implement per the spec + wire-in checklist.
 
-## NEXT SESSION — Lego World = the Fun Hub ("Vegas")  ⭐ START HERE
+## Status (session 26) — Lego glow-up + the new Secret World fun park
+Dad **changed the plan** (this overrides the "Lego = Vegas" spec below): keep
+**Lego World as a clean, high-res *build* world**, and put the "spend 💎 on fun"
+hub in a **separate new world he named "Secret World."** He gave full creative
+freedom on the rest ("let form what forms") and asked for **a few high-WOW
+attractions, not many meh ones.** Shipped on **`claude/dreamy-mccarthy-g6wgjr`**
+in two increments (push there; mirror to `main`/live pending the dad's OK).
+Now **47 goals**, **sw cache v12→v14**.
+1. **🧱 Lego World glow-up (high-res).** The chunk mesher now raises **real 3-D
+   studs** — four little bumps on every exposed Lego-brick top (`isLego` ids
+   83–94; visual only, never in collision; stud verts guarded separately so a
+   dense build can't overflow the Uint16 index range). In **Lego World the block
+   picker is a pure Lego palette** (only the 12 bricks show) and you **arrive
+   holding a brick**; every other world is unchanged. `generateLego` now lays a
+   cheerful **rainbow staircase + brick pyramid** to show off the studs.
+2. **🎡 Secret World (`js/secretworld.js`) — a free-to-enter fun park.** New
+   `WORLD_KINDS.secret` (festive ring-plaza `generateSecret`, reached via the 🌍
+   menu — no purchase, no flint). You **earn 💎 working in the other worlds and
+   SPLURGE here** (the dad's "work hard → treat yourself" grip): **rides cost a
+   few 💎 (`goals.spend`) and NEVER pay 💎** — the reward is fun + a ⭐. Three
+   WOW rides via a `SecretPark` mob-manager (mirrors nethermobs): a **real
+   vertically-turning Ferris wheel** (rotateX, rainbow spokes + gondolas with
+   **friends riding**), a **hot-air balloon ride** (float up for a view), and a
+   **spinning carousel**. Plus **drifting balloons, fireworks (timed particle
+   bursts + notes), glowing lamp posts, and roster-friend NPCs** wandering/riding.
+   Tap a ride → "Ride for 💎X?" prompt (`#ride`) → pay → a scripted ride that
+   drives the player along the attraction (physics paused via the `ride` state in
+   the frame loop), then deposits them back safely + a ⭐. Travel/recover always
+   ends a ride cleanly. New goals **Fun park!** + **Thrill seeker** (`funride`).
+   Debug: `__ezra.funRide(id)/endFunRide()/funRiding()/funpark`, `setView(yaw,pitch)`.
+   Deleted the obsolete `js/legoworld.js` scaffold (its "Lego = Vegas" purpose is
+   now the Secret World).
+   Verified: Node logic (studs geometry + no index overflow + covered-brick has
+   no studs; Secret gen + registry + attractions) + headless browser (Lego studs
+   ~21.7k verts/chunk + Lego-only picker; Secret World travel, all 3 rides
+   start→spend the right 💎→animate→bump the goal→end clean, **refused when
+   broke**, fireworks; full world-hop + **save/reload** keeps it all; zero
+   errors) with screenshots of the studded rainbow staircase, the Ferris wheel
+   with riders, and the carousel. Tuning candidates: fun-park NPCs have no blob
+   shadow yet (rides are elevated, so minor); the Ferris wheel faces ±X (full
+   from the front, thin edge-on from the side); carousel ride spins fast (fun but
+   could ease). Backlog: go-kart ride, bumper cars, a Ferris-wheel that frames
+   nicer in third-person, balloon variety.
+
+## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
+**This plan was replaced** (see session 26): Lego World stayed a *build* world
+and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept
+below only as historical context.
 Dad's brief (approved, build NEXT session — this session only **set up the repo +
 this handoff**; nothing below is built yet). He loved the Lego idea and wants it
 to become the **most fun world**: a dazzling amusement park you **visit to spend
@@ -834,6 +881,14 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
   drift AI, ease to a hover height over the ground, `petNearest`, and an
   `onMeet(species,pos)` callback the first time the player comes close (drives the
   "meet a ghast/blaze" goals). Spawned via `populate(SX,SZ)`.
+- `js/secretworld.js` — the **Secret World fun park** (`SecretPark`, a mob-style
+  manager for `WORLD_KINDS.secret`). Box-mesh attractions: a **vertically-turning
+  Ferris wheel** (built in the Y-Z plane, spun with `mat4.rotateX`; gondolas drawn
+  upright with seated roster-friend NPCs), **drifting balloons**, a **carousel**
+  (spun about Y), glowing kiosks, wandering NPC `Character`s, and a fireworks
+  timer (`onFirework`). `pickRay` → an attraction; main shows a "Ride for 💎X?"
+  prompt, `goals.spend`s, then runs a scripted ride (see `ride`/`updateRide` in
+  main.js). **Never grants 💎** — it's a pure diamond *sink*.
 - `js/zombies.js` — night-time `Zombies` (built like creepers, but they **chase +
   attack**): spawn around the player at night, bonk a heart on a cooldown
   (`onEvent('hit')`), take two `bonk`s to defeat (`pickRay`), fade out by day.

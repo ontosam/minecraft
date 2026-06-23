@@ -622,6 +622,29 @@ export class World {
     this.spawn = [SX / 2 + 0.5, base + 2, SZ / 2 + 0.5];
   }
 
+  // The Secret World: a bright festive plaza for the fun park. Flat quartz with
+  // cheerful colour rings + glowing lamp posts. The rides (Ferris wheel,
+  // carousel, balloons) are animated meshes drawn above this by SecretPark.
+  generateSecret() {
+    this.data.fill(B.AIR);
+    this.placed = new Set();
+    this.portals = [];
+    const base = 6, cx = SX / 2, cz = SZ / 2;
+    const ring = [B.QUARTZ, B.PINK, B.QUARTZ, B.CYAN, B.QUARTZ, B.YELLOW, B.QUARTZ, B.PURPLE];
+    for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) {
+      this.data[this.idx(x, 0, z)] = B.BEDROCK;
+      for (let y = 1; y < base; y++) this.data[this.idx(x, y, z)] = B.QUARTZ;
+      const d = Math.round(Math.hypot(x - cx, z - cz));
+      this.data[this.idx(x, base, z)] = ring[d % ring.length];   // concentric colour rings
+    }
+    // Glowing lamp posts around the plaza (a pillar topped with a sea lantern).
+    for (const [x, z] of [[10, 10], [54, 10], [10, 54], [54, 54], [32, 8], [32, 56], [8, 32], [56, 32]]) {
+      for (let y = 1; y <= 3; y++) this.data[this.idx(x, base + y, z)] = B.STONE_BRICK;
+      this.data[this.idx(x, base + 4, z)] = B.SEA_LANTERN;
+    }
+    this.spawn = [cx + 0.5, base + 2, cz + 8.5];
+  }
+
   // Boom! Clear destructible blocks within radius r of (cx,cy,cz). Returns the
   // positions of any *other* TNT caught in the blast (for chain reactions).
   explode(cx, cy, cz, r) {

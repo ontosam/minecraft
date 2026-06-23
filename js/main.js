@@ -6,6 +6,7 @@ import { mat4 } from './math.js';
 import { initGL, makeWorldProgram, makeAtlasTexture, GLMesh, blockPreview, shadowMesh } from './gfx.js';
 import { World, BLOCKS, CATEGORIES, B, SX, SY, SZ, isLego } from './world.js';
 import { WORLD_KINDS, WORLD_ORDER } from './worlds.js';
+import { SecretPark, ATTRACTIONS } from './secretworld.js';
 import { Player } from './player.js';
 import { Animals } from './animals.js';
 import { Creepers } from './creepers.js';
@@ -68,6 +69,8 @@ let prevX = 0, prevZ = 0, goalToastTimer = 0;
 let shake = 0;            // camera kick from explosions
 let trailT = 0;           // throttle for the "Sparkle Trail" shop reward
 let riding = null;        // the pony Animal you're currently riding (or null)
+let ride = null;          // an active fun-park ride: { att, t, dur, returnPos }
+let pendingRide = null;   // a ride waiting on the "Ride for 💎?" prompt
 let fishing = null;       // an active cast: { wx, wy, wz, t } while waiting for a bite
 let bobberEl = null;      // the on-screen bobber marker
 const saplings = [];      // planted saplings growing into trees: { world, x, y, z, t }
@@ -132,6 +135,9 @@ function makeMobs(kind, w) {
       };
     } else if (t === 'villagers') {
       m.villagers = new Villagers(gl, w);
+    } else if (t === 'funpark') {
+      m.funpark = new SecretPark(gl, w);
+      m.funpark.onFirework = (pos) => { spawnParticles(pos, ['🎆', '🎇', '✨'][Math.floor(Math.random() * 3)], 'puff', 5, 80); sound.note(Math.floor(Math.random() * 5)); };
     } else if (t === 'dragon') {
       m.dragon = new Dragon(gl, w);
       m.dragon.onEvent = (type, pos) => {
@@ -156,6 +162,7 @@ function populateMobs(m) {
   if (m.animals) m.animals.spawn(10);
   if (m.ants) m.ants.spawn(14);
   if (m.villagers) m.villagers.spawn(2);
+  if (m.funpark) m.funpark.populate();
   if (m.nethermobs) m.nethermobs.populate(SX, SZ);
   if (m.dragon) m.dragon.populate();
   // creepers spawn lazily (paced) during update — no initial spawn
@@ -169,6 +176,7 @@ function updateMobs(m, dt) {
   if (m.spiders) m.spiders.update(dt, player, night && dimension === 'over');
   if (m.skeletons) m.skeletons.update(dt, player, night && dimension === 'over');
   if (m.villagers) m.villagers.update(dt, player);
+  if (m.funpark) m.funpark.update(dt, player);
   if (m.dragon) m.dragon.update(dt, player);
 }
 function drawMobs(m) {
@@ -180,6 +188,7 @@ function drawMobs(m) {
   if (m.spiders) m.spiders.draw(worldProg);
   if (m.skeletons) m.skeletons.draw(worldProg);
   if (m.villagers) m.villagers.draw(worldProg);
+  if (m.funpark) m.funpark.draw(worldProg);
   if (m.dragon) m.dragon.draw(worldProg);
 }
 
@@ -270,6 +279,7 @@ function travelTo(dest) {
   try {
     if (fishing) reelIn(false);               // reel in before leaving
     if (riding) dismount();                   // the pony stays home in the overworld
+    if (ride) { const fp = mobs().funpark; if (fp) { fp.rideKind = null; fp.rideBalloon = null; } ride = null; } // end any ride safely
     fuses.length = 0;                         // cancel any fuses lit in the world we're leaving
     positions[dimension] = player.pos.slice();
     const from = dimension;
@@ -288,6 +298,7 @@ function travelTo(dest) {
     recheckBuild();                           // build challenges check the world you're now in
     if (dest === 'lego' && !isLego(selected)) selected = B.LEGO_RED; // arrive holding a Lego brick
     buildPicker(); refreshBlocksButton();     // Lego World shows a Lego-only palette
+    if (dest === 'secret') tip('secret', '🎡 Welcome to the Secret World! Tap a ride to go on it. Rides cost 💎 — earn 💎 in the other worlds!');
   } catch (e) {
     // A portal should never strand Ezra on the scary "Oops" screen. If anything
     // goes wrong mid-trip, log it for us and pop him safely back home instead.
@@ -299,6 +310,7 @@ function travelTo(dest) {
 
 // Safety net: get the player back to a known-good spot in the overworld.
 function recoverHome() {
+  if (ride) { const fp = mobs().funpark; if (fp) { fp.rideKind = null; fp.rideBalloon = null; } ride = null; }
   ensureDim('over');
   setDimension('over');
   player.world = world;
@@ -1659,6 +1671,66 @@ function buildWorldMenu() {
 function openWorldMenu() { buildWorldMenu(); document.getElementById('worldmenu').classList.remove('hidden'); }
 function closeWorldMenu() { document.getElementById('worldmenu').classList.add('hidden'); }
 
+// --- Secret World fun-park rides: tap a ride → pay 💎 → enjoy. The reward is
+// pure fun + a ⭐; rides NEVER pay diamonds (you earn those working elsewhere). ---
+function openRidePrompt(att) {
+  if (ride) return;
+  pendingRide = att;
+  document.getElementById('ride-title').textContent = att.icon + ' ' + att.name;
+  document.getElementById('ride-msg').textContent = 'Ride for 💎' + att.cost + '?   (You have 💎' + goals.gems + ')';
+  document.getElementById('ride').classList.remove('hidden');
+}
+function closeRidePrompt() { pendingRide = null; document.getElementById('ride').classList.add('hidden'); }
+function confirmRide() {
+  const att = pendingRide; closeRidePrompt();
+  if (!att || ride) return;
+  if (!goals.spend(att.cost)) { sound.play('deny'); showToast('Mine more 💎 first! Earn 💎 in the other worlds, then splurge here! (need ' + att.cost + ')', 3800); return; }
+  updateGems();
+  const fp = mobs().funpark; if (!fp) return;
+  ride = { att, t: 0, dur: att.dur, returnPos: player.pos.slice() };
+  fp.rideKind = att.id;
+  sound.play('portal');
+  showToast('🎟️ ' + att.icon + ' Hold on tight — here we go!', 2200);
+}
+// Drive the player along the active ride each frame (replaces normal physics).
+function updateRide(dt) {
+  const fp = mobs().funpark;
+  if (!fp) { ride = null; return; }
+  ride.t += dt;
+  const u = Math.min(1, ride.t / ride.dur);
+  if (ride.att.id === 'ferris') {
+    fp.wheel.angle = u * Math.PI * 4;                 // two gentle turns
+    const gp = fp.gondolaPos(0);
+    player.pos = [gp[0], gp[1] + 0.15, gp[2]];
+    player.yaw = Math.PI;
+  } else if (ride.att.id === 'carousel') {
+    fp.carousel.angle = u * Math.PI * 6;              // three spins
+    const a = fp.carousel.angle;
+    player.pos = [fp.carousel.cx + Math.cos(a) * 1.9, fp.carousel.cy + 0.9, fp.carousel.cz + Math.sin(a) * 1.9];
+    player.yaw = a + Math.PI / 2;
+  } else {                                            // balloon: up, hover, gently down
+    const pad = fp.balloonPad;
+    const h = u < 0.4 ? (u / 0.4) : (u < 0.62 ? 1 : (1 - (u - 0.62) / 0.38));
+    player.pos = [pad.cx, pad.cy + 1.2 + h * 15, pad.cz];
+    player.yaw += dt * 0.5;
+    fp.rideBalloon = [player.pos[0], player.pos[1] + 2.7, player.pos[2]];
+  }
+  player.vel = [0, 0, 0];
+  if (ride.t >= ride.dur) endRide();
+}
+function endRide() {
+  const att = ride.att, fp = mobs().funpark;
+  if (fp) { fp.rideKind = null; fp.rideBalloon = null; }
+  player.pos = ride.returnPos.slice();
+  player.vel = [0, 0, 0];
+  ride = null;
+  goals.bump('funride');
+  spawnParticles([player.pos[0], player.pos[1] + 2, player.pos[2]], '🎉', 'puff', 12, 90);
+  spawnSparkles([player.pos[0], player.pos[1] + 1.2, player.pos[2]]);
+  sound.play('treasure');
+  showToast('⭐ ' + att.icon + ' Wheee! What a ride! You went on the ' + att.name + '!', 3600);
+}
+
 function refreshGoalsButton() {
   document.getElementById('btn-goals').textContent = '⭐' + goals.stars;
 }
@@ -1783,6 +1855,9 @@ function wireUI() {
   });
   document.getElementById('worldmenu-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeWorldMenu(); });
   document.getElementById('worldmenu').addEventListener('pointerdown', (e) => { if (e.target.id === 'worldmenu') closeWorldMenu(); });
+
+  document.getElementById('ride-yes').addEventListener('pointerdown', (e) => { e.preventDefault(); confirmRide(); });
+  document.getElementById('ride-no').addEventListener('pointerdown', (e) => { e.preventDefault(); closeRidePrompt(); });
 
   document.getElementById('btn-buildkit').addEventListener('pointerdown', (e) => {
     e.preventDefault(); sound.resume();
@@ -1932,7 +2007,7 @@ function frame(now) {
 
   controls.frame();
   applyLook();
-  player.update(dt, controls, camYaw);
+  if (ride) updateRide(dt); else player.update(dt, controls, camYaw);
   cameraFollow(dt);
   const dxm = player.pos[0] - prevX, dzm = player.pos[2] - prevZ;
   const dm = Math.hypot(dxm, dzm);
@@ -1949,7 +2024,7 @@ function frame(now) {
   // Step into a portal swirl → travel to its destination world.
   portalCooldown = Math.max(0, portalCooldown - dt);
   portalHintTimer = Math.max(0, portalHintTimer - dt);
-  if (portalCooldown === 0) {
+  if (portalCooldown === 0 && !ride) {
     const bx = Math.floor(player.pos[0]), bz = Math.floor(player.pos[2]);
     const p = world.portalAt(bx, Math.floor(player.pos[1] + 0.4), bz) || world.portalAt(bx, Math.floor(player.pos[1] + 1.2), bz);
     if (p) travelTo(p.dest);
@@ -1992,7 +2067,8 @@ function frame(now) {
   if (controls.tapPending) {
     controls.tapPending = false;
     const dir = screenRay(controls.tapX, controls.tapY);
-    const dg = m.dragon ? m.dragon.pickRay(camPos, dir) : null;   // The End: crystals + dragon
+    const fk = (!ride && m.funpark) ? m.funpark.pickRay(camPos, dir) : null;   // Secret World rides
+    const dg = (!fk && m.dragon) ? m.dragon.pickRay(camPos, dir) : null;   // The End: crystals + dragon
     const cr = (!dg && m.creepers) ? m.creepers.pickRay(camPos, dir) : null;
     const zb = (!dg && !cr && m.zombies) ? m.zombies.pickRay(camPos, dir) : null;
     const sp = (!dg && !cr && !zb && m.spiders) ? m.spiders.pickRay(camPos, dir) : null;
@@ -2002,7 +2078,9 @@ function frame(now) {
       rayHitsSphere(camPos, dir, buddy.pos[0], buddy.pos[1] + 0.9, buddy.pos[2], 1.2);
     const stv = (!dg && !cr && !zb && !sp && !sk && !vl && !bd && stevePos && dimension === 'over') &&
       rayHitsSphere(camPos, dir, stevePos[0], stevePos[1] + 0.9, stevePos[2], 1.2);
-    if (dg) doDragonTap(dg);
+    if (ride) { /* enjoying a ride — taps do nothing */ }
+    else if (fk) openRidePrompt(fk);
+    else if (dg) doDragonTap(dg);
     else if (cr) doDefend(cr);
     else if (zb) doBonkZombie(zb);
     else if (sp) doBonkSpider(sp);
@@ -2061,7 +2139,8 @@ function frame(now) {
     riding.yaw = player.yaw; riding.walking = player.moving;
   }
   drawShadows(m);
-  character.draw(worldProg, player.pos[0], player.pos[1] + (riding ? 0.62 : 0), player.pos[2], player.yaw, player.walkPhase, player.moveAmt, actionAnim, !!riding);
+  const seatRide = ride && ride.att.id !== 'balloon';     // sit in the gondola/carousel
+  character.draw(worldProg, player.pos[0], player.pos[1] + ((riding || seatRide) ? 0.62 : 0), player.pos[2], player.yaw, player.walkPhase, player.moveAmt, actionAnim, !!riding || !!seatRide);
   drawMobs(m);
   // Steve mans his Lava Chicken stand in the overworld, turning to face you.
   if (stevePos && dimension === 'over') {
@@ -2239,6 +2318,7 @@ function init() {
     popCrystals: () => { const d = mobs().dragon; if (d) d.crystals.forEach((c) => doDragonTap({ kind: 'crystal', c })); },
     tameDragon: () => { const d = mobs().dragon; if (d) doDragonTap({ kind: 'dragon' }); },
     cam: () => ({ yaw: camYaw, pitch: camPitch, pos: camPos.slice(), dir: camDir.slice() }),
+    setView: (y, p) => { camYaw = y; if (p != null) camPitch = p; },
     target: () => targetCells(),
     rayHit: (x, y) => rayHitAt(x, y),
     sel: () => selected,
@@ -2253,6 +2333,10 @@ function init() {
     buy: (idd) => { const it = SHOP.find((s) => s.id === idd); if (it) buyItem(it); },
     resetWorld: () => resetWorld(),
     travelTo: (k) => travelTo(k),
+    get funpark() { return mobs().funpark; },
+    funRide: (id) => { const a = ATTRACTIONS.find((x) => x.id === id); if (a) { openRidePrompt(a); confirmRide(); } },
+    endFunRide: () => { if (ride) endRide(); },
+    funRiding: () => (ride ? ride.att.id : null),
     lightPortal: (k) => lightPortal(k),
     enterPortal: () => travelTo(dimension === 'over' ? 'nether' : 'over'),
     goals,

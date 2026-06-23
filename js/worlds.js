@@ -70,7 +70,14 @@ export const WORLD_KINDS = {
     flint: true,
     locked: 'legoworld',        // the big-ticket 💎 reward (lots of diamonds!)
   },
+  secret: {
+    name: 'Secret World', emoji: '🎡',
+    sky: [0.60, 0.80, 0.98], fog: [60, 130],
+    gen: 'generateSecret', ground: B.QUARTZ,
+    mobs: ['funpark'],          // the fun-park rides + friends having fun
+    fun: true,                  // free to visit; you SPEND 💎 on rides here
+  },
 };
 
 // Display order for menus/minimap.
-export const WORLD_ORDER = ['over', 'nether', 'gold', 'ant', 'tnt', 'sky', 'end', 'lego'];
+export const WORLD_ORDER = ['over', 'nether', 'gold', 'ant', 'tnt', 'sky', 'end', 'lego', 'secret'];
