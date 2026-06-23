@@ -182,6 +182,14 @@ const FACES = [
 ];
 const AO_LEVEL = [0.5, 0.7, 0.85, 1.0];
 
+// 3-D Lego studs: four little raised bumps drawn on an exposed Lego top so the
+// bricks read as real Lego instead of flat cubes. Each stud is a tiny box (its
+// top + 4 sides; the bottom sits flush on the brick). Visual only — never in
+// collision — so the kid still stands on a clean cube surface.
+const STUD_CENTERS = [[0.3, 0.3], [0.7, 0.3], [0.3, 0.7], [0.7, 0.7]];
+const STUD_R = 0.16, STUD_H = 0.17;
+export function isLego(id) { return id >= B.LEGO_RED && id <= B.LEGO_LIME; }
+
 function mulberry32(seed) {
   let s = seed >>> 0;
   return () => {
@@ -603,9 +611,14 @@ export class World {
       for (let y = 1; y < base; y++) this.data[this.idx(x, y, z)] = B.LEGO_GREEN;
       this.data[this.idx(x, base, z)] = B.LEGO_GREEN;     // studded top = the baseplate
     }
-    // A few cheerful sample brick stacks to spark ideas (not added to `placed`).
-    const stacks = [[16, 16, B.LEGO_RED], [22, 18, B.LEGO_BLUE], [44, 40, B.LEGO_YELLOW], [40, 22, B.LEGO_PURPLE], [20, 44, B.LEGO_CYAN]];
-    for (const [x, z, id] of stacks) for (let y = 1; y <= 3; y++) this.data[this.idx(x, base + y, z)] = id;
+    const put = (x, y, z, id) => { if (x >= 0 && x < SX && z >= 0 && z < SZ) this.data[this.idx(x, base + y, z)] = id; };
+    // A cheerful rainbow staircase — shows off the 3-D studs at every height.
+    const rainbow = [B.LEGO_RED, B.LEGO_ORANGE, B.LEGO_YELLOW, B.LEGO_LIME, B.LEGO_GREEN, B.LEGO_CYAN, B.LEGO_BLUE, B.LEGO_PURPLE];
+    for (let i = 0; i < rainbow.length; i++) for (let y = 1; y <= i + 1; y++) put(44, y, 38 + i, rainbow[i]);
+    // A little brick pyramid to spark ideas.
+    for (let y = 1; y <= 3; y++) for (let dx = -(3 - y); dx <= 3 - y; dx++) for (let dz = -(3 - y); dz <= 3 - y; dz++) put(20 + dx, y, 20 + dz, B.LEGO_PINK);
+    // A couple of sample brick stacks (not added to `placed`).
+    for (const [x, z, id] of [[16, 44, B.LEGO_CYAN], [40, 22, B.LEGO_WHITE]]) for (let y = 1; y <= 3; y++) put(x, y, z, id);
     this.spawn = [SX / 2 + 0.5, base + 2, SZ / 2 + 0.5];
   }
 
@@ -781,6 +794,17 @@ export class World {
     const pos = [], uv = [], col = [], light = [], idxArr = [];
     const x0 = cx * CHUNK, z0 = cz * CHUNK;
     let base = 0;
+    // Push one quad (4 corners, CCW) for a Lego stud face: textured with the
+    // brick's side tile + tint so the bump matches the brick colour.
+    const studQuad = (corners, sh, rs, t) => {
+      const uvs = [[0, 0], [1, 0], [1, 1], [0, 1]];
+      for (let k = 0; k < 4; k++) {
+        pos.push(corners[k][0], corners[k][1], corners[k][2]);
+        uv.push(uvs[k][0] ? rs.u1 : rs.u0, uvs[k][1] ? rs.v1 : rs.v0);
+        col.push(t[0], t[1], t[2]); light.push(sh);
+      }
+      idxArr.push(base, base + 1, base + 2, base, base + 2, base + 3); base += 4;
+    };
     outer:
     for (let x = x0; x < x0 + CHUNK; x++) {
       for (let z = z0; z < z0 + CHUNK; z++) {
@@ -807,6 +831,22 @@ export class World {
             }
             idxArr.push(base, base + 1, base + 2, base, base + 2, base + 3);
             base += 4;
+          }
+          // Lego brick with open air above → raise 4 little 3-D studs on top.
+          // Guard the stud verts separately (up to 80) so a dense build can't
+          // overflow the Uint16 index range between the per-block check above.
+          if (isLego(id) && this.get(x, y + 1, z) === B.AIR && base + 80 <= 0xffff) {
+            const rs = getUV(def.tiles.side), t = def.tint;
+            for (const [sx, sz] of STUD_CENTERS) {
+              const ax = x + sx - STUD_R, bx = x + sx + STUD_R;
+              const az = z + sz - STUD_R, bz = z + sz + STUD_R;
+              const y0 = y + 1, y1 = y + 1 + STUD_H;
+              studQuad([[ax, y1, bz], [bx, y1, bz], [bx, y1, az], [ax, y1, az]], 1.00, rs, t); // top
+              studQuad([[bx, y0, az], [ax, y0, az], [ax, y1, az], [bx, y1, az]], 0.70, rs, t); // -z
+              studQuad([[ax, y0, bz], [bx, y0, bz], [bx, y1, bz], [ax, y1, bz]], 0.85, rs, t); // +z
+              studQuad([[ax, y0, az], [ax, y0, bz], [ax, y1, bz], [ax, y1, az]], 0.65, rs, t); // -x
+              studQuad([[bx, y0, bz], [bx, y0, az], [bx, y1, az], [bx, y1, bz]], 0.80, rs, t); // +x
+            }
           }
         }
       }

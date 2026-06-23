@@ -4,7 +4,7 @@
 
 import { mat4 } from './math.js';
 import { initGL, makeWorldProgram, makeAtlasTexture, GLMesh, blockPreview, shadowMesh } from './gfx.js';
-import { World, BLOCKS, CATEGORIES, B, SX, SY, SZ } from './world.js';
+import { World, BLOCKS, CATEGORIES, B, SX, SY, SZ, isLego } from './world.js';
 import { WORLD_KINDS, WORLD_ORDER } from './worlds.js';
 import { Player } from './player.js';
 import { Animals } from './animals.js';
@@ -286,6 +286,8 @@ function travelTo(dest) {
     if (dest === 'nether') goals.bump('nether'); // first trip completes "Find the portal"
     goals.bump('travel');
     recheckBuild();                           // build challenges check the world you're now in
+    if (dest === 'lego' && !isLego(selected)) selected = B.LEGO_RED; // arrive holding a Lego brick
+    buildPicker(); refreshBlocksButton();     // Lego World shows a Lego-only palette
   } catch (e) {
     // A portal should never strand Ezra on the scary "Oops" screen. If anything
     // goes wrong mid-trip, log it for us and pop him safely back home instead.
@@ -1577,8 +1579,11 @@ function closeChars() { document.getElementById('chars').classList.add('hidden')
 function buildPicker() {
   const body = document.getElementById('picker-body');
   body.innerHTML = '';
+  // In Lego World the picker is a pure Lego table — only the Lego bricks show.
+  const legoOnly = dimension === 'lego' && goals.hasUnlock('legoworld');
   for (const cat of CATEGORIES) {
     if (cat.locked && !goals.hasUnlock(cat.locked)) continue;   // hidden until bought
+    if (legoOnly && cat.name !== 'Lego 🧱') continue;           // Lego World = Lego pieces only
     const label = document.createElement('div');
     label.className = 'pick-cat'; label.textContent = cat.name;
     body.appendChild(label);
