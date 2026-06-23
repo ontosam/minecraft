@@ -29,10 +29,14 @@ export const B = {
   MOSS: 72, MUSHROOM_RED: 73, MUSHROOM_BROWN: 74, CACTUS: 75, MUD: 76,
   NETHER_BRICK: 77, MAGMA: 78,
   MELON: 79, HAY: 80, NOTE_BLOCK: 81, SPONGE: 82,
+  LEGO_RED: 83, LEGO_ORANGE: 84, LEGO_YELLOW: 85, LEGO_GREEN: 86, LEGO_BLUE: 87, LEGO_CYAN: 88,
+  LEGO_PURPLE: 89, LEGO_PINK: 90, LEGO_WHITE: 91, LEGO_BLACK: 92, LEGO_BROWN: 93, LEGO_LIME: 94,
 };
 
 const W = [1, 1, 1]; // white tint for textured blocks
 function colored(tile, tint, ui) { return { tiles: { top: tile, side: tile, bottom: tile }, tint, ui }; }
+// A textured block tinted a colour (e.g. Lego bricks: neutral studded tiles × tint).
+function tinted(top, side, bottom, tint, ui) { return { tiles: { top, side, bottom }, tint, ui }; }
 function nat(tile, ui) { return { tiles: { top: tile, side: tile, bottom: tile }, tint: W, ui }; }
 function nat3(top, side, bottom, ui) { return { tiles: { top, side, bottom }, tint: W, ui }; }
 
@@ -126,6 +130,19 @@ export const BLOCKS = {
   [B.HAY]: nat3(TILE.HAY_TOP, TILE.HAY_SIDE, TILE.HAY_TOP, '#d8b23a'),
   [B.NOTE_BLOCK]: nat(TILE.NOTE_BLOCK, '#8a5a30'),
   [B.SPONGE]: nat(TILE.SPONGE, '#d8c24a'),
+  // Lego bricks — vivid studded blocks (one neutral tile set, tinted per colour).
+  [B.LEGO_RED]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.86, 0.16, 0.16], '#d62828'),
+  [B.LEGO_ORANGE]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.95, 0.55, 0.12], '#f28c1e'),
+  [B.LEGO_YELLOW]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.98, 0.82, 0.18], '#f7d22e'),
+  [B.LEGO_GREEN]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.30, 0.66, 0.28], '#3fa83f'),
+  [B.LEGO_BLUE]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.18, 0.40, 0.82], '#2e66d6'),
+  [B.LEGO_CYAN]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.20, 0.72, 0.80], '#33bccd'),
+  [B.LEGO_PURPLE]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.55, 0.30, 0.78], '#9050d0'),
+  [B.LEGO_PINK]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.95, 0.55, 0.74], '#f28cbf'),
+  [B.LEGO_WHITE]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.96, 0.96, 0.97], '#f5f5f7'),
+  [B.LEGO_BLACK]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.20, 0.20, 0.23], '#33333a'),
+  [B.LEGO_BROWN]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.55, 0.36, 0.20], '#8a5a32'),
+  [B.LEGO_LIME]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.55, 0.80, 0.25], '#8ccc40'),
 };
 
 // Build blocks grouped into categories for the pop-up picker.
@@ -145,6 +162,8 @@ export const CATEGORIES = [
   { name: 'Special ✨', blocks: [B.RAINBOW], locked: 'rainbow' },
   // Shown only once the Mega TNT upgrade is bought in the 💎 shop.
   { name: 'Mega 💣', blocks: [B.MEGA_TNT], locked: 'megatnt' },
+  // Unlocked by buying Lego World in the 💎 shop.
+  { name: 'Lego 🧱', blocks: [B.LEGO_RED, B.LEGO_ORANGE, B.LEGO_YELLOW, B.LEGO_LIME, B.LEGO_GREEN, B.LEGO_CYAN, B.LEGO_BLUE, B.LEGO_PURPLE, B.LEGO_PINK, B.LEGO_WHITE, B.LEGO_BLACK, B.LEGO_BROWN], locked: 'legoworld' },
   { name: 'Nether 🔥', blocks: [B.NETHERRACK, B.NETHER_BRICK, B.MAGMA, B.LAVA] },
   { name: 'Colours', blocks: [B.RED, B.ORANGE, B.YELLOW, B.GREEN, B.CYAN, B.BLUE, B.PURPLE, B.PINK, B.WHITE, B.BLACK] },
 ];
@@ -570,6 +589,24 @@ export class World {
       this.crystalSpots.push([px, ph + 2, pz]);        // crystal floats just above the pillar
     }
     this.spawn = [cxC + 0.5, top + 2, czC + 0.5];
+  }
+
+  // Lego World: a big flat green Lego baseplate (studded) under a bright sky —
+  // a clean Lego table to build vivid brick creations on.
+  generateLego() {
+    this.data.fill(B.AIR);
+    this.placed = new Set();
+    this.portals = [];
+    const base = 6;
+    for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) {
+      this.data[this.idx(x, 0, z)] = B.BEDROCK;
+      for (let y = 1; y < base; y++) this.data[this.idx(x, y, z)] = B.LEGO_GREEN;
+      this.data[this.idx(x, base, z)] = B.LEGO_GREEN;     // studded top = the baseplate
+    }
+    // A few cheerful sample brick stacks to spark ideas (not added to `placed`).
+    const stacks = [[16, 16, B.LEGO_RED], [22, 18, B.LEGO_BLUE], [44, 40, B.LEGO_YELLOW], [40, 22, B.LEGO_PURPLE], [20, 44, B.LEGO_CYAN]];
+    for (const [x, z, id] of stacks) for (let y = 1; y <= 3; y++) this.data[this.idx(x, base + y, z)] = id;
+    this.spawn = [SX / 2 + 0.5, base + 2, SZ / 2 + 0.5];
   }
 
   // Boom! Clear destructible blocks within radius r of (cx,cy,cz). Returns the

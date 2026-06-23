@@ -62,7 +62,15 @@ export const WORLD_KINDS = {
     flint: true,                // appears in the flint menu…
     locked: 'endworld',         // …after it's bought (the big adventure reward)
   },
+  lego: {
+    name: 'Lego World', emoji: '🧱',
+    sky: [0.74, 0.90, 1.0], fog: [60, 120],
+    gen: 'generateLego', ground: B.LEGO_GREEN,
+    mobs: [],                   // a clean, calm Lego table to build on
+    flint: true,
+    locked: 'legoworld',        // the big-ticket 💎 reward (lots of diamonds!)
+  },
 };
 
 // Display order for menus/minimap.
-export const WORLD_ORDER = ['over', 'nether', 'gold', 'ant', 'tnt', 'sky', 'end'];
+export const WORLD_ORDER = ['over', 'nether', 'gold', 'ant', 'tnt', 'sky', 'end', 'lego'];

@@ -660,6 +660,33 @@ types"). Shipped on **`claude/store-portal-bugs-hzcr72`**, mirrored to `main`.
   (crafting table/furnace/chest need multi-face art; froglight/sculk/copper easy
   to add next).
 
+## Status (session 25) — readability + friend interaction + 🧱 Lego World (dad:
+small font/long sentences mean he doesn't read them; friend interaction low; add
+a high-value Lego World that costs lots of 💎; Legos should look higher-res).
+Shipped on **`claude/store-portal-bugs-hzcr72`**, mirrored to `main`.
+**sw cache v11→v12.** Now **95 block ids**, **8 worlds**, **14 shop items**.
+1. **Readability pass.** Bumped dialog/toast fonts (`.adv-text` 17→24 bold,
+   `.adv-name` 24, `.adv-task` 21, `#quest-msg` 22, `#goaltoast` 20 + wrap) and
+   **rewrote every adventure blurb + all `tip()` strings into short, punchy lines**
+   (e.g., "Let's build a cozy house! 🏠"). A 6-yr-old can actually read them now.
+2. **Friend interaction.** The walking buddy now greets with a clear **"👋 [name]
+   is here! Tap me!"** (or "you did it! Tap me! 🎉") on **every** visit, and
+   visits a bit more often (first 16–38s, then 35–65s) — still gentle, not naggy.
+3. **🧱 Lego World (the big-ticket reward, 50💎).** New flint world
+   `WORLD_KINDS.lego` (`generateLego` = a big flat **studded green baseplate** +
+   a few sample brick stacks, bright sky). Bought in the 💎 shop (priced high so
+   it's real work — diamonds are easy to earn). Unlocks a **"Lego 🧱" picker tab**
+   with **12 vivid Lego bricks** (`B.LEGO_*`): drawn from **two neutral tiles**
+   (`LEGO_TOP` = 2×2 glossy studs via `ctx.arc`, `LEGO_SIDE` = shiny-rim brick)
+   **× a per-colour tint** (new `tinted()` def helper) — so 12 colours cost only
+   2 atlas tiles. Reachable via the 🌍 menu / flint; auto-selects a brick on buy.
+   Verified headless: fonts 24px + short blurbs; Lego tab hidden→buy→12 bricks;
+   travel to Lego (baseplate id 86 under spawn); place bricks; 4s soak; reload +
+   world-hop all green, zero errors. Screenshots of the Lego build + the big-text
+   dialog. Note on "higher res": the engine is 16px pixel-art atlas-wide, so the
+   studs are as crisp as 16px + tint allows (glossy, rounded) — true HD or real
+   3-D stud geometry would be an engine-level change (offered as a future step).
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files

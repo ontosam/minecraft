@@ -24,6 +24,7 @@ export const TILE = {
   MOSS: 68, MUSHROOM_RED: 69, MUSHROOM_BROWN: 70, CACTUS_TOP: 71, CACTUS_SIDE: 72, MUD: 73,
   NETHER_BRICK: 74, MAGMA: 75,
   MELON_TOP: 76, MELON_SIDE: 77, HAY_TOP: 78, HAY_SIDE: 79, NOTE_BLOCK: 80, SPONGE: 81,
+  LEGO_TOP: 82, LEGO_SIDE: 83,
 };
 
 export function initGL(canvas) {
@@ -447,6 +448,23 @@ function buildAtlasCanvas() {
   { const q = at(TILE.HAY_SIDE); noise(ctx, q[0], q[1], 0xe0c04a, 0.08, 227); ctx.fillStyle = shade(0x9c7a1e, 1); ctx.fillRect(q[0], q[1] + 1, T, 1); ctx.fillRect(q[0], q[1] + T - 2, T, 1); ctx.fillStyle = shade(0xb08a24, 1); for (let x = 1; x < T; x += 3) ctx.fillRect(q[0] + x, q[1] + 3, 1, T - 6); }
   { const q = at(TILE.NOTE_BLOCK); noise(ctx, q[0], q[1], 0x8a5a30, 0.10, 228); ctx.fillStyle = shade(0x5a3a1c, 1); ctx.strokeRect(q[0] + 0.5, q[1] + 0.5, T - 1, T - 1); ctx.fillStyle = shade(0x2a2030, 1); ctx.fillRect(q[0] + 9, q[1] + 4, 2, 7); ctx.fillRect(q[0] + 5, q[1] + 9, 5, 3); }
   { const q = at(TILE.SPONGE); noise(ctx, q[0], q[1], 0xd8c24a, 0.10, 229); ctx.fillStyle = shade(0x9c8a2a, 1); const r = rng(229); for (let i = 0; i < 12; i++) ctx.fillRect(q[0] + (r() * 14 | 0), q[1] + (r() * 14 | 0), 2, 2); }
+
+  // --- Lego bricks: drawn neutral (white/greys) so a per-colour tint makes
+  // vivid bricks. Top = 2x2 glossy studs; side = a brick with a shiny top rim.
+  { const q = at(TILE.LEGO_TOP); ctx.fillStyle = '#ededed'; ctx.fillRect(q[0], q[1], T, T);
+    ctx.fillStyle = 'rgba(0,0,0,0.10)'; ctx.fillRect(q[0], q[1] + T - 1, T, 1); ctx.fillRect(q[0] + T - 1, q[1], 1, T);
+    const studs = [[4, 4], [12, 4], [4, 12], [12, 12]];
+    for (const [sx, sy] of studs) {
+      ctx.fillStyle = '#cfcfcf'; ctx.beginPath(); ctx.arc(q[0] + sx, q[1] + sy, 3.0, 0, 7); ctx.fill();          // stud base/shadow
+      ctx.fillStyle = '#f6f6f6'; ctx.beginPath(); ctx.arc(q[0] + sx - 0.4, q[1] + sy - 0.4, 2.1, 0, 7); ctx.fill(); // stud top
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(q[0] + sx - 0.9, q[1] + sy - 0.9, 0.9, 0, 7); ctx.fill(); // hot spot
+    }
+  }
+  { const q = at(TILE.LEGO_SIDE); ctx.fillStyle = '#e2e2e2'; ctx.fillRect(q[0], q[1], T, T);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(q[0], q[1], T, 2);                       // glossy top rim
+    ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(q[0] + 2, q[1] + 3, 2, T - 5);  // soft left highlight
+    ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(q[0], q[1] + T - 2, T, 2);    // bottom shade
+  }
 
   return c;
 }

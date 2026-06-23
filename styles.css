@@ -317,9 +317,10 @@ body {
 
 /* Villager quest dialog */
 #quest-msg {
-  font-size: 17px;
+  font-size: 22px;
+  font-weight: 700;
   color: #2a2a33;
-  line-height: 1.6;
+  line-height: 1.5;
   text-align: center;
   margin-bottom: 18px;
 }
@@ -335,14 +336,14 @@ body {
   color: #fff !important;
 }
 
-/* 📖 Adventure dialog */
+/* 📖 Adventure dialog — big, easy-to-read text for a 6-year-old */
 #adv-body { text-align: center; }
-.adv-portrait { display: block; margin: 2px auto 4px; image-rendering: pixelated; }
-.adv-name { font-weight: 800; color: #4a3b86; font-size: 18px; margin-bottom: 6px; }
-.adv-text { font-size: 17px; line-height: 1.35; margin: 0 auto 10px; max-width: 340px; color: #2e2e36; }
-.adv-task { background: #f1ecff; border-radius: 12px; padding: 8px 10px; font-size: 15px; color: #2e2e36; }
+.adv-portrait { display: block; margin: 2px auto 6px; image-rendering: pixelated; }
+.adv-name { font-weight: 800; color: #4a3b86; font-size: 24px; margin-bottom: 8px; }
+.adv-text { font-size: 24px; font-weight: 700; line-height: 1.4; margin: 0 auto 12px; max-width: 360px; color: #2e2e36; }
+.adv-task { background: #f1ecff; border-radius: 14px; padding: 12px 12px; font-size: 21px; font-weight: 700; color: #2e2e36; }
 .adv-task.done { background: #e3f7e3; }
-.adv-task small { color: #6a5fa0; }
+.adv-task small { display: block; margin-top: 4px; font-size: 17px; font-weight: 600; color: #6a5fa0; }
 .adv-finale-row { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-bottom: 8px; }
 .adv-finale-row canvas { image-rendering: pixelated; }
 
@@ -645,8 +646,10 @@ body {
   background: linear-gradient(135deg, #ffd23f, #ff9f1c);
   color: #4a3000;
   font-weight: 800;
-  font-size: 17px;
-  padding: 12px 20px;
+  font-size: 20px;
+  max-width: 84vw;
+  text-align: center;
+  padding: 14px 22px;
   border-radius: 22px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, .3);
   opacity: 0;

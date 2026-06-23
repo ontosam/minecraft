@@ -120,7 +120,7 @@ function makeMobs(kind, w) {
         else if (type === 'web') {              // a sticky web briefly slows you (no damage)
           player.webT = 1.6; sound.play('hiss');
           spawnParticles(pos, '🕸️', 'puff', 1, 14);
-          tip('web', '🕸️ A spider web! It slows you down for a moment — keep moving, it wears off fast.');
+          tip('web', '🕸️ Spider web! A bit slow for a sec — keep going!');
         }
       };
     } else if (t === 'skeletons') {
@@ -310,7 +310,7 @@ function recoverHome() {
 
 // Flint & steel portals line up in a tidy row right by home, one slot per
 // destination — so they never stack behind each other and are easy to find.
-const HUB_DESTS = ['gold', 'ant', 'tnt', 'sky', 'end'];
+const HUB_DESTS = ['gold', 'ant', 'tnt', 'sky', 'end', 'lego'];
 function placeHubPortal(W, kind, dest) {
   const slot = Math.max(0, HUB_DESTS.indexOf(dest));
   const sp = W.spawn;
@@ -493,7 +493,7 @@ function doBuild(hit) {
   goals.onBuild(selected);
   if (isRedstone(selected)) {
     world.updateRedstone();   // a new wire/lamp may light up
-    tip('redstone', '⚙️ Redstone! Put a Lamp next to a Lever (or join them with Redstone wire), then tap the Lever to switch the light on and off!');
+    tip('redstone', '⚙️ Put a Lamp next to a Lever, then tap the Lever!');
   }
   recheckBuild();             // did this block finish a build challenge?
   if (selected === B.SAPLING) { saplings.push({ world, x, y, z, t: 14 + Math.random() * 14 }); goals.bump('plant'); }
@@ -565,7 +565,7 @@ let noteStep = 0;
 function playNoteBlock(x, y, z) {
   sound.note(noteStep++);
   spawnParticles([x + 0.5, y + 1.1, z + 0.5], '🎵', 'heart', 1, 14);
-  tip('note', '🎵 A note block! Tap it for a musical note. Put a row of them and tap along to make a song!');
+  tip('note', '🎵 Tap it for a note! A row makes a song!');
 }
 
 // --- Doors: a 2-tall openable door for house-building ---
@@ -615,7 +615,7 @@ function placeBed(hit) {
   world.placed.add(world.idx(x, y, z)); world.placed.add(world.idx(hx, y, hz));
   sound.play('door'); saveDirty = true; actionAnim = 1; minimapDirty = true;
   goals.onBuild(B.BED_FOOT);
-  tip('bed', '🛏️ A bed! Tap it to sleep — it turns night into morning, fills your hearts, and sets your 🏠 home right here.');
+  tip('bed', '🛏️ Tap to sleep! Night → morning, full hearts, home set.');
 }
 function sleepInBed(x, y, z) {
   night = false; updateNightButton();
@@ -997,7 +997,7 @@ function castLine() {
   fishing = { wx: spot[0], wy: spot[1], wz: spot[2], t: 1.6 + Math.random() * 2.4 };
   sound.play('splash');
   updateFishButton();
-  tip('fishing', '🎣 Little ponds have little fish — find or build a BIG lake or ocean for bigger fish worth more 💎!');
+  tip('fishing', '🎣 Big water = big fish + more 💎!');
 }
 // How big is the body of water at (x,y,z)? A flood-fill, capped — bigger water
 // has bigger fish worth more 💎 (so a 1-block puddle can't farm diamonds).
@@ -1067,6 +1067,7 @@ const SHOP = [
   { id: 'crown', icon: '👑', name: 'Golden Crown', cost: 14, desc: 'Wear a royal crown — be the king!' },
   { id: 'skyworld', icon: '☁️', name: 'Sky World', cost: 20, desc: 'A whole new floating-islands world — best with Fly!' },
   { id: 'endworld', icon: '🐉', name: 'The End', cost: 30, desc: 'A floating world with a friendly dragon to tame!' },
+  { id: 'legoworld', icon: '🧱', name: 'Lego World', cost: 50, desc: 'A giant Lego table + 12 shiny Lego bricks! (a big treasure goal)' },
 ];
 function buildShop() {
   document.getElementById('shop-gems').textContent = 'You have 💎 ' + goals.gems;
@@ -1102,6 +1103,7 @@ function buyItem(it) {
   }
   if (it.id === 'skyworld') showToast('☁️ Sky World unlocked! Tap 🔥, choose Sky World, then walk in!', 4200);
   if (it.id === 'endworld') showToast('🐉 The End unlocked! Tap 🔥, choose The End, then walk in to meet the dragon!', 4600);
+  if (it.id === 'legoworld') { buildPicker(); selected = B.LEGO_RED; refreshBlocksButton(); showToast('🧱 Lego World! Tap 🌍 → Lego World. New Lego bricks are in your blocks!', 4600); }
   sound.play('treasure');
   updateGems(); buildShop();
   showToast('✨ Unlocked: ' + it.name + '!');
@@ -1165,18 +1167,18 @@ function questOk() {
 // task (tracked from now via a goals counter), a 💎 reward, friendship hearts,
 // and sometimes a gift. The 📖 button is always there so he's never lost. ---
 const STORY = [
-  { friend: 'chris', say: "Welcome to our big adventure, Ezra! 🎉 Let's start at home — build a cozy house so we have somewhere to play!", hint: "Tap 🏗️, then pick 'Cozy House'.", task: { metric: 'place', n: 20, mode: 'do', icon: '🏠', label: 'build a house' }, reward: 4 },
-  { friend: 'alex', say: "Hi! I'm Alex! 🗼 Let's build a TOWER together — stack blocks up nice and tall!", hint: 'Stack blocks up high, or tap 🏗️ → Long Wall (it counts!).', task: { kind: 'build', type: 'tower', n: 4, icon: '🗼', label: 'build a tower 4 tall' }, reward: 5 },
-  { friend: 'vlad', say: "Every explorer needs animal friends! 🐾 Come and say hello to the animals with me.", hint: 'Walk up to a pig or sheep and tap 🐾 Pet.', task: { metric: 'pet', n: 3, mode: 'do', icon: '🐾', label: 'pet 3 animals' }, reward: 4, gift: 'pet' },
-  { friend: 'chip', say: "Chip here! 🌉 Let's build a long BRIDGE — a row of blocks across the ground (or the water)!", hint: 'Lay blocks in a line, or tap 🏗️ → Big Floor.', task: { kind: 'build', type: 'line', n: 7, icon: '🌉', label: 'build a bridge 7 long' }, reward: 5 },
-  { friend: 'cora', say: "Let's make the world greener! 🌱 Plant a little sapling and we'll watch it grow into a tree.", hint: 'Pick the 🌱 sapling (Nature tab) and tap the grass.', task: { metric: 'plant', n: 1, mode: 'do', icon: '🌱', label: 'plant a sapling' }, reward: 4 },
-  { friend: 'milo', say: "I'm Milo! 🟫 Let's lay down a big FLOOR — a 4-by-4 square to dance on!", hint: 'Tap 🏗️ → Big Floor, or place blocks in a square.', task: { kind: 'build', type: 'floor', n: 4, icon: '🟫', label: 'build a 4×4 floor' }, reward: 5 },
-  { friend: 'jovi', say: "I heard there's shiny treasure in the 🪙 Gold World! ✨ Let's go dig some up!", hint: 'Tap 🌍 → Gold World, then dig the shiny blocks.', task: { metric: 'treasure', n: 2, mode: 'do', icon: '💎', label: 'dig up 2 treasures' }, reward: 5 },
-  { friend: 'brexin', say: "I'm Brexin — your new friend! 🧱 Let's build a big WALL, 6 long and 3 tall!", hint: 'Tap 🏗️ → Long Wall (easy!), or stack a wall yourself.', task: { kind: 'build', type: 'wall', n: 6, n2: 3, icon: '🧱', label: 'build a wall 6 long, 3 tall' }, reward: 6, gift: 'sparkle' },
-  { friend: 'steve', say: "Brain power time! 🧮 Answer some of my fun number questions and I'll cheer you on!", hint: 'Find Steve at his stand and tap him.', task: { metric: 'math', n: 3, mode: 'do', icon: '🍗', label: 'answer 3 math questions' }, reward: 5 },
-  { friend: 'cristiano', say: "Goooal! ⚽ Actually... let's BOUNCE! Put down a slime block and boing on it with me!", hint: 'Pick the 🟢 slime block (Fun tab), place it, and jump!', task: { metric: 'bounce', n: 1, mode: 'do', icon: '🟢', label: 'bounce on slime' }, reward: 4, gift: 'crown' },
-  { friend: 'hero', say: "Time to be BRAVE! 🦸 Turn on night and gently bonk a wobbly monster. I'm right beside you — you always wake up safe!", hint: 'Tap 🌙, then tap a zombie or spider.', task: { metric: 'monster', n: 1, mode: 'do', icon: '⚔️', label: 'bonk 1 night monster' }, reward: 6 },
-  { friend: 'cora', say: "The GRAND finale! 🐉 Let's go to The End and tame the friendly dragon together. You can do it!", hint: 'Buy The End in the 💎 shop, tap 🌍 → The End, pop the crystals, then pet the dragon!', task: { metric: 'dragon', n: 1, mode: 'have', icon: '🐉', label: 'tame the dragon' }, reward: 12, gift: 'rainbow' },
+  { friend: 'chris', say: "Let's build a cozy house! 🏠", hint: 'Tap 🏗️ → Cozy House.', task: { metric: 'place', n: 20, mode: 'do', icon: '🏠', label: 'build a house' }, reward: 4 },
+  { friend: 'alex', say: "Hi, I'm Alex! Build a tower! 🗼", hint: 'Tap 🏗️ → Long Wall.', task: { kind: 'build', type: 'tower', n: 4, icon: '🗼', label: 'build a tower 4 tall' }, reward: 5 },
+  { friend: 'vlad', say: "Let's pet 3 animals! 🐾", hint: 'Tap 🐾 next to an animal.', task: { metric: 'pet', n: 3, mode: 'do', icon: '🐾', label: 'pet 3 animals' }, reward: 4, gift: 'pet' },
+  { friend: 'chip', say: "I'm Chip! Build a bridge! 🌉", hint: 'Tap 🏗️ → Big Floor.', task: { kind: 'build', type: 'line', n: 7, icon: '🌉', label: 'build a bridge 7 long' }, reward: 5 },
+  { friend: 'cora', say: "Plant a little tree! 🌱", hint: 'Place a 🌱 sapling on grass.', task: { metric: 'plant', n: 1, mode: 'do', icon: '🌱', label: 'plant a sapling' }, reward: 4 },
+  { friend: 'milo', say: "I'm Milo! Build a big floor! 🟫", hint: 'Tap 🏗️ → Big Floor.', task: { kind: 'build', type: 'floor', n: 4, icon: '🟫', label: 'build a 4×4 floor' }, reward: 5 },
+  { friend: 'jovi', say: "Find treasure in Gold World! 💎", hint: 'Tap 🌍 → Gold World, then dig.', task: { metric: 'treasure', n: 2, mode: 'do', icon: '💎', label: 'dig up 2 treasures' }, reward: 5 },
+  { friend: 'brexin', say: "I'm Brexin! Build a big wall! 🧱", hint: 'Tap 🏗️ → Long Wall.', task: { kind: 'build', type: 'wall', n: 6, n2: 3, icon: '🧱', label: 'build a wall 6 long, 3 tall' }, reward: 6, gift: 'sparkle' },
+  { friend: 'steve', say: "Answer 3 number puzzles! 🧮", hint: 'Tap Steve at his stand.', task: { metric: 'math', n: 3, mode: 'do', icon: '🍗', label: 'answer 3 math questions' }, reward: 5 },
+  { friend: 'cristiano', say: "Let's bounce on slime! 🟢", hint: 'Place slime, then jump on it.', task: { metric: 'bounce', n: 1, mode: 'do', icon: '🟢', label: 'bounce on slime' }, reward: 4, gift: 'crown' },
+  { friend: 'hero', say: "Be brave at night! 🦸", hint: 'Tap 🌙, then tap a monster.', task: { metric: 'monster', n: 1, mode: 'do', icon: '⚔️', label: 'bonk 1 night monster' }, reward: 6 },
+  { friend: 'cora', say: "Last one — tame the dragon! 🐉", hint: 'Go to The End, pop crystals, pet her.', task: { metric: 'dragon', n: 1, mode: 'have', icon: '🐉', label: 'tame the dragon' }, reward: 12, gift: 'rainbow' },
 ];
 const ADV_FRIENDS = [...new Set(STORY.map((c) => c.friend))];
 
@@ -1193,7 +1195,7 @@ const BUILD_FRIENDS = ['alex', 'chip', 'milo', 'brexin'];
 function makeFreeChallenge() {
   const b = BUILD_POOL[Math.floor(Math.random() * BUILD_POOL.length)];
   const friend = BUILD_FRIENDS[Math.floor(Math.random() * BUILD_FRIENDS.length)];
-  return { friend, free: true, say: charById(friend).name + " wants to build with you! 🛠️ Can you " + b.label + "?", hint: 'Use your blocks (or the 🏗️ button) anywhere near you!', task: { kind: 'build', type: b.type, n: b.n, n2: b.n2, icon: b.icon, label: b.label }, reward: 4 };
+  return { friend, free: true, say: charById(friend).name + " says: build with me! 🛠️", hint: 'Use 🏗️ or your blocks near you!', task: { kind: 'build', type: b.type, n: b.n, n2: b.n2, icon: b.icon, label: b.label }, reward: 4 };
 }
 
 // Scan the blocks the player has placed for a finished structure.
@@ -1263,7 +1265,7 @@ function renderAdventure() {
     for (const id of ADV_FRIENDS) row.appendChild(charPreview(charById(id), 48));
     body.appendChild(row);
     const t = document.createElement('div'); t.className = 'adv-text';
-    t.innerHTML = '🎉 You finished the Big Adventure with all your friends! 🎉<br>You\'re an amazing adventurer, Ezra! 💖<br>Now your friends will keep dropping by with fun build challenges!';
+    t.innerHTML = '🎉 You did the whole adventure! 🎉<br>Great job, Ezra! 💖<br>Now friends bring fun build jobs!';
     body.appendChild(t);
     btn.textContent = 'Yay! 🎉';
     return;
@@ -1320,7 +1322,7 @@ function setupBuddy() {
   if (!buddyChar) buddyChar = new Character(gl);
   const W = worlds.over.world, sp = W.spawn;
   const hx = Math.max(2, Math.min(SX - 2, Math.floor(sp[0]) + 4)), hz = Math.max(2, Math.min(SZ - 2, Math.floor(sp[2]) + 4));
-  buddy = { pos: [hx + 0.5, W.heightAt(hx, hz) + 1, hz + 0.5], home: [hx + 0.5, hz + 0.5], yaw: 0, mode: 'home', timer: 25 + Math.random() * 30, walk: 0, linger: 0, hostId: null, chimed: false };
+  buddy = { pos: [hx + 0.5, W.heightAt(hx, hz) + 1, hz + 0.5], home: [hx + 0.5, hz + 0.5], yaw: 0, mode: 'home', timer: 16 + Math.random() * 22, walk: 0, linger: 0, hostId: null, chimed: false };
   syncBuddySkin();
 }
 function syncBuddySkin() {
@@ -1338,18 +1340,19 @@ function updateBuddy(dt) {
     buddy.walk = 0;
     if (dist < 6) buddy.yaw = Math.atan2(-dx, -dz);                 // turn to look if you're near
     if ((buddy.timer <= 0 || claimable) && dist < 24 && dist > 2.6) { buddy.mode = 'approach'; buddy.chimed = false; buddy.linger = 0; }
-    else if (buddy.timer <= 0) buddy.timer = 45 + Math.random() * 40;
+    else if (buddy.timer <= 0) buddy.timer = 35 + Math.random() * 30;
   } else if (buddy.mode === 'approach') {
     if (dist > 2.3) { buddy.yaw = Math.atan2(-dx, -dz); buddy.pos[0] += dx / dist * 2.1 * dt; buddy.pos[2] += dz / dist * 2.1 * dt; buddy.walk += dt * 8; }
     else {
       buddy.yaw = Math.atan2(-dx, -dz); buddy.walk = 0;
-      if (!buddy.chimed) {
+      if (!buddy.chimed) {                       // a clear "tap me!" greeting every visit
         buddy.chimed = true; sound.play('pet');
-        spawnParticles([buddy.pos[0], buddy.pos[1] + 1.9, buddy.pos[2]], claimable ? '⭐' : '👋', 'heart', 1, 12);
-        if (claimable) showToast('📖 ' + charById(buddy.hostId).name + ': you did it! Tap me! 🎉', 2800);
+        const nm = charById(buddy.hostId).name;
+        spawnParticles([buddy.pos[0], buddy.pos[1] + 1.9, buddy.pos[2]], claimable ? '⭐' : '👋', 'heart', 2, 14);
+        showToast(claimable ? ('📖 ' + nm + ': you did it! Tap me! 🎉') : ('👋 ' + nm + ' is here! Tap me!'), 3000);
       }
       buddy.linger += dt;
-      if (buddy.linger > (claimable ? 14 : 8)) { buddy.mode = 'leave'; buddy.timer = 50 + Math.random() * 40; }
+      if (buddy.linger > (claimable ? 16 : 9)) { buddy.mode = 'leave'; buddy.timer = 38 + Math.random() * 30; }
     }
   } else { // leave → wander home
     const hx = buddy.home[0] - buddy.pos[0], hz = buddy.home[1] - buddy.pos[2], hd = Math.hypot(hx, hz) || 1;
@@ -1763,14 +1766,14 @@ function wireUI() {
   document.getElementById('btn-flint').addEventListener('pointerdown', (e) => {
     e.preventDefault(); sound.resume();
     flintMode = !flintMode; updateFlintButton();
-    if (flintMode) tip('flint', '🔥 Flint & steel! Build an obsidian doorway (a closed frame), then tap inside it to light a portal. It also lights TNT. Tap 🔥 again to put it away.');
+    if (flintMode) tip('flint', '🔥 Build an obsidian frame, tap inside to make a portal! Tap 🔥 to put away.');
   });
   document.getElementById('portalmenu-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closePortalMenu(); });
   document.getElementById('portalmenu').addEventListener('pointerdown', (e) => { if (e.target.id === 'portalmenu') closePortalMenu(); });
 
   document.getElementById('btn-worlds').addEventListener('pointerdown', (e) => {
     e.preventDefault(); sound.resume();
-    tip('worlds', '🌍 Tap any world to zoom straight there! Locked ones (🔒) you buy in the 💎 shop or earn with ⭐.');
+    tip('worlds', '🌍 Tap a world to go there! 🔒 = buy in 💎 shop.');
     openWorldMenu();
   });
   document.getElementById('worldmenu-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeWorldMenu(); });
@@ -1778,7 +1781,7 @@ function wireUI() {
 
   document.getElementById('btn-buildkit').addEventListener('pointerdown', (e) => {
     e.preventDefault(); sound.resume();
-    tip('buildkit', '🏗️ Big builds! Pick a House, Floor or Wall and it appears right in front of you. Tip: choose a block first to pick what your Floor and Wall are made of.');
+    tip('buildkit', '🏗️ Pick House, Floor or Wall — it builds in front of you!');
     openBuildMenu();
   });
   document.getElementById('buildmenu-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeBuildMenu(); });
@@ -1787,7 +1790,7 @@ function wireUI() {
   document.getElementById('btn-night').addEventListener('pointerdown', (e) => {
     e.preventDefault(); sound.resume();
     night = !night; updateNightButton();
-    if (night) { goals.bump('night'); tip('night', '🌙 At night friendly monsters wander out. Tap to bonk them, or fly up high to stay safe — you always wake up at home, never losing anything!'); }
+    if (night) { goals.bump('night'); tip('night', '🌙 Monsters come out! Tap them, or fly up. You always wake up safe!'); }
   });
 
   document.getElementById('btn-ride').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); toggleRide(); });
@@ -1805,7 +1808,7 @@ function wireUI() {
   document.getElementById('shop').addEventListener('pointerdown', (e) => { if (e.target.id === 'shop') closeShop(); });
   document.getElementById('btn-adventure').addEventListener('pointerdown', (e) => {
     e.preventDefault(); sound.resume();
-    tip('adventure', '📖 This is your Adventure! Your friends give you fun things to do together. Do the job, then tap 📖 to see what\'s next!');
+    tip('adventure', '📖 Friends give you fun jobs! Do it, then tap 📖.');
     openAdventure();
   });
   document.getElementById('adv-ok').addEventListener('pointerdown', (e) => { e.preventDefault(); advOk(); });
@@ -1933,9 +1936,9 @@ function frame(now) {
 
   // Friendly first-time blurbs when you wander near something new (overworld).
   if (dimension === 'over') {
-    if (stevePos) { const dx = player.pos[0] - stevePos[0], dz = player.pos[2] - stevePos[2]; if (dx * dx + dz * dz < 30) tip('steve', '🍗 That\'s Steve! Tap him for a fun math game (earn 💎) and snacks that fill your hearts.'); }
+    if (stevePos) { const dx = player.pos[0] - stevePos[0], dz = player.pos[2] - stevePos[2]; if (dx * dx + dz * dz < 30) tip('steve', '🍗 Tap Steve for math games and snacks!'); }
     const vs = mobs().villagers;
-    if (vs) for (const v of vs.list) { const dx = player.pos[0] - v.pos[0], dz = player.pos[2] - v.pos[2]; if (dx * dx + dz * dz < 16) { tip('villager', '🧑‍🌾 Villagers have little jobs for you — tap one for a job and earn 💎!'); break; } }
+    if (vs) for (const v of vs.list) { const dx = player.pos[0] - v.pos[0], dz = player.pos[2] - v.pos[2]; if (dx * dx + dz * dz < 16) { tip('villager', '🧑‍🌾 Tap a villager for a job + 💎!'); break; } }
   }
 
   // Step into a portal swirl → travel to its destination world.
