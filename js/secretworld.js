@@ -65,6 +65,14 @@ export const ATTRACTIONS = [
   { id: 'carousel', icon: '🎠', name: 'Carousel', cost: 2, metric: 'carousel', dur: 9 },
 ];
 
+// --- Stands: little booths you tap (or walk up to) for a menu. The Ticket booth
+// is the easy way onto the rides; plus a Popcorn stand and a Gift Shop. ---
+export const STANDS = [
+  { id: 'tickets', icon: '🎟️', name: 'Ride Tickets', label: 'Ride Tickets!', color: [0.92, 0.24, 0.30] },
+  { id: 'popcorn', icon: '🍿', name: 'Popcorn Stand', label: 'Popcorn!', color: [0.98, 0.82, 0.24] },
+  { id: 'shop', icon: '🛍️', name: 'Gift Shop', label: 'Gift Shop!', color: [0.36, 0.78, 0.36] },
+];
+
 // Wheel structure (spokes + rim) built in the Y-Z plane so it spins about X
 // (a real upright Ferris wheel). Gondolas are drawn separately so they stay
 // level and can carry upright riders.
@@ -150,6 +158,17 @@ function buildKiosk(color) {
   };
 }
 
+// A shop booth: a counter, a back wall, posts, and a bright striped awning.
+function buildBooth(color) {
+  return (A) => {
+    addBox(A, 0, 0.45, 0, 1.1, 0.45, 0.5, WHITE);          // counter
+    addBox(A, 0, 0.7, -0.45, 1.1, 0.7, 0.08, color);        // back wall
+    for (const sx of [-1.0, 1.0]) addBox(A, sx, 1.0, 0.4, 0.08, 1.0, 0.08, BROWN); // front posts
+    addBox(A, 0, 1.7, 0, 1.25, 0.16, 0.7, color, true);     // glowing striped awning
+    for (let i = -1; i <= 1; i++) addBox(A, i * 0.7, 1.72, 0.72, 0.18, 0.14, 0.04, i % 2 ? WHITE : color, true); // scallops
+  };
+}
+
 class NPC {
   constructor(id, x, z) { this.id = id; this.pos = [x, 7, z]; this.yaw = Math.random() * 6.28; this.targetYaw = this.yaw; this.walk = Math.random() * 6; this.timer = 1 + Math.random() * 3; this.moving = true; this.seat = -1; }
 }
@@ -163,10 +182,15 @@ export class SecretPark {
     this.carouselMesh = meshFrom(gl, buildCarousel);
     this.balloonMeshes = PAL.slice(0, 5).map((c) => meshFrom(gl, buildBalloon(c)));
     this.kioskMeshes = { ferris: meshFrom(gl, buildKiosk(PAL[0])), balloon: meshFrom(gl, buildKiosk(PAL[4])), carousel: meshFrom(gl, buildKiosk(PAL[3])) };
+    this.standMeshes = {};          // booth meshes for the ticket/popcorn/shop stands
+    for (const s of STANDS) this.standMeshes[s.id] = meshFrom(gl, buildBooth(s.color));
     this.list = [];                 // NPC friends (this.list[i] — matches the shadow API)
     this.balloons = [];             // drifting ambient balloons
     this.kiosks = [];               // { id, pos, def }
-    this.signs = [];                // { id, pos } — anchors for the floating "Ride!" labels
+    this.stands = [];               // { id, pos } — tappable ticket/popcorn/shop booths
+    this.signs = [];                // { id, pos } — anchors for the floating signs
+    this.onApproachTicket = null;   // called once when the player walks up to the ticket booth
+    this.ticketArmed = true;
     this.wheel = { cx: 18, cy: 14, cz: 32, R: WHEEL.R, angle: 0 };
     this.carousel = { cx: 44, cy: 7, cz: 24, angle: 0 };
     this.balloonPad = { cx: 40, cy: 7, cz: 44 };
@@ -190,6 +214,12 @@ export class SecretPark {
     ];
     // Anchor a big tappable "Ride!" sign over each ride so it's obvious + easy.
     this.signs = this.kiosks.map((k) => ({ id: k.id, pos: [k.pos[0], k.pos[1] + 2.5, k.pos[2]] }));
+    // Ticket / Popcorn / Gift-shop booths in a tidy row near the spawn — the
+    // Ticket booth is the easy, can't-miss way onto the rides.
+    const sx = [26, 32, 38];
+    this.stands = STANDS.map((s, i) => ({ id: s.id, pos: [sx[i], g, 36] }));
+    for (const st of this.stands) this.signs.push({ id: st.id, pos: [st.pos[0], st.pos[1] + 2.7, st.pos[2]] });
+    this.ticketArmed = true;
     // A few drifting balloons up in the sky for dazzle.
     this.balloons = [];
     for (let i = 0; i < 5; i++) this.balloons.push({ x: 10 + i * 11, y: g + 12 + (i % 3) * 3, z: 14 + (i * 13) % 40, t: Math.random() * 6, mesh: this.balloonMeshes[i % this.balloonMeshes.length] });
@@ -225,6 +255,14 @@ export class SecretPark {
         else n.targetYaw = n.yaw + Math.PI;
       }
     }
+    // Walk up to the Ticket booth and the ride menu pops open (foolproof way onto
+    // the rides). Re-arms once you step away, so it's never naggy.
+    const tk = this.stands.find((s) => s.id === 'tickets');
+    if (tk) {
+      const dd = Math.hypot(player.pos[0] - tk.pos[0], player.pos[2] - tk.pos[2]);
+      if (dd < 2.6 && this.ticketArmed) { this.ticketArmed = false; if (this.onApproachTicket) this.onApproachTicket(); }
+      else if (dd > 4.5) this.ticketArmed = true;
+    }
     // Fireworks for dazzle.
     this.fwTimer -= dt;
     if (this.fwTimer <= 0) {
@@ -233,14 +271,14 @@ export class SecretPark {
     }
   }
 
-  // Tap an attraction (its kiosk OR its body) → return the attraction to ride.
+  // Tap a stand or a ride → return a descriptor { kind:'stand'|'ride', id } for
+  // main to act on (open the right menu / start the ride).
   pickRay(o, d) {
-    for (const k of this.kiosks) {
-      if (rayHitsSphere(o, d, k.pos[0], k.pos[1] + 0.6, k.pos[2], 1.6)) return ATTRACTIONS.find((a) => a.id === k.id);
-    }
-    if (rayHitsSphere(o, d, this.wheel.cx, this.wheel.cy, this.wheel.cz, this.wheel.R + 1)) return ATTRACTIONS.find((a) => a.id === 'ferris');
-    if (rayHitsSphere(o, d, this.carousel.cx, this.carousel.cy + 2, this.carousel.cz, 3)) return ATTRACTIONS.find((a) => a.id === 'carousel');
-    if (rayHitsSphere(o, d, this.balloonPad.cx, this.balloonPad.cy + 1, this.balloonPad.cz, 2.2)) return ATTRACTIONS.find((a) => a.id === 'balloon');
+    for (const s of this.stands) if (rayHitsSphere(o, d, s.pos[0], s.pos[1] + 0.9, s.pos[2], 2.0)) return { kind: 'stand', id: s.id };
+    for (const k of this.kiosks) if (rayHitsSphere(o, d, k.pos[0], k.pos[1] + 0.6, k.pos[2], 1.6)) return { kind: 'ride', id: k.id };
+    if (rayHitsSphere(o, d, this.wheel.cx, this.wheel.cy, this.wheel.cz, this.wheel.R + 1)) return { kind: 'ride', id: 'ferris' };
+    if (rayHitsSphere(o, d, this.carousel.cx, this.carousel.cy + 2, this.carousel.cz, 3)) return { kind: 'ride', id: 'carousel' };
+    if (rayHitsSphere(o, d, this.balloonPad.cx, this.balloonPad.cy + 1, this.balloonPad.cz, 2.2)) return { kind: 'ride', id: 'balloon' };
     return null;
   }
 
@@ -271,6 +309,8 @@ export class SecretPark {
     if (this.rideBalloon) { mat4.model(this._m, this.rideBalloon[0], this.rideBalloon[1], this.rideBalloon[2], 0, 1.3, 1.3, 1.3); gl.uniformMatrix4fv(prog.u.uModel, false, this._m); this.balloonMeshes[0].draw(prog); }
     // Kiosks.
     for (const k of this.kiosks) { mat4.model(this._m, k.pos[0], k.pos[1], k.pos[2], 0, 1, 1, 1); gl.uniformMatrix4fv(prog.u.uModel, false, this._m); k.mesh.draw(prog); }
+    // Stand booths (tickets / popcorn / gift shop).
+    for (const s of this.stands) { mat4.model(this._m, s.pos[0], s.pos[1], s.pos[2], 0, 1, 1, 1); gl.uniformMatrix4fv(prog.u.uModel, false, this._m); this.standMeshes[s.id].draw(prog); }
     // Wandering plaza friends.
     for (const n of this.list) if (n.seat < 0) this.chars[n.id].draw(prog, n.pos[0], n.pos[1], n.pos[2], n.yaw, n.walk, n.moving ? 1 : 0, 0, false);
   }

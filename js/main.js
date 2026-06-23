@@ -6,7 +6,7 @@ import { mat4 } from './math.js';
 import { initGL, makeWorldProgram, makeAtlasTexture, GLMesh, blockPreview, shadowMesh } from './gfx.js';
 import { World, BLOCKS, CATEGORIES, B, SX, SY, SZ, isLego } from './world.js';
 import { WORLD_KINDS, WORLD_ORDER } from './worlds.js';
-import { SecretPark, ATTRACTIONS } from './secretworld.js';
+import { SecretPark, ATTRACTIONS, STANDS } from './secretworld.js';
 import { Player } from './player.js';
 import { Animals } from './animals.js';
 import { Creepers } from './creepers.js';
@@ -155,6 +155,7 @@ function makeMobs(kind, w) {
     } else if (t === 'funpark') {
       m.funpark = new SecretPark(gl, w);
       m.funpark.onFirework = (pos) => { spawnParticles(pos, ['🎆', '🎇', '✨'][Math.floor(Math.random() * 3)], 'puff', 5, 80); sound.note(Math.floor(Math.random() * 5)); };
+      m.funpark.onApproachTicket = () => { if (!ride) openRideMenu(); };   // walk up to the booth → ride menu
     } else if (t === 'dragon') {
       m.dragon = new Dragon(gl, w);
       m.dragon.onEvent = (type, pos) => {
@@ -315,7 +316,7 @@ function travelTo(dest) {
     recheckBuild();                           // build challenges check the world you're now in
     if (dest === 'lego' && !isLego(selected)) selected = B.LEGO_RED; // arrive holding a Lego brick
     buildPicker(); refreshBlocksButton();     // Lego World shows a Lego-only palette
-    if (dest === 'secret') tip('rides', '🎡 Tap a glowing "Ride!" sign to go on a ride! Find them with the pink dots on your map.');
+    if (dest === 'secret') tip('tickets', '🎟️ Walk up to the Ticket booth to pick a ride! There\'s a Popcorn stand and Gift Shop too. 🍿🛍️');
   } catch (e) {
     // A portal should never strand Ezra on the scary "Oops" screen. If anything
     // goes wrong mid-trip, log it for us and pop him safely back home instead.
@@ -1715,16 +1716,71 @@ function openRidePrompt(att) {
   document.getElementById('ride').classList.remove('hidden');
 }
 function closeRidePrompt() { pendingRide = null; document.getElementById('ride').classList.add('hidden'); }
-function confirmRide() {
-  const att = pendingRide; closeRidePrompt();
-  if (!att || ride) return;
-  if (!goals.spend(att.cost)) { sound.play('deny'); showToast('Mine more 💎 first! Earn 💎 in the other worlds, then splurge here! (need ' + att.cost + ')', 3800); return; }
+function rideById(id) { return ATTRACTIONS.find((a) => a.id === id); }
+// Pay for + start a ride (used by the per-ride prompt and the ticket menu).
+function beginRide(att) {
+  if (!att || ride) return false;
+  if (!goals.spend(att.cost)) { sound.play('deny'); showToast('Mine more 💎 first! Earn 💎 in the other worlds, then come splurge here! (need ' + att.cost + ')', 4000); return false; }
   updateGems();
-  const fp = mobs().funpark; if (!fp) return;
+  const fp = mobs().funpark; if (!fp) return false;
   ride = { att, t: 0, dur: att.dur, returnPos: player.pos.slice() };
   fp.rideKind = att.id;
   sound.play('portal');
   showToast('🎟️ ' + att.icon + ' Hold on tight — here we go!', 2200);
+  return true;
+}
+function confirmRide() { const att = pendingRide; closeRidePrompt(); beginRide(att); }
+
+// --- Stands: the Ticket booth (ride menu), Popcorn stand, and Gift Shop ---
+function openStand(id) {
+  if (id === 'tickets') openRideMenu();
+  else if (id === 'popcorn') openPopcorn();
+  else if (id === 'shop') { showToast('🛍️ Welcome to the Gift Shop! Spend your 💎 on cool things!', 2600); openShop(); }
+}
+// The Ticket booth: a simple tap-a-ride menu (the easy, can't-miss way to ride).
+function buildRideMenu() {
+  const body = document.getElementById('ridemenu-body');
+  body.innerHTML = '';
+  for (const att of ATTRACTIONS) {
+    const btn = document.createElement('button');
+    btn.className = 'portal-choice';
+    btn.innerHTML = '<span class="pe">' + att.icon + '</span><b>' + att.name + '</b><small>💎 ' + att.cost + '</small>';
+    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); closeRideMenu(); beginRide(att); });
+    body.appendChild(btn);
+  }
+}
+function openRideMenu() { if (ride) return; buildRideMenu(); document.getElementById('ridemenu').classList.remove('hidden'); }
+function closeRideMenu() { document.getElementById('ridemenu').classList.add('hidden'); }
+
+// The Popcorn stand: tasty treats to spend 💎 on (pure fun + a goal; some heal).
+const TREATS = [
+  { icon: '🍿', name: 'Popcorn', cost: 1, heal: 1 },
+  { icon: '🥤', name: 'Fizzy Pop', cost: 1, heal: 1 },
+  { icon: '🍭', name: 'Cotton Candy', cost: 2, heal: 2 },
+  { icon: '🍦', name: 'Ice Cream', cost: 2, heal: 2 },
+];
+function buildPopcornMenu() {
+  const body = document.getElementById('popcorn-body');
+  body.innerHTML = '';
+  for (const t of TREATS) {
+    const btn = document.createElement('button');
+    btn.className = 'portal-choice';
+    btn.innerHTML = '<span class="pe">' + t.icon + '</span><b>' + t.name + '</b><small>💎 ' + t.cost + '</small>';
+    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); buyTreat(t); });
+    body.appendChild(btn);
+  }
+}
+function openPopcorn() { buildPopcornMenu(); document.getElementById('popcorn').classList.remove('hidden'); }
+function closePopcorn() { document.getElementById('popcorn').classList.add('hidden'); }
+function buyTreat(t) {
+  if (!goals.spend(t.cost)) { sound.play('deny'); showToast('Mine more 💎 first! (need ' + t.cost + ')'); return; }
+  updateGems();
+  if (hearts < effMax()) { hearts = Math.min(effMax(), hearts + t.heal); updateHearts(); }
+  goals.bump('snack'); goals.bump('treat');
+  sound.play('pet');
+  spawnParticles([player.pos[0], player.pos[1] + 1.8, player.pos[2]], t.icon, 'puff', 8, 60);
+  showToast(t.icon + ' Yum! Enjoy your ' + t.name + '!', 2200);
+  buildPopcornMenu();   // refresh the 💎 you have
 }
 // Drive the player along the active ride each frame (replaces normal physics).
 function updateRide(dt) {
@@ -1765,21 +1821,25 @@ function endRide() {
   showToast('⭐ ' + att.icon + ' Wheee! What a ride! You went on the ' + att.name + '!', 3600);
 }
 
-// Big, bright, tappable "Ride!" signs that float over each Secret World ride —
+// Big, bright, tappable signs that float over each Secret World ride + stand —
 // so a 6-year-old can clearly see what to tap (aiming at the 3-D ride is fiddly).
 let rideSignEls = null;
 function ensureRideSigns() {
   if (rideSignEls) return;
   const layer = document.getElementById('ridesigns');
   if (!layer) return;
-  rideSignEls = ATTRACTIONS.map((att) => {
+  const configs = [
+    ...ATTRACTIONS.map((a) => ({ id: a.id, icon: a.icon, text: 'Ride! 💎' + a.cost, tap: () => openRidePrompt(a) })),
+    ...STANDS.map((s) => ({ id: s.id, icon: s.icon, text: s.label, tap: () => openStand(s.id), cls: 'stand' })),
+  ];
+  rideSignEls = configs.map((c) => {
     const el = document.createElement('button');
-    el.className = 'ridesign';
-    el.innerHTML = '<span class="rs-emoji">' + att.icon + '</span><span>Ride! 💎' + att.cost + '</span>';
+    el.className = 'ridesign' + (c.cls ? ' ' + c.cls : '');
+    el.innerHTML = '<span class="rs-emoji">' + c.icon + '</span><span>' + c.text + '</span>';
     el.style.display = 'none';
-    el.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); sound.resume(); openRidePrompt(att); });
+    el.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); sound.resume(); c.tap(); });
     layer.appendChild(el);
-    return { el, att };
+    return { el, id: c.id };
   });
 }
 function updateRideSigns() {
@@ -1788,7 +1848,7 @@ function updateRideSigns() {
   const fp = (dimension === 'secret') ? mobs().funpark : null;
   if (!fp || !pv || ride) { for (const s of rideSignEls) s.el.style.display = 'none'; return; }
   for (const s of rideSignEls) {
-    const sign = fp.signs.find((g) => g.id === s.att.id);
+    const sign = fp.signs.find((g) => g.id === s.id);
     if (!sign) { s.el.style.display = 'none'; continue; }
     mat4.transformPoint(scratch4, pv, sign.pos[0], sign.pos[1], sign.pos[2]);
     if (scratch4[3] <= 0) { s.el.style.display = 'none'; continue; }    // behind the camera
@@ -1930,6 +1990,11 @@ function wireUI() {
   document.getElementById('ride-yes').addEventListener('pointerdown', (e) => { e.preventDefault(); confirmRide(); });
   document.getElementById('ride-no').addEventListener('pointerdown', (e) => { e.preventDefault(); closeRidePrompt(); });
 
+  document.getElementById('ridemenu-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeRideMenu(); });
+  document.getElementById('ridemenu').addEventListener('pointerdown', (e) => { if (e.target.id === 'ridemenu') closeRideMenu(); });
+  document.getElementById('popcorn-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closePopcorn(); });
+  document.getElementById('popcorn').addEventListener('pointerdown', (e) => { if (e.target.id === 'popcorn') closePopcorn(); });
+
   document.getElementById('btn-buildkit').addEventListener('pointerdown', (e) => {
     e.preventDefault(); sound.resume();
     tip('buildkit', '🏗️ Pick House, Floor or Wall — it builds in front of you!');
@@ -2038,12 +2103,18 @@ function drawMinimap() {
       mmCtx.beginPath(); mmCtx.arc(stevePos[0] * s, stevePos[2] * s, 4, 0, Math.PI * 2); mmCtx.fill(); mmCtx.stroke();
     }
   }
-  // Secret World ride markers (pink) so the rides are easy to find.
+  // Secret World markers: rides (pink) + stands incl. the ticket booth (gold).
   if (dimension === 'secret') {
     const fp = mobs().funpark;
-    if (fp) for (const k of fp.kiosks) {
-      mmCtx.fillStyle = '#ff4d88'; mmCtx.strokeStyle = '#7a1840'; mmCtx.lineWidth = 1.5;
-      mmCtx.beginPath(); mmCtx.arc(k.pos[0] * s, k.pos[2] * s, 4, 0, Math.PI * 2); mmCtx.fill(); mmCtx.stroke();
+    if (fp) {
+      for (const k of fp.kiosks) {
+        mmCtx.fillStyle = '#ff4d88'; mmCtx.strokeStyle = '#7a1840'; mmCtx.lineWidth = 1.5;
+        mmCtx.beginPath(); mmCtx.arc(k.pos[0] * s, k.pos[2] * s, 4, 0, Math.PI * 2); mmCtx.fill(); mmCtx.stroke();
+      }
+      for (const st of fp.stands) {
+        mmCtx.fillStyle = '#ffcf33'; mmCtx.strokeStyle = '#7a5a00'; mmCtx.lineWidth = 1.5;
+        mmCtx.beginPath(); mmCtx.arc(st.pos[0] * s, st.pos[2] * s, 4, 0, Math.PI * 2); mmCtx.fill(); mmCtx.stroke();
+      }
     }
   }
   // player arrow (points the way you face)
@@ -2170,7 +2241,7 @@ function frameBody(now) {
     const stv = (!dg && !cr && !zb && !sp && !sk && !vl && !bd && stevePos && dimension === 'over') &&
       rayHitsSphere(camPos, dir, stevePos[0], stevePos[1] + 0.9, stevePos[2], 1.2);
     if (ride) { /* enjoying a ride — taps do nothing */ }
-    else if (fk) openRidePrompt(fk);
+    else if (fk) { if (fk.kind === 'stand') openStand(fk.id); else openRidePrompt(rideById(fk.id)); }
     else if (dg) doDragonTap(dg);
     else if (cr) doDefend(cr);
     else if (zb) doBonkZombie(zb);
@@ -2427,6 +2498,8 @@ function init() {
     travelTo: (k) => travelTo(k),
     get funpark() { return mobs().funpark; },
     funRide: (id) => { const a = ATTRACTIONS.find((x) => x.id === id); if (a) { openRidePrompt(a); confirmRide(); } },
+    openStand: (id) => openStand(id),
+    buyTreat: (i) => buyTreat(TREATS[i || 0]),
     endFunRide: () => { if (ride) endRide(); },
     funRiding: () => (ride ? ride.att.id : null),
     lightPortal: (k) => lightPortal(k),

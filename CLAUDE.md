@@ -802,6 +802,30 @@ at a 3-D ride from third-person while focused on the floor is too fiddly for a
   errors; screenshot of a "🎡 Ride! 💎3" sign floating over the wheel. (Idea if
   still tricky: also auto-pop the prompt when he walks right up to a ride.)
 
+## Status (session 29) — Ticket booth + Popcorn + Gift Shop (rides finally easy)
+Dad: Ezra loves the game but STILL couldn't get on the rides; he asked for a
+"stand where he gets ride tickets," a popcorn stand, and shops. Also wants more
+MC blocks + a larger flat high-res building world (those two queued — see
+Backlog). Shipped the stands on **`claude/dreamy-mccarthy-g6wgjr`** → `main`.
+**sw v17→v18.** Now **48 goals**.
+- **🎟️ Ticket booth = the easy way onto rides.** A booth by the spawn; **walk up
+  to it and a simple "Pick a ride!" menu opens automatically** (`onApproachTicket`,
+  re-arms when you step away so it's never naggy) — or tap it. The menu lists each
+  ride + 💎 cost; tap one → `beginRide` (pays + starts). This is the foolproof
+  fix (he already uses the 🌍 menu fine). The per-ride floating signs + on-canvas
+  taps still work too.
+- **🍿 Popcorn stand** (`TREATS`: popcorn/pop/cotton-candy/ice-cream, 1–2💎) →
+  a treat menu; buying heals up to `effMax()` + a fun burst + new 'Sweet tooth'
+  goal (`treat`). **🛍️ Gift Shop** → opens the existing 💎 shop.
+- Booths built from a new `buildBooth` mesh; `SecretPark.stands`; `pickRay` now
+  returns `{kind:'ride'|'stand', id}`; floating signs + pink/gold minimap markers
+  cover rides + stands. New dialogs `#ridemenu`/`#popcorn`. Debug:
+  `__ezra.openStand(id)/buyTreat(i)`.
+  Verified headless: 3 stands + 6 signs; ticket menu lists 3 rides and a tap
+  starts one (−3💎); **walking up to the booth auto-opens the menu**; popcorn buys
+  a treat (−1💎, goal ticks); gift shop opens the 💎 shop; signs hide at home;
+  zero errors. Screenshot of the booth row.
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept
