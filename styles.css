@@ -627,6 +627,31 @@ body {
   z-index: 6;
 }
 
+/* Floating "Tap to ride!" signs over Secret World attractions (positioned each
+   frame from JS). Big, bright and tappable so a 6-year-old can't miss them. */
+#ridesigns { position: absolute; inset: 0; pointer-events: none; z-index: 7; }
+.ridesign {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 13px;
+  border-radius: 16px;
+  background: linear-gradient(#fff, #ffe7b0);
+  border: 3px solid #ff8c1a;
+  color: #5a2e00;
+  font-weight: 800;
+  font-size: 19px;
+  white-space: nowrap;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, .35);
+  cursor: pointer;
+  animation: ridebob 1.1s ease-in-out infinite;
+}
+.ridesign .rs-emoji { font-size: 24px; }
+@keyframes ridebob { 0%, 100% { margin-top: 0; } 50% { margin-top: -6px; } }
+
 /* Red flash when hurt (set per-frame from JS) */
 #hurt-flash {
   position: absolute;

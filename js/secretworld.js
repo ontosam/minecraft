@@ -166,6 +166,7 @@ export class SecretPark {
     this.list = [];                 // NPC friends (this.list[i] — matches the shadow API)
     this.balloons = [];             // drifting ambient balloons
     this.kiosks = [];               // { id, pos, def }
+    this.signs = [];                // { id, pos } — anchors for the floating "Ride!" labels
     this.wheel = { cx: 18, cy: 14, cz: 32, R: WHEEL.R, angle: 0 };
     this.carousel = { cx: 44, cy: 7, cz: 24, angle: 0 };
     this.balloonPad = { cx: 40, cy: 7, cz: 44 };
@@ -187,6 +188,8 @@ export class SecretPark {
       { id: 'carousel', pos: [this.carousel.cx + 3.4, g + 0.5, this.carousel.cz], mesh: this.kioskMeshes.carousel },
       { id: 'balloon', pos: [this.balloonPad.cx + 0.5, g + 0.5, this.balloonPad.cz + 3.2], mesh: this.kioskMeshes.balloon },
     ];
+    // Anchor a big tappable "Ride!" sign over each ride so it's obvious + easy.
+    this.signs = this.kiosks.map((k) => ({ id: k.id, pos: [k.pos[0], k.pos[1] + 2.5, k.pos[2]] }));
     // A few drifting balloons up in the sky for dazzle.
     this.balloons = [];
     for (let i = 0; i < 5; i++) this.balloons.push({ x: 10 + i * 11, y: g + 12 + (i % 3) * 3, z: 14 + (i * 13) % 40, t: Math.random() * 6, mesh: this.balloonMeshes[i % this.balloonMeshes.length] });

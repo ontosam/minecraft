@@ -783,6 +783,25 @@ zoomed-out option + a top-down view for navigation. Shipped on
    top-down map view, and the far view. Idea backlog offered: a "home/portal"
    compass arrow, a bigger/clearer minimap, pinch-to-zoom.
 
+## Status (session 28) — make Secret World rides discoverable (dad feedback)
+Dad: navigation's great + Ezra loves building patterns on the flat Secret World
+floor, but he **couldn't figure out how to ride** the attractions (aiming a tap
+at a 3-D ride from third-person while focused on the floor is too fiddly for a
+6-yr-old). Shipped on **`claude/dreamy-mccarthy-g6wgjr`** → `main`. **sw v16→v17.**
+- **Big tappable floating "Ride!" signs** over each attraction. `SecretPark`
+  now exposes `signs` (anchored over each kiosk); main projects them to screen
+  each frame (`updateRideSigns`, mirrors the fishing-bobber projection) as bright,
+  bouncing `.ridesign` buttons reading e.g. "🎡 Ride! 💎3". Tap one → the existing
+  "Ride for 💎?" prompt. Hidden during a ride and in every other world. The
+  on-canvas 3-D tap still works too.
+- **Minimap ride markers** (pink dots) in the Secret World so the rides are easy
+  to find; arrival tip rewritten to "Tap a glowing Ride! sign… find them with the
+  pink dots on your map."
+  Verified headless: 3 signs render with the right emoji+cost; tapping a sign
+  opens the prompt and starts the ride; signs hide during a ride + at home; zero
+  errors; screenshot of a "🎡 Ride! 💎3" sign floating over the wheel. (Idea if
+  still tricky: also auto-pop the prompt when he walks right up to a ride.)
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept

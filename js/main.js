@@ -315,7 +315,7 @@ function travelTo(dest) {
     recheckBuild();                           // build challenges check the world you're now in
     if (dest === 'lego' && !isLego(selected)) selected = B.LEGO_RED; // arrive holding a Lego brick
     buildPicker(); refreshBlocksButton();     // Lego World shows a Lego-only palette
-    if (dest === 'secret') tip('secret', '🎡 Welcome to the Secret World! Tap a ride to go on it. Rides cost 💎 — earn 💎 in the other worlds!');
+    if (dest === 'secret') tip('rides', '🎡 Tap a glowing "Ride!" sign to go on a ride! Find them with the pink dots on your map.');
   } catch (e) {
     // A portal should never strand Ezra on the scary "Oops" screen. If anything
     // goes wrong mid-trip, log it for us and pop him safely back home instead.
@@ -1765,6 +1765,39 @@ function endRide() {
   showToast('⭐ ' + att.icon + ' Wheee! What a ride! You went on the ' + att.name + '!', 3600);
 }
 
+// Big, bright, tappable "Ride!" signs that float over each Secret World ride —
+// so a 6-year-old can clearly see what to tap (aiming at the 3-D ride is fiddly).
+let rideSignEls = null;
+function ensureRideSigns() {
+  if (rideSignEls) return;
+  const layer = document.getElementById('ridesigns');
+  if (!layer) return;
+  rideSignEls = ATTRACTIONS.map((att) => {
+    const el = document.createElement('button');
+    el.className = 'ridesign';
+    el.innerHTML = '<span class="rs-emoji">' + att.icon + '</span><span>Ride! 💎' + att.cost + '</span>';
+    el.style.display = 'none';
+    el.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); sound.resume(); openRidePrompt(att); });
+    layer.appendChild(el);
+    return { el, att };
+  });
+}
+function updateRideSigns() {
+  ensureRideSigns();
+  if (!rideSignEls) return;
+  const fp = (dimension === 'secret') ? mobs().funpark : null;
+  if (!fp || !pv || ride) { for (const s of rideSignEls) s.el.style.display = 'none'; return; }
+  for (const s of rideSignEls) {
+    const sign = fp.signs.find((g) => g.id === s.att.id);
+    if (!sign) { s.el.style.display = 'none'; continue; }
+    mat4.transformPoint(scratch4, pv, sign.pos[0], sign.pos[1], sign.pos[2]);
+    if (scratch4[3] <= 0) { s.el.style.display = 'none'; continue; }    // behind the camera
+    s.el.style.display = 'flex';
+    s.el.style.left = (scratch4[0] / scratch4[3] * 0.5 + 0.5) * canvas.clientWidth + 'px';
+    s.el.style.top = (1 - (scratch4[1] / scratch4[3] * 0.5 + 0.5)) * canvas.clientHeight + 'px';
+  }
+}
+
 function refreshGoalsButton() {
   document.getElementById('btn-goals').textContent = '⭐' + goals.stars;
 }
@@ -2005,6 +2038,14 @@ function drawMinimap() {
       mmCtx.beginPath(); mmCtx.arc(stevePos[0] * s, stevePos[2] * s, 4, 0, Math.PI * 2); mmCtx.fill(); mmCtx.stroke();
     }
   }
+  // Secret World ride markers (pink) so the rides are easy to find.
+  if (dimension === 'secret') {
+    const fp = mobs().funpark;
+    if (fp) for (const k of fp.kiosks) {
+      mmCtx.fillStyle = '#ff4d88'; mmCtx.strokeStyle = '#7a1840'; mmCtx.lineWidth = 1.5;
+      mmCtx.beginPath(); mmCtx.arc(k.pos[0] * s, k.pos[2] * s, 4, 0, Math.PI * 2); mmCtx.fill(); mmCtx.stroke();
+    }
+  }
   // player arrow (points the way you face)
   const px = player.pos[0] * s, pz = player.pos[2] * s;
   const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), rx = -fz, rz = fx;
@@ -2158,6 +2199,8 @@ function frameBody(now) {
     if (fishing.t <= 0) reelIn(true);
     else positionBobber(fishing);
   }
+
+  updateRideSigns();   // floating "Tap to ride!" signs over Secret World attractions
 
   // Sparkle Trail (shop reward): drop little ✨ behind you while you move.
   if (goals.hasUnlock('sparkle')) {
