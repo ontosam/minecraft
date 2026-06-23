@@ -1,7 +1,7 @@
 // WebGL setup, shader programs, procedural texture atlas, and mesh helpers.
 // Targets WebGL1 (works on essentially every iPad) with no external libraries.
 
-export const ATLAS = { tile: 16, perRow: 8, size: 128 }; // 8x8 grid of 16px tiles
+export const ATLAS = { tile: 16, perRow: 16, size: 256 }; // 16x16 grid of 16px tiles
 
 // Tile indices in the atlas.
 export const TILE = {
@@ -18,6 +18,12 @@ export const TILE = {
   SLIME: 42, SAPLING: 43,
   MEGA_TNT_SIDE: 44, MEGA_TNT_TOP: 45, SANDSTONE: 46, END_STONE: 47,
   BED_FOOT: 48, BED_HEAD: 49, BED_SIDE: 50, BARRIER: 51, LANTERN: 52,
+  IRON_BLOCK: 53, GOLD_BLOCK: 54, DIAMOND_BLOCK: 55, EMERALD_BLOCK: 56, LAPIS_BLOCK: 57,
+  REDSTONE_BLOCK: 58, COAL_BLOCK: 59, AMETHYST: 60,
+  DEEPSLATE: 61, GRANITE: 62, ANDESITE: 63, DIORITE: 64, QUARTZ: 65, PRISMARINE: 66, SEA_LANTERN: 67,
+  MOSS: 68, MUSHROOM_RED: 69, MUSHROOM_BROWN: 70, CACTUS_TOP: 71, CACTUS_SIDE: 72, MUD: 73,
+  NETHER_BRICK: 74, MAGMA: 75,
+  MELON_TOP: 76, MELON_SIDE: 77, HAY_TOP: 78, HAY_SIDE: 79, NOTE_BLOCK: 80, SPONGE: 81,
 };
 
 export function initGL(canvas) {
@@ -401,6 +407,46 @@ function buildAtlasCanvas() {
   ctx.fillStyle = shade(0x5bbf3a, 1);
   ctx.fillRect(p[0] + 4, p[1] + 6, 3, 2); ctx.fillRect(p[0] + 9, p[1] + 6, 3, 2);        // side leaves
   ctx.fillRect(p[0] + 6, p[1] + 2, 4, 3);                                                // top bud
+
+  // --- A big batch of recognizable Minecraft-style blocks (variety = the toy) ---
+  // Small reusable styles keep this compact.
+  const speckle = (tile, base, v, seed, d, l) => { const q = at(tile); noise(ctx, q[0], q[1], base, v, seed); const r = rng(seed * 7 + 3); for (let i = 0; i < 30; i++) { ctx.fillStyle = shade(i % 2 ? d : l, 1); ctx.fillRect(q[0] + (r() * T | 0), q[1] + (r() * T | 0), 1, 1); } };
+  const metal = (tile, base, seed) => { const q = at(tile); noise(ctx, q[0], q[1], base, 0.05, seed); ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fillRect(q[0] + 2, q[1] + 2, T - 6, 1); ctx.fillRect(q[0] + 2, q[1] + 2, 1, T - 6); ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(q[0] + 3, q[1] + T - 3, T - 5, 1); ctx.fillRect(q[0] + T - 3, q[1] + 3, 1, T - 5); };
+  const gem = (tile, base, accent, seed) => { const q = at(tile); noise(ctx, q[0], q[1], base, 0.07, seed); ctx.fillStyle = shade(accent, 1); ctx.fillRect(q[0] + 5, q[1] + 3, 2, 2); ctx.fillRect(q[0] + 9, q[1] + 8, 2, 2); ctx.fillRect(q[0] + 4, q[1] + 10, 1, 1); ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fillRect(q[0] + 3, q[1] + 3, 3, 1); };
+  const glow = (tile, base, bright, seed) => { const q = at(tile); noise(ctx, q[0], q[1], base, 0.05, seed); const r = rng(seed); for (let i = 0; i < 16; i++) { ctx.fillStyle = shade(bright, 1); ctx.fillRect(q[0] + (r() * 14 | 0), q[1] + (r() * 14 | 0), 2, 2); } };
+  const soft = (tile, base, seed) => { const q = at(tile); noise(ctx, q[0], q[1], base, 0.04, seed); };
+  // Minerals
+  metal(TILE.IRON_BLOCK, 0xd8d8de, 201); metal(TILE.GOLD_BLOCK, 0xf2c63a, 202);
+  gem(TILE.DIAMOND_BLOCK, 0x57d6c8, 0xbff7f2, 203); gem(TILE.EMERALD_BLOCK, 0x36c463, 0xa9f0c0, 204);
+  speckle(TILE.LAPIS_BLOCK, 0x274bbf, 0.12, 205, 0x16307f, 0x5b7be6);
+  speckle(TILE.REDSTONE_BLOCK, 0xb01818, 0.12, 206, 0x7a0e0e, 0xe85a4a);
+  speckle(TILE.COAL_BLOCK, 0x24232a, 0.14, 207, 0x111014, 0x4a4954);
+  gem(TILE.AMETHYST, 0x9b59d0, 0xd9b8f5, 208);
+  // Stone variants
+  speckle(TILE.DEEPSLATE, 0x3a3a42, 0.10, 209, 0x24242a, 0x55555f);
+  speckle(TILE.GRANITE, 0xa56b53, 0.12, 210, 0x7e4d3a, 0xc89077);
+  speckle(TILE.ANDESITE, 0x8f8f95, 0.10, 211, 0x70707a, 0xb0b0b6);
+  speckle(TILE.DIORITE, 0xdcdce0, 0.10, 212, 0xb4b4bc, 0xffffff);
+  soft(TILE.QUARTZ, 0xeee9dd, 213); { const q = at(TILE.QUARTZ); ctx.fillStyle = 'rgba(0,0,0,0.06)'; ctx.fillRect(q[0], q[1] + 7, T, 1); }
+  speckle(TILE.PRISMARINE, 0x3f8f86, 0.12, 214, 0x2c6a63, 0x67bdb2);
+  glow(TILE.SEA_LANTERN, 0xcfeee6, 0xffffff, 215);
+  // Nature
+  speckle(TILE.MOSS, 0x5a8f3a, 0.16, 216, 0x3f6a26, 0x7fc257);
+  { const q = at(TILE.MUSHROOM_RED); noise(ctx, q[0], q[1], 0xc23a32, 0.06, 217); ctx.fillStyle = shade(0xf4f0e6, 1); const r = rng(217); for (let i = 0; i < 7; i++) ctx.fillRect(q[0] + (r() * 13 | 0), q[1] + (r() * 13 | 0), 3, 3); }
+  soft(TILE.MUSHROOM_BROWN, 0x8a6a4a, 218);
+  { const q = at(TILE.CACTUS_TOP); noise(ctx, q[0], q[1], 0x4f9a3a, 0.10, 219); ctx.fillStyle = shade(0x3f7a2e, 1); ctx.fillRect(q[0] + 5, q[1] + 5, 6, 6); }
+  { const q = at(TILE.CACTUS_SIDE); noise(ctx, q[0], q[1], 0x4f9a3a, 0.10, 220); ctx.fillStyle = shade(0x3f7a2e, 1); ctx.fillRect(q[0], q[1], 1, T); ctx.fillRect(q[0] + T - 1, q[1], 1, T); ctx.fillStyle = shade(0x6fc257, 1); for (let y = 2; y < T; y += 5) ctx.fillRect(q[0] + 7, q[1] + y, 2, 2); }
+  speckle(TILE.MUD, 0x4a3a30, 0.10, 221, 0x352820, 0x604c3e);
+  // Nether
+  { const q = at(TILE.NETHER_BRICK); noise(ctx, q[0], q[1], 0x3a1c22, 0.08, 222); ctx.fillStyle = shade(0x200f14, 1); for (let y = 0; y < T; y += 4) ctx.fillRect(q[0], q[1] + y, T, 1); for (let y = 0; y < T; y += 8) ctx.fillRect(q[0] + 8, q[1] + y, 1, 4); for (let y = 4; y < T; y += 8) ctx.fillRect(q[0], q[1] + y, 1, 4); }
+  { const q = at(TILE.MAGMA); noise(ctx, q[0], q[1], 0x3a1810, 0.10, 223); const r = rng(223); for (let i = 0; i < 10; i++) { ctx.fillStyle = shade(i % 2 ? 0xf08a2a : 0xf2d234, 1); ctx.fillRect(q[0] + (r() * 13 | 0), q[1] + (r() * 13 | 0), 3, 2); } }
+  // Decor
+  { const q = at(TILE.MELON_TOP); noise(ctx, q[0], q[1], 0x4f9a3a, 0.08, 224); ctx.fillStyle = shade(0x2f6a22, 1); for (let i = 2; i < T; i += 4) ctx.fillRect(q[0] + i, q[1], 1, T); }
+  { const q = at(TILE.MELON_SIDE); noise(ctx, q[0], q[1], 0x3f7a2e, 0.08, 225); ctx.fillStyle = shade(0xc23a32, 1); ctx.fillRect(q[0] + 2, q[1] + 2, T - 4, T - 4); ctx.fillStyle = shade(0xe06a52, 1); for (let i = 3; i < T - 2; i += 3) ctx.fillRect(q[0] + i, q[1] + 3, 1, T - 6); }
+  { const q = at(TILE.HAY_TOP); noise(ctx, q[0], q[1], 0xd8b23a, 0.08, 226); ctx.fillStyle = shade(0x9c7a1e, 1); ctx.strokeStyle = shade(0x9c7a1e, 1); ctx.fillRect(q[0] + 6, q[1] + 6, 4, 4); ctx.fillRect(q[0] + 2, q[1] + 2, 2, 2); ctx.fillRect(q[0] + T - 4, q[1] + 2, 2, 2); ctx.fillRect(q[0] + 2, q[1] + T - 4, 2, 2); ctx.fillRect(q[0] + T - 4, q[1] + T - 4, 2, 2); }
+  { const q = at(TILE.HAY_SIDE); noise(ctx, q[0], q[1], 0xe0c04a, 0.08, 227); ctx.fillStyle = shade(0x9c7a1e, 1); ctx.fillRect(q[0], q[1] + 1, T, 1); ctx.fillRect(q[0], q[1] + T - 2, T, 1); ctx.fillStyle = shade(0xb08a24, 1); for (let x = 1; x < T; x += 3) ctx.fillRect(q[0] + x, q[1] + 3, 1, T - 6); }
+  { const q = at(TILE.NOTE_BLOCK); noise(ctx, q[0], q[1], 0x8a5a30, 0.10, 228); ctx.fillStyle = shade(0x5a3a1c, 1); ctx.strokeRect(q[0] + 0.5, q[1] + 0.5, T - 1, T - 1); ctx.fillStyle = shade(0x2a2030, 1); ctx.fillRect(q[0] + 9, q[1] + 4, 2, 7); ctx.fillRect(q[0] + 5, q[1] + 9, 5, 3); }
+  { const q = at(TILE.SPONGE); noise(ctx, q[0], q[1], 0xd8c24a, 0.10, 229); ctx.fillStyle = shade(0x9c8a2a, 1); const r = rng(229); for (let i = 0; i < 12; i++) ctx.fillRect(q[0] + (r() * 14 | 0), q[1] + (r() * 14 | 0), 2, 2); }
 
   return c;
 }

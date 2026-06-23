@@ -559,6 +559,15 @@ function toggleLever(x, y, z) {
   if (lit > 0) goals.bump('lamp');
 }
 
+// --- Note block: tap it to play a musical note (taps climb the scale, so a row
+// of note blocks makes a little tune — just like the Minecraft videos) ---
+let noteStep = 0;
+function playNoteBlock(x, y, z) {
+  sound.note(noteStep++);
+  spawnParticles([x + 0.5, y + 1.1, z + 0.5], '🎵', 'heart', 1, 14);
+  tip('note', '🎵 A note block! Tap it for a musical note. Put a row of them and tap along to make a song!');
+}
+
 // --- Doors: a 2-tall openable door for house-building ---
 function isDoor(id) { return id === B.DOOR || id === B.DOOR_OPEN; }
 function doorBase(x, y, z) { return isDoor(world.get(x, y - 1, z)) ? y - 1 : y; }
@@ -2000,6 +2009,7 @@ function frame(now) {
       if (hit && isDoor(bid)) toggleDoor(hit.block[0], hit.block[1], hit.block[2]);
       else if (hit && isBed(bid)) sleepInBed(hit.block[0], hit.block[1], hit.block[2]);
       else if (hit && (bid === B.LEVER || bid === B.LEVER_ON)) toggleLever(hit.block[0], hit.block[1], hit.block[2]);
+      else if (hit && bid === B.NOTE_BLOCK) playNoteBlock(hit.block[0], hit.block[1], hit.block[2]);
       else if (hit && isTNT(bid)) lightTNT(hit.block[0], hit.block[1], hit.block[2]);
       else doAction(hit);
     }

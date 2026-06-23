@@ -635,6 +635,31 @@ pen is yours"). Shipped on **`claude/store-portal-bugs-hzcr72`**, mirrored to
    pre-existing big build can satisfy a challenge instantly (intentional — it
    rewards building); could later diff "new since the ask" if it feels too easy.
 
+## Status (session 24) — big block-variety pass (dad: "variety charms him —
+research more Minecraft blocks/elements that surprise him; a lot more block
+types"). Shipped on **`claude/store-portal-bugs-hzcr72`**, mirrored to `main`.
+**sw cache v10→v11.** Now **83 block ids** (26 new), **77 picker tiles**.
+- **Atlas expanded** `perRow 8→16` / `size 128→256` (256 tiles) — everything is
+  parameterized off `ATLAS`, so getUV/`at()`/blockPreview all scaled for free.
+- **26 recognizable Minecraft-style blocks**, drawn with compact reusable
+  texture styles (`metal`/`gem`/`speckle`/`glow`/`soft` helpers in
+  `buildAtlasCanvas`): **Shiny 💎** (Iron/Gold/Diamond/Emerald/Lapis/Redstone/
+  Coal blocks + Amethyst), **Stone 🪨** (Deepslate/Granite/Andesite/Diorite/
+  Quartz/Prismarine), **Nature** (Moss/Mud/Cactus[top+side]/Red &Brown Mushroom),
+  **Nether 🔥** (Nether Brick/Magma), **Decor 🪑** (Melon/Hay/Sponge/Sea Lantern
+  + Note Block). Picker reorganized into clearer tabs (Stone🪨, Shiny💎, Decor🪑,
+  Nether🔥).
+- **🎵 Note Block is interactive** — tap it to play a pentatonic note (`sound.note`
+  added to audio.js; taps climb the scale so a row makes a tune). One-time
+  `tip('note', …)`.
+  Verified: ids unique + every category block has a def (Node); headless boot
+  with the 256-atlas = zero errors; all 26 new blocks place; picker shows 12 tabs
+  / 77 tiles (Shiny 11, Decor 7); place + reload clean. Screenshots of a showcase
+  wall + the picker. Tuning candidates: glow blocks (sea lantern/magma) use bright
+  textures, not true emissive light (engine bakes light); more waves possible
+  (crafting table/furnace/chest need multi-face art; froglight/sculk/copper easy
+  to add next).
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files

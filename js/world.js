@@ -23,6 +23,12 @@ export const B = {
   LEVER: 43, LEVER_ON: 44, REDSTONE: 45, REDLAMP: 46, REDLAMP_ON: 47, SLIME: 48,
   SAPLING: 49, MEGA_TNT: 50, SANDSTONE: 51, END_STONE: 52,
   BED_FOOT: 53, BED_HEAD: 54, BARRIER: 55, LANTERN: 56,
+  IRON_BLOCK: 57, GOLD_BLOCK: 58, DIAMOND_BLOCK: 59, EMERALD_BLOCK: 60, LAPIS_BLOCK: 61,
+  REDSTONE_BLOCK: 62, COAL_BLOCK: 63, AMETHYST: 64,
+  DEEPSLATE: 65, GRANITE: 66, ANDESITE: 67, DIORITE: 68, QUARTZ: 69, PRISMARINE: 70, SEA_LANTERN: 71,
+  MOSS: 72, MUSHROOM_RED: 73, MUSHROOM_BROWN: 74, CACTUS: 75, MUD: 76,
+  NETHER_BRICK: 77, MAGMA: 78,
+  MELON: 79, HAY: 80, NOTE_BLOCK: 81, SPONGE: 82,
 };
 
 const W = [1, 1, 1]; // white tint for textured blocks
@@ -93,25 +99,53 @@ export const BLOCKS = {
   [B.BED_HEAD]: nat3(TILE.BED_HEAD, TILE.BED_SIDE, TILE.PLANKS, '#e2dccb'),
   [B.BARRIER]: { tiles: { top: TILE.BARRIER, side: TILE.BARRIER, bottom: TILE.BARRIER }, tint: W, ui: '#7be6f0', seethrough: true },
   [B.LANTERN]: nat(TILE.LANTERN, '#ffe07a'),
+  // Recognizable Minecraft-style blocks (lots of building variety).
+  [B.IRON_BLOCK]: nat(TILE.IRON_BLOCK, '#d8d8de'),
+  [B.GOLD_BLOCK]: nat(TILE.GOLD_BLOCK, '#f2c63a'),
+  [B.DIAMOND_BLOCK]: nat(TILE.DIAMOND_BLOCK, '#57d6c8'),
+  [B.EMERALD_BLOCK]: nat(TILE.EMERALD_BLOCK, '#36c463'),
+  [B.LAPIS_BLOCK]: nat(TILE.LAPIS_BLOCK, '#274bbf'),
+  [B.REDSTONE_BLOCK]: nat(TILE.REDSTONE_BLOCK, '#b01818'),
+  [B.COAL_BLOCK]: nat(TILE.COAL_BLOCK, '#24232a'),
+  [B.AMETHYST]: nat(TILE.AMETHYST, '#9b59d0'),
+  [B.DEEPSLATE]: nat(TILE.DEEPSLATE, '#3a3a42'),
+  [B.GRANITE]: nat(TILE.GRANITE, '#a56b53'),
+  [B.ANDESITE]: nat(TILE.ANDESITE, '#8f8f95'),
+  [B.DIORITE]: nat(TILE.DIORITE, '#dcdce0'),
+  [B.QUARTZ]: nat(TILE.QUARTZ, '#eee9dd'),
+  [B.PRISMARINE]: nat(TILE.PRISMARINE, '#3f8f86'),
+  [B.SEA_LANTERN]: nat(TILE.SEA_LANTERN, '#cfeee6'),
+  [B.MOSS]: nat(TILE.MOSS, '#5a8f3a'),
+  [B.MUSHROOM_RED]: nat(TILE.MUSHROOM_RED, '#c23a32'),
+  [B.MUSHROOM_BROWN]: nat(TILE.MUSHROOM_BROWN, '#8a6a4a'),
+  [B.CACTUS]: nat3(TILE.CACTUS_TOP, TILE.CACTUS_SIDE, TILE.CACTUS_TOP, '#4f9a3a'),
+  [B.MUD]: nat(TILE.MUD, '#4a3a30'),
+  [B.NETHER_BRICK]: nat(TILE.NETHER_BRICK, '#3a1c22'),
+  [B.MAGMA]: nat(TILE.MAGMA, '#a85a2a'),
+  [B.MELON]: nat3(TILE.MELON_TOP, TILE.MELON_SIDE, TILE.MELON_TOP, '#3f7a2e'),
+  [B.HAY]: nat3(TILE.HAY_TOP, TILE.HAY_SIDE, TILE.HAY_TOP, '#d8b23a'),
+  [B.NOTE_BLOCK]: nat(TILE.NOTE_BLOCK, '#8a5a30'),
+  [B.SPONGE]: nat(TILE.SPONGE, '#d8c24a'),
 };
 
 // Build blocks grouped into categories for the pop-up picker.
 export const CATEGORIES = [
-  { name: 'Nature', blocks: [B.GRASS, B.DIRT, B.SAND, B.GRAVEL, B.SNOW, B.SAPLING, B.LOG, B.BIRCH_LOG, B.LEAVES] },
+  { name: 'Nature', blocks: [B.GRASS, B.DIRT, B.SAND, B.GRAVEL, B.SNOW, B.MOSS, B.MUD, B.SAPLING, B.LOG, B.BIRCH_LOG, B.LEAVES, B.CACTUS, B.MUSHROOM_RED, B.MUSHROOM_BROWN] },
   { name: 'Water 🪣', blocks: [B.WATER] },
   { name: 'House 🏠', blocks: [B.DOOR, B.BED_FOOT, B.GLASS, B.LANTERN, B.PLANKS, B.BRICK] },
   { name: 'Boom 💥', blocks: [B.TNT] },
   // Tap a lever → it powers redstone wire → wired-up lamps light up.
   { name: 'Redstone ⚙️', blocks: [B.LEVER, B.REDSTONE, B.REDLAMP] },
-  { name: 'Stone', blocks: [B.STONE, B.COBBLE, B.STONE_BRICK, B.SANDSTONE, B.END_STONE, B.BRICK, B.OBSIDIAN, B.GLOWSTONE] },
+  { name: 'Stone 🪨', blocks: [B.STONE, B.COBBLE, B.STONE_BRICK, B.DEEPSLATE, B.GRANITE, B.ANDESITE, B.DIORITE, B.QUARTZ, B.PRISMARINE, B.SANDSTONE, B.END_STONE, B.BRICK, B.OBSIDIAN] },
+  { name: 'Shiny 💎', blocks: [B.IRON_BLOCK, B.GOLD_BLOCK, B.DIAMOND_BLOCK, B.EMERALD_BLOCK, B.LAPIS_BLOCK, B.REDSTONE_BLOCK, B.COAL_BLOCK, B.AMETHYST, B.GOLD, B.DIAMOND, B.ICE] },
   { name: 'Wood', blocks: [B.PLANKS, B.BIRCH_PLANKS, B.DARK_PLANKS, B.BOOKSHELF] },
-  { name: 'Shiny', blocks: [B.GOLD, B.DIAMOND, B.ICE, B.GLASS] },
+  { name: 'Decor 🪑', blocks: [B.MELON, B.HAY, B.NOTE_BLOCK, B.SPONGE, B.PUMPKIN, B.GLOWSTONE, B.SEA_LANTERN] },
   { name: 'Fun', blocks: [B.PUMPKIN, B.SLIME, B.BARRIER] },
   // Shown in the picker only after it's bought in the 💎 shop.
   { name: 'Special ✨', blocks: [B.RAINBOW], locked: 'rainbow' },
   // Shown only once the Mega TNT upgrade is bought in the 💎 shop.
   { name: 'Mega 💣', blocks: [B.MEGA_TNT], locked: 'megatnt' },
-  { name: 'Nether', blocks: [B.NETHERRACK, B.LAVA] },
+  { name: 'Nether 🔥', blocks: [B.NETHERRACK, B.NETHER_BRICK, B.MAGMA, B.LAVA] },
   { name: 'Colours', blocks: [B.RED, B.ORANGE, B.YELLOW, B.GREEN, B.CYAN, B.BLUE, B.PURPLE, B.PINK, B.WHITE, B.BLACK] },
 ];
 

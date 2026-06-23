@@ -31,6 +31,16 @@ export class Sound {
     osc.start(t); osc.stop(t + dur + 0.02);
   }
 
+  // A cheerful musical note (pentatonic) — the note block plays these so taps
+  // make a little tune.
+  note(step) {
+    if (!this.enabled || !this.ctx) return;
+    const scale = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5, 1174.7];
+    const f = scale[((step % scale.length) + scale.length) % scale.length];
+    this.blip(f, 0.5, 'sine', 0.16);
+    this.blip(f * 2, 0.28, 'triangle', 0.05);
+  }
+
   play(name) {
     switch (name) {
       case 'place': this.blip(560, 0.12, 'triangle', 0.16, 720); break;
