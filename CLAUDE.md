@@ -737,6 +737,23 @@ Now **47 goals**, **sw cache v12→v14**.
    from the front, thin edge-on from the side); carousel ride spins fast (fun but
    could ease). Backlog: go-kart ride, bumper cars, a Ferris-wheel that frames
    nicer in third-person, balloon variety.
+3. **Crash-proofing hotfix (dad saw a "script error" Oops screen on iPad).** The
+   render loop scheduled its next `requestAnimationFrame` only at the *end* of
+   `frame()`, so ANY error in a frame froze the game and tripped the global
+   handler → the scary full-screen "Oops". Couldn't repro headlessly (SwiftShader
+   has loads of GPU/memory headroom; iOS Safari is stricter — likely a transient
+   WebGL/render blip surfacing as the generic cross-origin "Script error."). Fixed
+   the root fragility: `frame()` now wraps `frameBody()` in try/catch and ALWAYS
+   reschedules (one bad frame is logged + skipped, the loop carries on; a ride is
+   ended safely). Runtime `window` errors no longer pop the big overlay — they
+   `softError()` (console log + one tiny toast), keeping the kid unscared; the
+   overlay is reserved for a FATAL `init()` failure. `funpark` update/draw are
+   also individually try/caught so the park can never take down the rest of the
+   game. Trimmed park NPCs (5→4) as a small iPad-GPU hedge. **sw cache v14→v15.**
+   Verified headless: forced frame error + park-draw-throwing-every-frame both
+   leave the overlay hidden and the loop running; rides still complete; full
+   regression green. (Ask the dad if the Oops is truly gone on the iPad — if a
+   *specific* error text still shows in the console we can pin the iOS root cause.)
 
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world

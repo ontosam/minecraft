@@ -38,6 +38,9 @@ let hurtFlash = 0;                        // red screen flash timer
 let regenT = 0, sinceHurt = 99;           // gentle heart regen when safe
 let hurtEl = null;                        // cached red-flash overlay
 
+// The big "Oops" overlay is reserved for a FATAL failure to even start the game
+// (see init()'s catch). Everything that happens after start-up is recovered
+// gently instead — a 6-year-old should never get a scary full-screen error.
 function showError(msg) {
   const el = document.getElementById('error-overlay');
   if (el) {
@@ -45,8 +48,15 @@ function showError(msg) {
     el.querySelector('.msg').textContent = String(msg);
   }
 }
-window.addEventListener('error', (e) => showError(e.message || e.error || 'Unknown error'));
-window.addEventListener('unhandledrejection', (e) => showError(e.reason && e.reason.message || e.reason || 'Promise error'));
+// A runtime hiccup (a bad render frame, an odd touch event, an iOS WebGL blip):
+// log it for us, keep the game running, and show at most one tiny friendly note.
+let _hiccups = 0;
+function softError(msg) {
+  console.error('recovered runtime error:', msg);
+  if (_hiccups++ === 0) { try { showToast('🛠️ Tiny hiccup — all good, keep playing!', 2400); } catch (e) { } }
+}
+window.addEventListener('error', (e) => softError(e.message || e.error || 'Unknown error'));
+window.addEventListener('unhandledrejection', (e) => softError(e.reason && e.reason.message || e.reason || 'Promise error'));
 
 let gl, worldProg, atlas, world, player, controls, sound, character, goals;
 const worlds = {};                       // key -> { world, mobs, kind }; created lazily
@@ -176,7 +186,7 @@ function updateMobs(m, dt) {
   if (m.spiders) m.spiders.update(dt, player, night && dimension === 'over');
   if (m.skeletons) m.skeletons.update(dt, player, night && dimension === 'over');
   if (m.villagers) m.villagers.update(dt, player);
-  if (m.funpark) m.funpark.update(dt, player);
+  if (m.funpark) { try { m.funpark.update(dt, player); } catch (e) { softError(e); } }
   if (m.dragon) m.dragon.update(dt, player);
 }
 function drawMobs(m) {
@@ -188,7 +198,7 @@ function drawMobs(m) {
   if (m.spiders) m.spiders.draw(worldProg);
   if (m.skeletons) m.skeletons.draw(worldProg);
   if (m.villagers) m.villagers.draw(worldProg);
-  if (m.funpark) m.funpark.draw(worldProg);
+  if (m.funpark) { try { m.funpark.draw(worldProg); } catch (e) { softError(e); } }
   if (m.dragon) m.dragon.draw(worldProg);
 }
 
@@ -1986,7 +1996,19 @@ function resize() {
 }
 
 let last = 0;
+// The render loop is wrapped so a single bad frame can NEVER stop the game or
+// pop the scary "Oops" screen — we log it, end any ride safely, and the next
+// frame just carries on. (frameBody holds the real work.)
 function frame(now) {
+  try {
+    frameBody(now);
+  } catch (e) {
+    softError(e && e.stack || e);
+    if (ride) { try { endRide(); } catch (_) { } }   // never get stuck mid-ride
+  }
+  requestAnimationFrame(frame);
+}
+function frameBody(now) {
   const dt = Math.min(0.05, (now - last) / 1000 || 0);
   last = now;
   actionAnim = Math.max(0, actionAnim - dt * 3);
@@ -2156,8 +2178,6 @@ function frame(now) {
 
   // Autosave.
   if (saveDirty && now - lastSave > 6000) { saveGame(); lastSave = now; }
-
-  requestAnimationFrame(frame);
 }
 
 // --- Save / load (v4: a map of worlds; still reads old v3/v2 saves) ---

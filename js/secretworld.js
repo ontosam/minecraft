@@ -196,7 +196,7 @@ export class SecretPark {
     const pick = () => ids[Math.floor(Math.random() * ids.length)];
     const riders = [pick(), pick()];
     for (let i = 0; i < riders.length; i++) { const n = new NPC(riders[i], 0, 0); n.seat = i === 0 ? 2 : 5; this.list.push(n); }
-    const spots = [[28, 30], [34, 38], [38, 28]];
+    const spots = [[28, 30], [36, 36]];           // a couple of friends strolling (kept light for older iPads)
     for (const [x, z] of spots) { const n = new NPC(pick(), x, z); n.pos[1] = g; this.list.push(n); }
     this.chars = {};
     for (const n of this.list) { if (!this.chars[n.id]) { const c = new Character(this.gl); c.setCharacter(charById(n.id)); this.chars[n.id] = c; } }
