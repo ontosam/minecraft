@@ -3,7 +3,7 @@
 // (see worlds.js): adding a new place is a recipe, not a rewrite.
 
 import { mat4 } from './math.js';
-import { initGL, makeWorldProgram, makeAtlasTexture, GLMesh, blockPreview, shadowMesh } from './gfx.js';
+import { initGL, makeWorldProgram, makeAtlasTexture, GLMesh, blockPreview, shadowMesh, quadMesh } from './gfx.js';
 import { World, BLOCKS, CATEGORIES, B, SX, SY, SZ, isLego } from './world.js';
 import { WORLD_KINDS, WORLD_ORDER } from './worlds.js';
 import { SecretPark, ATTRACTIONS, STANDS } from './secretworld.js';
@@ -69,6 +69,7 @@ let portalUnlocked = false;              // the Nether portal opens once enough 
 let portalHintTimer = 0;                 // throttle the "earn more stars" nudge
 let identity, proj, view, pv, scratch4;
 let shadow, mShadow;     // soft blob-shadow mesh + a scratch matrix for it
+let buildPreview;        // green footprint quad shown while placing a big build
 let selected = B.GRASS;
 let selectedChar = 'ezra';     // which character you're playing as
 let lastTool = 'build', actionAnim = 0;
@@ -298,6 +299,7 @@ function travelTo(dest) {
     if (fishing) reelIn(false);               // reel in before leaving
     if (riding) dismount();                   // the pony stays home in the overworld
     if (ride) { const fp = mobs().funpark; if (fp) { fp.rideKind = null; fp.rideBalloon = null; } ride = null; } // end any ride safely
+    if (pendingBuild) cancelPlacement();      // cancel a half-placed big build
     fuses.length = 0;                         // cancel any fuses lit in the world we're leaving
     positions[dimension] = player.pos.slice();
     const from = dimension;
@@ -711,10 +713,11 @@ function bigSet(x, y, z, id, force) {
 }
 // Where a big build lands: a few steps in front, level with the ground right
 // where you're standing (the door threshold), plus the facing axis.
-function bigBuildSpot(dist) {
+function bigBuildSpot(dist, rad = 3) {
   const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
-  const cx = Math.max(4, Math.min(SX - 5, Math.round(player.pos[0] + fx * dist)));
-  const cz = Math.max(4, Math.min(SZ - 5, Math.round(player.pos[2] + fz * dist)));
+  const m = rad + 1;
+  const cx = Math.max(m, Math.min(SX - 1 - m, Math.round(player.pos[0] + fx * dist)));
+  const cz = Math.max(m, Math.min(SZ - 1 - m, Math.round(player.pos[2] + fz * dist)));
   const g = Math.max(1, world.heightAt(cx, cz));
   return { cx, cz, g, fx, fz, horiz: Math.abs(fx) >= Math.abs(fz) };
 }
@@ -740,55 +743,98 @@ function finishBigBuild(n, cx, cy, cz, label) {
   showToast(label, 2800);
   recheckBuild();             // a big build may complete a build challenge
 }
-// A roomy house you can walk around inside: 5×5 floor, tall walls, a door
-// facing you, big windows, and a glowstone ceiling lamp.
-function buildHouse() {
-  const { cx, cz, g, fx, fz, horiz } = bigBuildSpot(5);
-  const wall = solidSelected();
-  const y0 = g + 1, H = 4;                 // interior floor level + a tall ceiling
-  let n = levelPad(cx, cz, 3, g, B.PLANKS);  // a clean, flat floor even on a hill
-  for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) {
-    n += bigSet(cx + dx, y0 + H, cz + dz, B.PLANKS);       // roof
-    const edge = (Math.abs(dx) === 3 || Math.abs(dz) === 3);
+// A room with 4 walls you can walk around inside — a door facing you, windows,
+// a floor and roof, and a ceiling lamp. `rad` sets the size (3 = cozy, 4 = big).
+function roomAt(s, rad, wall) {
+  const { cx, cz, g, fx, fz, horiz } = s;
+  const y0 = g + 1, H = 4;
+  let n = levelPad(cx, cz, rad, g, B.PLANKS);
+  for (let dx = -rad; dx <= rad; dx++) for (let dz = -rad; dz <= rad; dz++) {
+    n += bigSet(cx + dx, y0 + H, cz + dz, B.PLANKS);                  // roof
+    const edge = (Math.abs(dx) === rad || Math.abs(dz) === rad);
     for (let dy = 0; dy < H; dy++) {
-      if (edge) n += bigSet(cx + dx, y0 + dy, cz + dz, wall);   // walls
-      else bigSet(cx + dx, y0 + dy, cz + dz, B.AIR);            // keep the inside open
+      if (edge) n += bigSet(cx + dx, y0 + dy, cz + dz, wall);          // walls
+      else bigSet(cx + dx, y0 + dy, cz + dz, B.AIR);                   // open inside
     }
   }
-  // Big windows midway up each wall so it's bright and you can see out (force —
-  // they replace the wall blocks we just put up).
-  for (let t = -1; t <= 1; t++) {
-    bigSet(cx + t, y0 + 2, cz - 3, B.GLASS, true); bigSet(cx + t, y0 + 2, cz + 3, B.GLASS, true);
-    bigSet(cx - 3, y0 + 2, cz + t, B.GLASS, true); bigSet(cx + 3, y0 + 2, cz + t, B.GLASS, true);
+  for (let t = -1; t <= 1; t++) {                                      // windows on each wall
+    bigSet(cx + t, y0 + 2, cz - rad, B.GLASS, true); bigSet(cx + t, y0 + 2, cz + rad, B.GLASS, true);
+    bigSet(cx - rad, y0 + 2, cz + t, B.GLASS, true); bigSet(cx + rad, y0 + 2, cz + t, B.GLASS, true);
   }
-  // A doorway on the wall facing you (so you walk straight in).
-  const dX = horiz ? cx - 3 * sgn(fx) : cx;
-  const dZ = horiz ? cz : cz - 3 * sgn(fz);
+  const dX = horiz ? cx - rad * sgn(fx) : cx, dZ = horiz ? cz : cz - rad * sgn(fz);
   bigSet(dX, y0, dZ, B.DOOR, true); bigSet(dX, y0 + 1, dZ, B.DOOR, true); bigSet(dX, y0 + 2, dZ, B.GLASS, true);
   goals.bump('doors');
-  bigSet(cx, y0 + H - 1, cz, B.GLOWSTONE, true);   // a cozy ceiling lamp
-  finishBigBuild(n, cx, y0, cz, '🏠 Your cozy house is ready — walk in the door!');
+  bigSet(cx, y0 + H - 1, cz, B.GLOWSTONE, true);                       // cozy ceiling lamp
+  finishBigBuild(n, cx, y0, cz, '🏠 Your house is ready — walk in the door!');
 }
-// A big flat floor of your chosen block — lay a whole patio in one tap.
-function stampFloor() {
-  const { cx, cz, g } = bigBuildSpot(5);
-  const n = levelPad(cx, cz, 3, g, solidSelected());
-  finishBigBuild(n, cx, g, cz, '🟫 A whole floor, done!');
-}
-// A long wall of your chosen block, standing across in front of you.
-function stampWall() {
-  const { cx, cz, g, horiz } = bigBuildSpot(4);
-  const id = solidSelected();
-  let n = 0;
-  for (let i = -3; i <= 3; i++) for (let dy = 1; dy <= 4; dy++) {
-    n += horiz ? bigSet(cx, g + dy, cz + i, id) : bigSet(cx + i, g + dy, cz, id);
+function buildHouse(s) { roomAt(s, 3, solidSelected()); }
+function buildBigHouse(s) { roomAt(s, 4, solidSelected()); }
+// A tall tower with a door, windows up the sides, and a crenellated top.
+function buildTower(s) {
+  const { cx, cz, g, fx, fz, horiz } = s, wall = solidSelected(), r = 1, H = 9;
+  let n = levelPad(cx, cz, r, g, B.STONE_BRICK);
+  for (let dy = 1; dy <= H; dy++) for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
+    const edge = Math.abs(dx) === r || Math.abs(dz) === r;
+    if (edge) n += bigSet(cx + dx, g + dy, cz + dz, wall); else bigSet(cx + dx, g + dy, cz + dz, B.AIR);
   }
+  const dX = horiz ? cx - r * sgn(fx) : cx, dZ = horiz ? cz : cz - r * sgn(fz);
+  bigSet(dX, g + 1, dZ, B.DOOR, true); bigSet(dX, g + 2, dZ, B.DOOR, true);
+  for (let dy = 3; dy <= H - 1; dy += 2) { bigSet(cx + r, g + dy, cz, B.GLASS, true); bigSet(cx - r, g + dy, cz, B.GLASS, true); bigSet(cx, g + dy, cz + r, B.GLASS, true); bigSet(cx, g + dy, cz - r, B.GLASS, true); }
+  for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) if ((dx + dz) % 2 === 0) n += bigSet(cx + dx, g + H + 1, cz + dz, wall);
+  bigSet(cx, g + H, cz, B.GLOWSTONE, true);
+  finishBigBuild(n, cx, g + H, cz, '🗼 A tall tower!');
+}
+// A castle: high walls with crenellations, four corner towers, and a gateway.
+function buildCastle(s) {
+  const { cx, cz, g, fx, fz, horiz } = s, wall = B.STONE_BRICK, r = 5, H = 4;
+  let n = levelPad(cx, cz, r, g, B.STONE);
+  for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
+    if (Math.abs(dx) === r || Math.abs(dz) === r) {
+      for (let dy = 1; dy <= H; dy++) n += bigSet(cx + dx, g + dy, cz + dz, wall);
+      if ((dx + dz) % 2 === 0) n += bigSet(cx + dx, g + H + 1, cz + dz, wall);      // crenellations
+    }
+  }
+  for (const ox of [-r, r]) for (const oz of [-r, r]) { for (let dy = 1; dy <= H + 3; dy++) n += bigSet(cx + ox, g + dy, cz + oz, wall); bigSet(cx + ox, g + H + 3, cz + oz, B.GLOWSTONE, true); }
+  // Gateway: a 2-wide, 2-tall opening in the wall facing you.
+  for (let t = -1; t <= 0; t++) for (let dy = 1; dy <= 2; dy++) {
+    if (horiz) bigSet(cx - r * sgn(fx), g + dy, cz + t, B.AIR, true);
+    else bigSet(cx + t, g + dy, cz - r * sgn(fz), B.AIR, true);
+  }
+  finishBigBuild(n, cx, g + H, cz, '🏰 A mighty castle!');
+}
+// A stepped pyramid of sandstone.
+function buildPyramid(s) {
+  const { cx, cz, g } = s; let n = 0;
+  for (let layer = 0; layer <= 4; layer++) { const r = 4 - layer; for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) n += bigSet(cx + dx, g + 1 + layer, cz + dz, B.SANDSTONE); }
+  finishBigBuild(n, cx, g + 5, cz, '🔺 A pyramid!');
+}
+// A long bridge/walkway of your chosen block, with glass railings.
+function buildBridge(s) {
+  const { cx, cz, g, fx, fz, horiz } = s, id = solidSelected(); let n = 0; const L = 9;
+  for (let i = 0; i < L; i++) for (let w = -1; w <= 1; w++) {
+    const x = horiz ? cx + sgn(fx) * i : cx + w, z = horiz ? cz + w : cz + sgn(fz) * i;
+    n += bigSet(x, g, z, id);
+    if (Math.abs(w) === 1) bigSet(x, g + 1, z, B.GLASS);
+  }
+  finishBigBuild(n, cx, g, cz, '🌉 A bridge!');
+}
+// A big flat floor / a long wall of your chosen block.
+function stampFloor(s) { const { cx, cz, g } = s; finishBigBuild(levelPad(cx, cz, 3, g, solidSelected()), cx, g, cz, '🟫 A whole floor, done!'); }
+function stampWall(s) {
+  const { cx, cz, g, horiz } = s, id = solidSelected(); let n = 0;
+  for (let i = -3; i <= 3; i++) for (let dy = 1; dy <= 4; dy++) n += horiz ? bigSet(cx, g + dy, cz + i, id) : bigSet(cx + i, g + dy, cz, id);
   finishBigBuild(n, cx, g + 2, cz, '🧱 A whole wall, done!');
 }
+
 const BIG_BUILDS = [
-  { emoji: '🏠', name: 'Cozy House', fn: buildHouse, hint: 'A whole house you can walk around inside' },
-  { emoji: '🟫', name: 'Big Floor', fn: stampFloor, hint: 'A big floor — pick the block first!' },
-  { emoji: '🧱', name: 'Long Wall', fn: stampWall, hint: 'A whole wall — pick the block first!' },
+  { emoji: '🏠', name: 'House', rad: 3, dist: 5, fn: buildHouse, hint: 'A room with 4 walls + a door' },
+  { emoji: '🏡', name: 'Big House', rad: 4, dist: 6, fn: buildBigHouse, hint: 'A bigger room to play in' },
+  { emoji: '🗼', name: 'Tower', rad: 1, dist: 4, fn: buildTower, hint: 'A tall tower with windows' },
+  { emoji: '🏰', name: 'Castle', rad: 5, dist: 7, fn: buildCastle, hint: 'Walls + corner towers' },
+  { emoji: '🔺', name: 'Pyramid', rad: 4, dist: 6, fn: buildPyramid, hint: 'A sandstone pyramid' },
+  { emoji: '🌉', name: 'Bridge', rad: 1, dist: 3, fn: buildBridge, hint: 'A long walkway — pick a block!' },
+  { emoji: '🟫', name: 'Big Floor', rad: 3, dist: 5, fn: stampFloor, hint: 'A big floor — pick a block!' },
+  { emoji: '🧱', name: 'Long Wall', rad: 3, dist: 4, fn: stampWall, hint: 'A whole wall — pick a block!' },
 ];
 function buildBuildMenu() {
   const body = document.getElementById('buildmenu-body');
@@ -797,12 +843,38 @@ function buildBuildMenu() {
     const btn = document.createElement('button');
     btn.className = 'portal-choice';
     btn.innerHTML = '<span class="pe">' + b.emoji + '</span><b>' + b.name + '</b><small>' + b.hint + '</small>';
-    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); closeBuildMenu(); b.fn(); });
+    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); closeBuildMenu(); startPlacement(b); });
     body.appendChild(btn);
   }
 }
 function openBuildMenu() { buildBuildMenu(); document.getElementById('buildmenu').classList.remove('hidden'); }
 function closeBuildMenu() { document.getElementById('buildmenu').classList.add('hidden'); }
+
+// --- Walk-and-confirm placement: pick a structure, a green outline shows where
+// it will go (you move it by walking/turning), then tap "Build here!" ---
+let pendingBuild = null;
+function startPlacement(b) {
+  pendingBuild = b;
+  document.getElementById('place-label').textContent = b.emoji + ' Walk where you want your ' + b.name + ', then tap Build!';
+  document.getElementById('placebar').classList.remove('hidden');
+  tip('place', '🟦 The blue square shows where it goes — walk around to move it, then tap ✅ Build here!');
+}
+function confirmPlacement() {
+  if (!pendingBuild) return;
+  const b = pendingBuild; cancelPlacement();
+  b.fn(bigBuildSpot(b.dist, b.rad));
+}
+function cancelPlacement() { pendingBuild = null; document.getElementById('placebar').classList.add('hidden'); }
+function drawBuildPreview() {
+  if (!pendingBuild) return;
+  const s = bigBuildSpot(pendingBuild.dist, pendingBuild.rad), size = pendingBuild.rad * 2 + 1;
+  gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+  gl.uniform1f(worldProg.u.uAlpha, 0.5 + 0.22 * Math.sin(performance.now() / 200));
+  mat4.model(mShadow, s.cx + 0.5, s.g + 1.05, s.cz + 0.5, 0, size, 1, size);
+  gl.uniformMatrix4fv(worldProg.u.uModel, false, mShadow);
+  buildPreview.draw(worldProg);
+  gl.uniform1f(worldProg.u.uAlpha, 1); gl.depthMask(true); gl.disable(gl.BLEND);
+}
 
 // --- TNT: place it, tap to light it, then BOOM (it chain-reacts) ---
 // Mega TNT (the 💎-shop block) behaves the same but blows a much bigger crater.
@@ -2002,6 +2074,8 @@ function wireUI() {
   });
   document.getElementById('buildmenu-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeBuildMenu(); });
   document.getElementById('buildmenu').addEventListener('pointerdown', (e) => { if (e.target.id === 'buildmenu') closeBuildMenu(); });
+  document.getElementById('place-ok').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); confirmPlacement(); });
+  document.getElementById('place-cancel').addEventListener('pointerdown', (e) => { e.preventDefault(); cancelPlacement(); });
 
   document.getElementById('btn-night').addEventListener('pointerdown', (e) => {
     e.preventDefault(); sound.resume();
@@ -2226,6 +2300,7 @@ function frameBody(now) {
   mat4.perspective(proj, 1.05, aspect, 0.08, 120);
   camDistEased += (camDist - camDistEased) * Math.min(1, dt * 8); // smooth zoom
   computeCamera();
+  if (controls.tapPending && pendingBuild) { controls.tapPending = false; }   // placing a big build — taps do nothing (use the Build button)
   if (controls.tapPending) {
     controls.tapPending = false;
     const dir = screenRay(controls.tapX, controls.tapY);
@@ -2303,6 +2378,7 @@ function frameBody(now) {
     riding.yaw = player.yaw; riding.walking = player.moving;
   }
   drawShadows(m);
+  drawBuildPreview();                                      // green "build here" footprint
   const seatRide = ride && ride.att.id !== 'balloon';     // sit in the gondola/carousel
   character.draw(worldProg, player.pos[0], player.pos[1] + ((riding || seatRide) ? 0.62 : 0), player.pos[2], player.yaw, player.walkPhase, player.moveAmt, actionAnim, !!riding || !!seatRide);
   drawMobs(m);
@@ -2414,6 +2490,7 @@ function init() {
   proj = mat4.create(); view = mat4.create(); pv = mat4.create();
   scratch4 = new Float32Array(4);
   shadow = shadowMesh(gl); mShadow = mat4.create();
+  buildPreview = quadMesh(gl, [0.15, 0.85, 1.0]);    // bright cyan "build here" footprint (pops on grass + plaza)
 
   sound = new Sound();
   goals = new Goals();
@@ -2500,6 +2577,9 @@ function init() {
     funRide: (id) => { const a = ATTRACTIONS.find((x) => x.id === id); if (a) { openRidePrompt(a); confirmRide(); } },
     openStand: (id) => openStand(id),
     buyTreat: (i) => buyTreat(TREATS[i || 0]),
+    placeBuild: (name) => { const b = BIG_BUILDS.find((x) => x.name === name); if (b) startPlacement(b); },
+    confirmPlace: () => confirmPlacement(),
+    placing: () => (pendingBuild ? pendingBuild.name : null),
     endFunRide: () => { if (ride) endRide(); },
     funRiding: () => (ride ? ride.att.id : null),
     lightPortal: (k) => lightPortal(k),

@@ -142,6 +142,9 @@ body {
 #portalmenu,
 #buildmenu,
 #worldmenu,
+#ride,
+#ridemenu,
+#popcorn,
 #shop,
 #confirm,
 #quest,
@@ -165,6 +168,9 @@ body {
 #portalmenu.hidden,
 #buildmenu.hidden,
 #worldmenu.hidden,
+#ride.hidden,
+#ridemenu.hidden,
+#popcorn.hidden,
 #shop.hidden,
 #confirm.hidden,
 #quest.hidden,
@@ -174,6 +180,8 @@ body {
 #steve.hidden {
   display: none;
 }
+/* The "Build here" bar is a bottom strip, not a full-screen modal. */
+#placebar.hidden { display: none; }
 
 /* Steve's stall menu */
 #steve-body {
@@ -653,6 +661,50 @@ body {
 /* Stand signs (tickets/popcorn/shop) — a teal frame so they read as shops. */
 .ridesign.stand { background: linear-gradient(#fff, #c8f0e4); border-color: #15a8a0; color: #0c4a47; }
 @keyframes ridebob { 0%, 100% { margin-top: 0; } 50% { margin-top: -6px; } }
+
+/* "Build here" bar shown while positioning a big build (walk to move, then tap) */
+#placebar {
+  position: absolute;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 9;
+  pointer-events: none;
+}
+#place-label {
+  background: rgba(20, 28, 48, .82);
+  color: #fff;
+  font-weight: 700;
+  font-size: 18px;
+  padding: 8px 16px;
+  border-radius: 14px;
+  max-width: 78vw;
+  text-align: center;
+}
+.place-btns { display: flex; gap: 12px; pointer-events: auto; }
+#place-ok {
+  font-size: 22px;
+  font-weight: 800;
+  padding: 12px 26px;
+  border-radius: 18px;
+  border: 3px solid #2a7d2a;
+  background: linear-gradient(#7fe07f, #38b838);
+  color: #0c3a0c;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, .3);
+}
+#place-cancel {
+  font-size: 18px;
+  font-weight: 700;
+  padding: 12px 20px;
+  border-radius: 18px;
+  border: 3px solid #888;
+  background: linear-gradient(#fff, #e2e2e6);
+  color: #333;
+}
 
 /* Red flash when hurt (set per-frame from JS) */
 #hurt-flash {

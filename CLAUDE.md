@@ -826,6 +826,37 @@ Backlog). Shipped the stands on **`claude/dreamy-mccarthy-g6wgjr`** → `main`.
   a treat (−1💎, goal ticks); gift shop opens the 💎 shop; signs hide at home;
   zero errors. Screenshot of the booth row.
 
+## Status (session 30) — intuitive building for a 6-yr-old architect (dad: Ezra
+chose the game over YouTube + loves building, but "can't choose where to put the
+walls / hard to make a 4-walled building"). Shipped on
+**`claude/dreamy-mccarthy-g6wgjr`** → `main`. **sw v18→v19.** Now **49 goals**.
+1. **🏗️ Walk-and-confirm Big Builds (the headline).** Picking a structure no
+   longer drops it instantly in front of you — instead a **bright cyan footprint
+   outline** shows where it'll land (a `quadMesh` drawn in the blended pass at
+   `bigBuildSpot`, updated each frame as you **walk/turn to move it**), with a
+   bottom **`#placebar`**: a big **"✅ Build here!"** button + **"✖ Cancel"**.
+   Taps are suppressed while placing (use the button); travel/knockout cancels.
+   `startPlacement`/`confirmPlacement`/`drawBuildPreview`; `pendingBuild`. This
+   fixes "can't choose where."
+2. **8 structures (bigger + varied).** Refactored the build fns to take a spot
+   `s`: **House** (4-wall room+door+windows+lamp), **Big House**, **🗼 Tower**
+   (tall, crenellated), **🏰 Castle** (walls+4 corner towers+gateway, ~305
+   blocks), **🔺 Pyramid**, **🌉 Bridge**, **Big Floor**, **Long Wall**.
+   `bigBuildSpot(dist, rad)` clamps by footprint.
+3. **CSS hidden-bug fix (important).** `#ride`/`#ridemenu`/`#popcorn` were missing
+   from the modal `display:flex` + `#id.hidden{display:none}` lists, so they
+   rendered as `block` and **never hid** — the ride prompt had been a stuck box
+   since the Secret World shipped (likely part of why rides felt broken). Added
+   them to both lists + `#placebar.hidden`. Now all dialogs open/close correctly.
+   Verified: Node syntax; headless — all 8 structures place via placeBuild→
+   confirmPlace (House 242 blocks incl. a door, Castle 305, Pyramid 165…) and
+   clear cleanly; placebar shows then **hides** after building; the 4 new dialogs
+   all compute `display:none` when hidden; cyan footprint visible on grass; zero
+   errors. Screenshots of the footprint preview + the finished house on a hill.
+   Still queued (dad's wishlist): lots more MC blocks + a special "Creative"
+   group; a **larger flat high-res building world** (do carefully w/ save
+   migration so builds are never lost).
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept

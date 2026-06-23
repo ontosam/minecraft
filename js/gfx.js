@@ -509,12 +509,16 @@ export function makeAtlasTexture(gl) {
 // A flat 1×1 dark quad laid in the ground plane — a soft blob shadow drawn
 // under each creature (with uAlpha + blending) so they feel planted in the
 // world instead of floating. Sample the NEUTRAL tile centre for a flat colour.
-export function shadowMesh(gl) {
+export function shadowMesh(gl) { return quadMesh(gl, [0, 0, 0]); }
+
+// A flat 1×1 quad at y=0 in a solid colour — used for the blob shadow (black) and
+// the green "build here" footprint preview. Drawn in a blended pass with uAlpha.
+export function quadMesh(gl, color) {
   const r = getUV(TILE.NEUTRAL);
   const u = (r.u0 + r.u1) / 2, v = (r.v0 + r.v1) / 2;
   const verts = [[-0.5, 0, 0.5], [0.5, 0, 0.5], [0.5, 0, -0.5], [-0.5, 0, -0.5]];
   const A = { pos: [], uv: [], col: [], light: [], idx: [] };
-  for (const p of verts) { A.pos.push(p[0], p[1], p[2]); A.uv.push(u, v); A.col.push(0, 0, 0); A.light.push(1); }
+  for (const p of verts) { A.pos.push(p[0], p[1], p[2]); A.uv.push(u, v); A.col.push(color[0], color[1], color[2]); A.light.push(1); }
   A.idx.push(0, 1, 2, 0, 2, 3);
   const m = new GLMesh(gl);
   m.setAttrib('aPos', new Float32Array(A.pos), 3);
