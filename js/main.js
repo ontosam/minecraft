@@ -290,6 +290,7 @@ function setDimension(key) {
   world = worlds[key].world;
   if (!player) player = new Player(world); else player.world = world;
   sky = WORLD_KINDS[key].sky;
+  player.gravityScale = WORLD_KINDS[key].lowGrav ? 0.36 : 1;   // float + bounce sky-high in Space World
   minimapDirty = true;
 }
 
@@ -320,6 +321,7 @@ function travelTo(dest) {
     if (dest === 'lego' && !isLego(selected)) selected = B.LEGO_RED; // arrive holding a Lego brick
     buildPicker(); refreshBlocksButton();     // Lego World shows a Lego-only palette
     if (dest === 'secret') tip('tickets', '🎟️ Walk up to the Ticket booth to pick a ride! There\'s a Popcorn stand and Gift Shop too. 🍿🛍️');
+    if (dest === 'space') { goals.bump('space'); tip('space', '🚀 Welcome to Space! Jump to bounce sky-high, and hop between the floating islands! 🌟'); }
   } catch (e) {
     // A portal should never strand Ezra on the scary "Oops" screen. If anything
     // goes wrong mid-trip, log it for us and pop him safely back home instead.
@@ -1190,6 +1192,7 @@ const SHOP = [
   { id: 'skyworld', icon: '☁️', name: 'Sky World', cost: 20, desc: 'A whole new floating-islands world — best with Fly!' },
   { id: 'endworld', icon: '🐉', name: 'The End', cost: 30, desc: 'A floating world with a friendly dragon to tame!' },
   { id: 'legoworld', icon: '🧱', name: 'Lego World', cost: 50, desc: 'A giant Lego table + 12 shiny Lego bricks! (a big treasure goal)' },
+  { id: 'spaceworld', icon: '🚀', name: 'Space World', cost: 100, desc: 'Bounce sky-high in a low-gravity world of floating islands in the stars! ✨ (the BIG 100💎 dream)' },
 ];
 function buildShop() {
   document.getElementById('shop-gems').textContent = 'You have 💎 ' + goals.gems;
@@ -1226,6 +1229,7 @@ function buyItem(it) {
   if (it.id === 'skyworld') showToast('☁️ Sky World unlocked! Tap 🔥, choose Sky World, then walk in!', 4200);
   if (it.id === 'endworld') showToast('🐉 The End unlocked! Tap 🔥, choose The End, then walk in to meet the dragon!', 4600);
   if (it.id === 'legoworld') { buildPicker(); selected = B.LEGO_RED; refreshBlocksButton(); showToast('🧱 Lego World! Tap 🌍 → Lego World. New Lego bricks are in your blocks!', 4600); }
+  if (it.id === 'spaceworld') showToast('🚀 SPACE WORLD unlocked! 🌟 Tap 🌍 → Space World — jump to bounce sky-high!', 5200);
   sound.play('treasure');
   updateGems(); buildShop();
   showToast('✨ Unlocked: ' + it.name + '!');

@@ -83,7 +83,16 @@ export const WORLD_KINDS = {
     gen: 'generateBuild', ground: B.GRASS,
     mobs: [],                   // a calm, wide-open flat plain just for building
   },
+  space: {
+    name: 'Space World', emoji: '🚀',
+    sky: [0.04, 0.03, 0.12], fog: [70, 180],   // deep starry void
+    gen: 'generateSpace', ground: B.QUARTZ,
+    mobs: [],
+    flint: true,
+    locked: 'spaceworld',       // the big 100💎 dream reward
+    lowGrav: true,              // float + bounce sky-high between the islands
+  },
 };
 
 // Display order for menus/minimap.
-export const WORLD_ORDER = ['over', 'nether', 'gold', 'ant', 'tnt', 'sky', 'end', 'lego', 'secret', 'build'];
+export const WORLD_ORDER = ['over', 'nether', 'gold', 'ant', 'tnt', 'sky', 'end', 'lego', 'secret', 'build', 'space'];

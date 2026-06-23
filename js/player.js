@@ -33,6 +33,7 @@ export class Player {
     this.flying = false;   // fly mode (toggled from the UI)
     this.speedMul = 1;     // shop "Speed Boots" multiply walk speed
     this.jumpMul = 1;      // shop "Super Jump" multiply jump height
+    this.gravityScale = 1; // <1 in Space World (low gravity = float + bounce high)
     this.mountSpeed = 1;   // extra speed while riding the pony
     this.mountJump = 1;    // extra jump while riding the pony
     this.webT = 0;         // seconds left of a spider-web slow (sticky, harmless)
@@ -112,7 +113,7 @@ export class Player {
       }
     } else {
       if (input.jump && this.onGround) { this.vel[1] = JUMP * this.jumpMul * this.mountJump; this.onGround = false; }
-      this.vel[1] -= GRAVITY * dt;
+      this.vel[1] -= GRAVITY * this.gravityScale * dt;
       if (this.vel[1] < -28) this.vel[1] = -28;
     }
 

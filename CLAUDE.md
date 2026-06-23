@@ -909,6 +909,30 @@ with graphics we can support"). Shipped on **`claude/dreamy-mccarthy-g6wgjr`** �
    terrain is ~2.25× geometry (fine on a real GPU; SwiftShader slow — watch FPS
    on an old iPad); old↔new terrain seam at the 64 line is cosmetic (more land).
 
+## Status (session 33) — 🚀 Space World (the 100💎 dream reward)
+Dad: Ezra's collecting 100💎 (loved Lego World at 50) and asked what's worth 100.
+Offered 4 ideas via AskUserQuestion; Ezra picked **Space World**. Shipped on
+**`claude/dreamy-mccarthy-g6wgjr`** → `main`. **sw v22→v23.** Now **50 goals**,
+**15 shop items**, **12 worlds**.
+- **`WORLD_KINDS.space`** (`generateSpace`): floating quartz/deepslate asteroids
+  in a **dark starry void** (the gradient sky renders deep space), dotted with
+  **Glow-Crystal stars**, a guaranteed central spawn island + the home portal.
+  Bought in the 💎 shop (`spaceworld`, **100💎** — the big one), then reached via
+  the 🌍 menu / flint like Sky/End (`locked:'spaceworld'`).
+- **Low gravity (the headline feel).** New `player.gravityScale` (used in the
+  gravity step); `setDimension` sets it to **0.36** in any `lowGrav` world, else
+  1 — so in Space you **bounce sky-high and float down** between the islands.
+  Falling off respawns you on the central island (`pos[1] < -4 → goHome`, already
+  there). New **🚀 Astronaut** goal (`space` metric, bumped on first arrival) +
+  a first-time tip.
+  Verified headless: buy→owns→travel; `gravityScale` 1→0.36→1 across worlds;
+  **free-fall ~1.2 blocks/0.5s in Space vs ~3.6 in the overworld** (low-g
+  confirmed); central island solid under spawn; Astronaut goal ticks; zero
+  errors; screenshot of the asteroids + starry sky. Tuning candidates: low-g
+  jump uses the same JUMP velocity (lower gravity alone makes it float — feels
+  great; could add a bigger launch); space islands are quartz/deepslate (could
+  add neon/space-themed decor next).
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept

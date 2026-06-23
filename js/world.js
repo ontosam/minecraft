@@ -679,6 +679,41 @@ export class World {
     this.spawn = [SX / 2 + 0.5, base + 2, SZ / 2 + 0.5];
   }
 
+  // Space World (the big 100💎 reward): floating asteroids in a starry void.
+  // Low gravity (set in main) means you bounce sky-high between the islands.
+  generateSpace() {
+    this.data.fill(B.AIR);
+    this.placed = new Set();
+    this.portals = [];
+    const rand = mulberry32(7777);
+    const cxC = Math.floor(SX / 2), czC = Math.floor(SZ / 2);
+    // A floating asteroid: a disc of space rock with a bright top, narrowing down.
+    const island = (cx, cz, r, ty, topId) => {
+      for (let dy = 0; dy < 5; dy++) {
+        const rr = r - dy * 1.1, y = ty - dy;
+        if (rr < 0.6 || y < 1) break;
+        for (let x = Math.max(1, Math.floor(cx - rr)); x <= Math.min(SX - 2, Math.ceil(cx + rr)); x++)
+          for (let z = Math.max(1, Math.floor(cz - rr)); z <= Math.min(SZ - 2, Math.ceil(cz + rr)); z++) {
+            if (Math.hypot(x - cx, z - cz) > rr) continue;
+            this.data[this.idx(x, y, z)] = dy === 0 ? topId : (dy <= 2 ? B.DEEPSLATE : B.STONE);
+          }
+      }
+    };
+    island(cxC, czC, 8, 12, B.QUARTZ);                            // central spawn island
+    for (let i = 0; i < 24; i++) {
+      const cx = 5 + Math.floor(rand() * (SX - 10)), cz = 5 + Math.floor(rand() * (SZ - 10));
+      if (Math.hypot(cx - cxC, cz - czC) < 12) continue;
+      island(cx, cz, 2 + Math.floor(rand() * 4), 5 + Math.floor(rand() * 16), rand() < 0.3 ? B.STARRY : B.QUARTZ);
+    }
+    // Glow crystals dotted around as stars/lanterns.
+    for (let i = 0; i < 60; i++) {
+      const x = 2 + Math.floor(rand() * (SX - 4)), z = 2 + Math.floor(rand() * (SZ - 4));
+      const h = this.heightAt(x, z);
+      if (h > 0 && rand() < 0.5) this.data[this.idx(x, h + 1, z)] = B.GLOW_CRYSTAL;
+    }
+    this.spawn = [cxC + 0.5, 14, czC + 0.5];
+  }
+
   // The Secret World: a bright festive plaza for the fun park. Flat quartz with
   // cheerful colour rings + glowing lamp posts. The rides (Ferris wheel,
   // carousel, balloons) are animated meshes drawn above this by SecretPark.

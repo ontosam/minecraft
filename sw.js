@@ -1,5 +1,5 @@
 // Offline service worker for Ezra's Blocks. Bump CACHE to push an update.
-const CACHE = 'ezrablocks-v22';
+const CACHE = 'ezrablocks-v23';
 const CORE = [
   '', 'index.html', 'styles.css', 'manifest.webmanifest',
   'js/main.js', 'js/math.js', 'js/gfx.js', 'js/world.js', 'js/worlds.js',
