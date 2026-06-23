@@ -1103,6 +1103,86 @@ function questOk() {
   closeQuest();
 }
 
+// --- 📖 Adventure: a story journey across the worlds, hosted by Ezra's friends.
+// Each chapter = a friend, a short readable blurb, one clear "do it together"
+// task (tracked from now via a goals counter), a 💎 reward, friendship hearts,
+// and sometimes a gift. The 📖 button is always there so he's never lost. ---
+const STORY = [
+  { friend: 'chris', say: "Welcome to our big adventure, Ezra! 🎉 Let's start at home — build a cozy house so we have somewhere to play!", hint: "Tap 🏗️, then pick 'Cozy House'.", task: { metric: 'place', n: 20, mode: 'do', icon: '🏠', label: 'build a house' }, reward: 4 },
+  { friend: 'vlad', say: "Every explorer needs animal friends! 🐾 Come and say hello to the animals with me.", hint: 'Walk up to a pig or sheep and tap 🐾 Pet.', task: { metric: 'pet', n: 3, mode: 'do', icon: '🐾', label: 'pet 3 animals' }, reward: 4, gift: 'pet' },
+  { friend: 'cora', say: "Let's make the world greener! 🌱 Plant a little sapling and we'll watch it grow into a tree.", hint: 'Pick the 🌱 sapling (Nature tab) and tap the grass.', task: { metric: 'plant', n: 1, mode: 'do', icon: '🌱', label: 'plant a sapling' }, reward: 4 },
+  { friend: 'jovi', say: "I heard there's shiny treasure in the 🪙 Gold World! ✨ Let's go dig some up!", hint: 'Tap 🌍 → Gold World, then dig the shiny blocks.', task: { metric: 'treasure', n: 2, mode: 'do', icon: '💎', label: 'dig up 2 treasures' }, reward: 5 },
+  { friend: 'steve', say: "Brain power time! 🧮 Answer some of my fun number questions and I'll cheer you on!", hint: 'Find Steve at his stand and tap him.', task: { metric: 'math', n: 3, mode: 'do', icon: '🍗', label: 'answer 3 math questions' }, reward: 5 },
+  { friend: 'cristiano', say: "Goooal! ⚽ Actually... let's BOUNCE! Put down a slime block and boing on it with me!", hint: 'Pick the 🟢 slime block (Fun tab), place it, and jump!', task: { metric: 'bounce', n: 1, mode: 'do', icon: '🟢', label: 'bounce on slime' }, reward: 4, gift: 'sparkle' },
+  { friend: 'hero', say: "Time to be BRAVE! 🦸 Turn on night and gently bonk a wobbly monster. I'm right beside you — you always wake up safe!", hint: 'Tap 🌙, then tap a zombie or spider.', task: { metric: 'monster', n: 1, mode: 'do', icon: '⚔️', label: 'bonk 1 night monster' }, reward: 6, gift: 'crown' },
+  { friend: 'cora', say: "The GRAND finale! 🐉 Let's go to The End and tame the friendly dragon together. You can do it!", hint: 'Buy The End in the 💎 shop, tap 🌍 → The End, pop the crystals, then pet the dragon!', task: { metric: 'dragon', n: 1, mode: 'have', icon: '🐉', label: 'tame the dragon' }, reward: 12, gift: 'rainbow' },
+];
+const ADV_FRIENDS = [...new Set(STORY.map((c) => c.friend))];
+function startChapter(i) {
+  const ch = STORY[i];
+  goals.adv = { i, base: ch ? (goals.counts[ch.task.metric] || 0) : 0 };
+  goals.save();
+}
+function curChapter() { return (goals.adv && goals.adv.i < STORY.length) ? STORY[goals.adv.i] : null; }
+function advProgress(ch) {
+  const cur = goals.counts[ch.task.metric] || 0;
+  return ch.task.mode === 'have' ? Math.min(ch.task.n, cur) : Math.max(0, Math.min(ch.task.n, cur - goals.adv.base));
+}
+function advDone(ch) { return advProgress(ch) >= ch.task.n; }
+function heartsHtml(id) { const n = Math.min(3, goals.friends[id] || 0); let s = ''; for (let k = 0; k < 3; k++) s += k < n ? '❤️' : '🤍'; return s; }
+function updateAdventureButton() {
+  const b = document.getElementById('btn-adventure');
+  if (b) { const ch = curChapter(); b.classList.toggle('on', !!(ch && advDone(ch))); }   // gold ring = ready to claim
+}
+function openAdventure() { renderAdventure(); document.getElementById('adventure').classList.remove('hidden'); }
+function closeAdventure() { document.getElementById('adventure').classList.add('hidden'); }
+function renderAdventure() {
+  const body = document.getElementById('adv-body'), btn = document.getElementById('adv-ok');
+  body.innerHTML = '';
+  const ch = curChapter();
+  if (!ch) {                         // the whole journey is finished — a happy finale
+    const row = document.createElement('div'); row.className = 'adv-finale-row';
+    for (const id of ADV_FRIENDS) row.appendChild(charPreview(charById(id), 48));
+    body.appendChild(row);
+    const t = document.createElement('div'); t.className = 'adv-text';
+    t.innerHTML = '🎉 You finished the Big Adventure with all your friends! 🎉<br>You are an amazing adventurer, Ezra! 💖';
+    body.appendChild(t);
+    btn.textContent = 'Yay! 🎉';
+    return;
+  }
+  const c = charById(ch.friend);
+  const port = charPreview(c, 84); port.className = 'adv-portrait'; body.appendChild(port);
+  const name = document.createElement('div'); name.className = 'adv-name'; name.innerHTML = c.name + ' &nbsp; ' + heartsHtml(ch.friend); body.appendChild(name);
+  const say = document.createElement('div'); say.className = 'adv-text'; say.innerHTML = ch.say; body.appendChild(say);
+  const done = advDone(ch);
+  const task = document.createElement('div'); task.className = 'adv-task' + (done ? ' done' : '');
+  task.innerHTML = (done ? '✅ ' : '') + ch.task.icon + ' <b>' + ch.task.label + '</b> — ' + advProgress(ch) + ' / ' + ch.task.n + (done ? '' : '<br><small>💡 ' + ch.hint + '</small>');
+  body.appendChild(task);
+  btn.textContent = done ? "Yay! What's next? 🎉" : 'Okay! 👍';
+}
+function applyGift(id) {
+  goals.setUnlock(id);
+  applyUnlocks();
+  if (id === 'pet') ensurePet();
+  if (id === 'pony') ensurePony();
+  if (id === 'rainbow') { buildPicker(); selected = B.RAINBOW; refreshBlocksButton(); }
+  saveDirty = true;
+}
+function advOk() {
+  const ch = curChapter();
+  if (!ch || !advDone(ch)) { closeAdventure(); return; }
+  goals.addGems(ch.reward); updateGems();
+  goals.bump('story');
+  goals.friends[ch.friend] = (goals.friends[ch.friend] || 0) + 1;
+  sound.play('treasure');
+  let giftMsg = '';
+  if (ch.gift && !goals.hasUnlock(ch.gift)) { applyGift(ch.gift); giftMsg = ' 🎁 ' + charById(ch.friend).name + ' gave you a present!'; }
+  startChapter(goals.adv.i + 1);          // advance + capture the next baseline (also saves)
+  showToast('🎉 +💎' + ch.reward + giftMsg, 3800);
+  updateAdventureButton();
+  renderAdventure();                      // show the next chapter (or finale) right away
+}
+
 // --- Steve's Lava Chicken stand: a math challenge that pays 💎 + 🍗 ---
 // Build a cute little stand (only into empty space, so it never wrecks a build).
 function buildLavaStand(w, sx, gy, sz) {
@@ -1540,6 +1620,13 @@ function wireUI() {
   document.getElementById('gem-bar').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); openShop(); });
   document.getElementById('shop-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeShop(); });
   document.getElementById('shop').addEventListener('pointerdown', (e) => { if (e.target.id === 'shop') closeShop(); });
+  document.getElementById('btn-adventure').addEventListener('pointerdown', (e) => {
+    e.preventDefault(); sound.resume();
+    tip('adventure', '📖 This is your Adventure! Your friends give you fun things to do together. Do the job, then tap 📖 to see what\'s next!');
+    openAdventure();
+  });
+  document.getElementById('adv-ok').addEventListener('pointerdown', (e) => { e.preventDefault(); advOk(); });
+  document.getElementById('adventure').addEventListener('pointerdown', (e) => { if (e.target.id === 'adventure') closeAdventure(); });
   document.getElementById('quest-ok').addEventListener('pointerdown', (e) => { e.preventDefault(); questOk(); });
   document.getElementById('quest').addEventListener('pointerdown', (e) => { if (e.target.id === 'quest') closeQuest(); });
   document.getElementById('btn-reset').addEventListener('pointerdown', (e) => { e.preventDefault(); askReset(); });
@@ -1691,6 +1778,8 @@ function frame(now) {
     const f = fuses.splice(i, 1)[0];
     if (isTNT(world.get(f.x, f.y, f.z))) detonate(f.x, f.y, f.z);
   }
+
+  updateAdventureButton();          // gold ring on 📖 when a chapter is ready to claim
 
   const m = mobs();
   updateMobs(m, dt);
@@ -1910,6 +1999,8 @@ function init() {
   ensurePet();
   ensurePony();
   setupSteve();
+  if (!goals.adv) startChapter(0);     // begin the adventure (captures "from now" baselines)
+  updateAdventureButton();
   updateHearts();
   updateNightButton();
   updateGems();

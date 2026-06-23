@@ -46,19 +46,22 @@ export const GOAL_DEFS = [
   { id: 'marathon', icon: '🏃', title: 'Marathon', desc: 'Walk really far (500)', metric: 'dist', target: 500 },
   { id: 'crystals', icon: '🔮', title: 'Crystal popper', desc: 'Pop 3 End crystals', metric: 'crystal', target: 3 },
   { id: 'dragontamer', icon: '🐉', title: 'Dragon tamer', desc: 'Tame the friendly End dragon', metric: 'dragon', target: 1 },
+  { id: 'storyteller', icon: '📖', title: 'Adventurer', desc: 'Finish 5 adventure chapters with friends', metric: 'story', target: 5 },
 ];
 
 const KEY = 'ezrablocks.goals.v1';
 
 export class Goals {
   constructor() {
-    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0, bought: 0, spider: 0, lamp: 0, monster: 0, lever: 0, bounce: 0, ride: 0, fish: 0, quest: 0, plant: 0, math: 0, snack: 0, skeleton: 0, crystal: 0, dragon: 0 };
+    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0, bought: 0, spider: 0, lamp: 0, monster: 0, lever: 0, bounce: 0, ride: 0, fish: 0, quest: 0, plant: 0, math: 0, snack: 0, skeleton: 0, crystal: 0, dragon: 0, story: 0 };
     this.usedTypes = new Set();
     this.done = {};
     this.stars = 0;
     this.gems = 0;            // 💎 spendable currency (mined + earned from goals)
     this.unlocks = {};        // shop unlocks: { pet, heart, megatnt }
     this.tips = {};           // which one-time friendly hint blurbs have been shown
+    this.adv = null;          // adventure story state: { i: chapter, base: counter baseline }
+    this.friends = {};        // friendship hearts earned with each buddy
     this.onComplete = null;   // (def) => void
     this._lastSave = 0;
     this.load();
@@ -103,7 +106,7 @@ export class Goals {
     this._lastSave = Date.now();
     try {
       localStorage.setItem(KEY, JSON.stringify({
-        c: this.counts, t: [...this.usedTypes], d: this.done, s: this.stars, g: this.gems, u: this.unlocks, p: this.tips,
+        c: this.counts, t: [...this.usedTypes], d: this.done, s: this.stars, g: this.gems, u: this.unlocks, p: this.tips, adv: this.adv, fr: this.friends,
       }));
     } catch (e) { /* ignore */ }
   }
@@ -118,6 +121,8 @@ export class Goals {
         this.gems = o.g || 0;
         this.unlocks = o.u || {};
         this.tips = o.p || {};
+        this.adv = o.adv || null;
+        this.friends = o.fr || {};
       }
     } catch (e) { /* ignore */ }
   }

@@ -542,6 +542,33 @@ worlds?"). Shipped on **`claude/store-portal-bugs-hzcr72`**, mirrored to `main`.
   they unlock, tap End→travels; zero errors; topbar still fits (right edge 668<
   1024).
 
+## Status (session 21) — 📖 Adventure with friends (dad: engagement via friends
+who do challenges *with* him; he picked "adventure story" + "friendship hearts +
+gifts" via AskUserQuestion). Shipped on **`claude/store-portal-bugs-hzcr72`**,
+mirrored to `main`. **sw cache v7→v8.** Now **45 goals**.
+- **A story journey across the worlds, hosted by the character roster as
+  friends.** New **📖 topbar button** opens an Adventure dialog: the current
+  friend's `charPreview` portrait + name + **friendship hearts**, a short
+  **readable blurb**, and one clear **do-it-together task** (tracked from a
+  baseline like the villager quests) with a 💡 hint. Finish it → the 📖 button
+  gets a **gold ring**; open it and tap **"Yay! What's next?"** to claim 💎,
+  earn a friendship heart with that friend, sometimes get a **gift**, and
+  advance. `STORY` = 8 chapters (Chris→build a house, Vlad→pet animals [gift
+  pet], Cora→plant, Jovi→Gold-World treasure, Steve→math, Cristiano→slime bounce
+  [gift sparkle], Hero→night monster [gift crown], Cora→tame the dragon [gift
+  rainbow]). Tasks use `mode:'do'` (relative baseline) or `'have'` (absolute,
+  for the dragon). A happy **finale** shows all friends. New 'Adventurer' goal
+  (`story` counter, 5 chapters). All state persists in the goals save
+  (`adv:{i,base}`, `fr:` friendship hearts). `__ezra`: drive via the buttons; the
+  loop badges 📖 each frame (`updateAdventureButton`).
+  Verified headless: dialog renders portrait+blurb+task; complete→badge→claim
+  pays 💎 + heart + gift; all 8 chapters + finale; gifts (pet/sparkle/crown/
+  rainbow) unlock; 'storyteller' goal completes; **state survives reload**; zero
+  errors. Screenshots of the offer + done states.
+  Next steps offered to dad: friends that physically **walk up** in the world
+  (not just the 📖 log), build-challenges that **check the real structure**, and
+  repeatable per-friend activities to grow hearts further.
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files
