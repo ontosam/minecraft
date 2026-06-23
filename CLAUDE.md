@@ -933,6 +933,63 @@ Offered 4 ideas via AskUserQuestion; Ezra picked **Space World**. Shipped on
   great; could add a bigger launch); space islands are quartz/deepslate (could
   add neon/space-themed decor next).
 
+## Status (session 34) — 🚀 Space Adventure: a drivable moon, rover, alien cops,
+black holes + space blocks (dad: "he's mesmerized by building; what's missing is
+a little adventure — black holes you can't see and fall into, a space rover you
+buy and drive [choose speed → needs big terrain], an alien cop or two that keeps
+your speed in check, an anti-gravity lever, and many space-friendly blocks incl.
+sticky + rock ones. Go crazy."). Shipped on **`claude/dreamy-mccarthy-g6wgjr`** →
+`main`. **sw v23→v24.** Now **52 goals**, **16 shop items**, **132 block ids**.
+1. **🌑 The moon got real (terrain redesign).** `generateSpace` is rebuilt: a big,
+   **solid, drivable cratered moon surface** (MOON_ROCK over deepslate, gentle
+   rolling height — 223/225 columns are drivable) instead of sparse islands, with
+   the **floating asteroid islands kept above** to bounce up to (low-grav). Old
+   floating-island saves are **migrated to the new moon without losing builds**
+   (`migrateSpaceIfOld` in main: detects the sparse old terrain, regenerates the
+   moon, then **re-stamps every `world.placed` block back**; also drops a hanging
+   arrival point onto solid ground). Space World was already live (v23 on `main`),
+   so this migration was required.
+2. **🕳️ Black holes (the "adventure" surprise).** Dark round pits punched straight
+   through the moon to the void (a subtle BLACKSTONE rim is the only tell). Drive
+   over one and *whoosh* — `blackHoleWhoosh()` (frame check: `dimension==='space'
+   && pos[1]<3`) pops you safely back to the launch pad with 🌀 particles + a
+   chime, ticks the new **🕳️ Black hole!** goal. Never scary, always recovers.
+   `world.blackHoles` lists them (debug only; the open shafts live in the bytes so
+   it still works after a save/reload).
+3. **🛸 Space Rover (`js/rover.js`).** Shop item (**30💎**); a **🛸 topbar button**
+   appears in Space when owned. Tap to hop on, tap again to **cycle the speed**
+   (🐢 Slow → 🚗 Cruise → 🚀 Zoom → 🛑 Park) — reuses the pony's `player.mountSpeed`
+   (muls 1.8/3.0/4.6). A little box-mesh moon buggy (wheels, rails, glowing
+   headlights/antenna) is drawn at the player's feet; the kid rides **seated**.
+   Travel/knockout/reset auto-park it (`stopRover`); `setDimension` shows/hides the
+   button. New **🛸 Space driver** goal. `__ezra.toggleRover/setRoverSpeed/roving/
+   roverSpeed`.
+4. **👽 Alien cops (`js/aliencops.js`).** 1–2 friendly UFO saucers patrol the moon
+   (drift + bob + flashing red/blue siren, blob-shadowed). Drive at **top speed
+   (🚀 Zoom)** near one → it flashes, eases toward you ("pulling you over"), and
+   `onSiren` toasts **"Slow down! Space speed limit!"** + **gently drops you to
+   Cruise** (no harm, no catch). Wired as a `space` mob via the registry
+   (`WORLD_KINDS.space.mobs=['aliencops']`). `__ezra.aliencops()`.
+5. **🚀 Six space blocks (ids 126–131) + a "Space 🚀" picker tab.** MOON_ROCK,
+   SPACE_METAL, METEOR, CRYSTAL_ORE, PLASMA (glow), and **ALIEN_GOO — a *sticky*
+   block** (`sticky:true`; player.js slows you to 0.4× while stood on it, like
+   honey). Drawn with the session-24 atlas helpers (new TILE ids 112–117) and
+   scattered across the moon (meteor boulders, goo puddles, gem ore, glow stones).
+   **Anti-gravity lever: DEFERRED** (a true upside-down camera/gravity flip is
+   finicky + nausea-risky for a 6-yr-old; the low-grav bounce already gives a
+   strong space feel) — told the dad it's a future pass.
+   Verified: Node logic (6 blocks defined + sticky + the Space cat; moon floor
+   solid, bedrock base, 6 black-hole shafts open to the void, 223/225 drivable,
+   save round-trip) + headless CDP (boot 0 errors with the new atlas tiles; buy
+   space+rover→travel; rover speed cycles 1→2→3→0 with muls [1,1.8,3,4.6]; cop
+   sirens at Zoom and drops you to Cruise; black-hole whoosh + a natural shaft-fall
+   both recover + tick the goal; **save/reload keeps space+rover+the new moon**;
+   full 11-world hop + a space soak all green, **zero errors**) with screenshots of
+   the rover on the cratered moon + an overview. Tuning candidates: rover is a
+   box-mesh buggy (no wheel spin); cops always patrol (could nap when you're slow);
+   the black-hole rim is subtle on purpose (a kid learns to spot them);
+   anti-gravity is still open if the dad wants the literal flip.
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept

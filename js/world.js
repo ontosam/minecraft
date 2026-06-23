@@ -38,6 +38,9 @@ export const B = {
   TERRACOTTA: 113, MOSSY_BRICK: 114,
   NEON_PINK: 115, NEON_GREEN: 116, NEON_BLUE: 117, NEON_ORANGE: 118, NEON_PURPLE: 119,
   CLOUD: 120, STARRY: 121, CHECKER: 122, CANDY: 123, CHROME: 124, GLOW_CRYSTAL: 125,
+  // session 34: space blocks (126-131) — rocky moon stuff, shiny metal, glowy
+  // plasma, gem ore, and a sticky alien goo that's hard to walk across.
+  MOON_ROCK: 126, SPACE_METAL: 127, ALIEN_GOO: 128, METEOR: 129, PLASMA: 130, CRYSTAL_ORE: 131,
 };
 
 const W = [1, 1, 1]; // white tint for textured blocks
@@ -183,6 +186,14 @@ export const BLOCKS = {
   [B.CANDY]: nat(TILE.CANDY, '#f04a7a'),
   [B.CHROME]: nat(TILE.CHROME, '#c8ccd8'),
   [B.GLOW_CRYSTAL]: nat(TILE.GLOW_CRYSTAL, '#3ad8e8'),
+  // Space blocks — for building bases on the moon. ALIEN_GOO is "sticky": you
+  // walk across it slowly (handled in player.js), like honey in Minecraft.
+  [B.MOON_ROCK]: nat(TILE.MOON_ROCK, '#8e8e96'),
+  [B.SPACE_METAL]: nat(TILE.SPACE_METAL, '#5a6580'),
+  [B.ALIEN_GOO]: { tiles: { top: TILE.ALIEN_GOO, side: TILE.ALIEN_GOO, bottom: TILE.ALIEN_GOO }, tint: W, ui: '#3ad04a', sticky: true },
+  [B.METEOR]: nat(TILE.METEOR, '#4a403a'),
+  [B.PLASMA]: nat(TILE.PLASMA, '#7a2ad8'),
+  [B.CRYSTAL_ORE]: nat(TILE.CRYSTAL_ORE, '#33e0d8'),
 };
 
 // Build blocks grouped into categories for the pop-up picker.
@@ -199,6 +210,8 @@ export const CATEGORIES = [
   { name: 'Decor 🪑', blocks: [B.MELON, B.HAY, B.HONEY, B.NOTE_BLOCK, B.SPONGE, B.SCULK, B.PUMPKIN, B.GLOWSTONE, B.SEA_LANTERN] },
   // A special group of wild blocks for crazy builds!
   { name: 'Creative ✨', blocks: [B.NEON_PINK, B.NEON_GREEN, B.NEON_BLUE, B.NEON_ORANGE, B.NEON_PURPLE, B.GLOW_CRYSTAL, B.STARRY, B.CLOUD, B.CHECKER, B.CANDY, B.CHROME] },
+  // Out-of-this-world blocks for building moon bases (alien goo is sticky!).
+  { name: 'Space 🚀', blocks: [B.MOON_ROCK, B.METEOR, B.SPACE_METAL, B.CRYSTAL_ORE, B.PLASMA, B.ALIEN_GOO, B.STARRY, B.GLOW_CRYSTAL] },
   { name: 'Fun', blocks: [B.PUMPKIN, B.SLIME, B.BARRIER] },
   // Shown in the picker only after it's bought in the 💎 shop.
   { name: 'Special ✨', blocks: [B.RAINBOW], locked: 'rainbow' },
@@ -685,33 +698,78 @@ export class World {
     this.data.fill(B.AIR);
     this.placed = new Set();
     this.portals = [];
+    this.blackHoles = [];                       // where the hidden void pits are
     const rand = mulberry32(7777);
     const cxC = Math.floor(SX / 2), czC = Math.floor(SZ / 2);
-    // A floating asteroid: a disc of space rock with a bright top, narrowing down.
+    const G = 8;                                 // base moon surface level
+    // A big, drivable cratered moon surface covering the whole world — wide-open
+    // room for the Space Rover. Gentle rolling height keeps it interesting but
+    // smooth enough to zoom across.
+    const hgt = (x, z) => G + Math.round((Math.sin(x * 0.16) * Math.cos(z * 0.15) + Math.sin((x + z) * 0.08) * 0.7) * 1.6);
+    for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) {
+      const h = hgt(x, z);
+      this.data[this.idx(x, 0, z)] = B.BEDROCK;
+      for (let y = 1; y <= h; y++) this.data[this.idx(x, y, z)] = (y >= h - 1) ? B.MOON_ROCK : B.DEEPSLATE;
+    }
+    // Craters: shallow round dips pressed into the surface, away from spawn.
+    for (let i = 0; i < 28; i++) {
+      const cx = 4 + (rand() * (SX - 8) | 0), cz = 4 + (rand() * (SZ - 8) | 0);
+      if (Math.hypot(cx - cxC, cz - czC) < 8) continue;
+      const r = 2 + (rand() * 3 | 0);
+      for (let x = cx - r; x <= cx + r; x++) for (let z = cz - r; z <= cz + r; z++) {
+        if (x < 1 || z < 1 || x >= SX - 1 || z >= SZ - 1) continue;
+        const d = Math.hypot(x - cx, z - cz); if (d > r) continue;
+        const depth = Math.round((1 - d / r) * 2);
+        for (let k = 0; k < depth; k++) { const top = this.heightAt(x, z); if (top > 1) this.data[this.idx(x, top, z)] = B.AIR; }
+        const nt = this.heightAt(x, z);
+        if (nt > 0) this.data[this.idx(x, nt, z)] = (rand() < 0.3) ? B.CRYSTAL_ORE : B.MOON_ROCK;
+      }
+    }
+    // Scatter meteor boulders, sticky alien-goo puddles, gem ore + glow stones.
+    for (let i = 0; i < 70; i++) {
+      const x = 2 + (rand() * (SX - 4) | 0), z = 2 + (rand() * (SZ - 4) | 0);
+      if (Math.hypot(x - cxC, z - czC) < 6) continue;
+      const h = this.heightAt(x, z) + 1; if (h < 2) continue;
+      const r = rand();
+      if (r < 0.16) { this.data[this.idx(x, h, z)] = B.METEOR; this.data[this.idx(x, h + 1, z)] = B.METEOR; }
+      else if (r < 0.32) this.data[this.idx(x, h, z)] = B.ALIEN_GOO;
+      else if (r < 0.46) this.data[this.idx(x, h, z)] = B.GLOW_CRYSTAL;
+      else if (r < 0.56) this.data[this.idx(x, h, z)] = B.CRYSTAL_ORE;
+    }
+    // Black holes: dark round pits punched straight through the moon into the
+    // void. Hard to spot while you zoom around — fall in and *whoosh*, you pop
+    // safely back to the launch pad (handled in main). A little space adventure!
+    for (let i = 0; i < 7; i++) {
+      const cx = 8 + (rand() * (SX - 16) | 0), cz = 8 + (rand() * (SZ - 16) | 0);
+      if (Math.hypot(cx - cxC, cz - czC) < 13) continue;     // never right at spawn
+      const r = 2 + (rand() * 1.4 | 0);
+      for (let x = cx - r - 1; x <= cx + r + 1; x++) for (let z = cz - r - 1; z <= cz + r + 1; z++) {
+        if (x < 1 || z < 1 || x >= SX - 1 || z >= SZ - 1) continue;
+        const d = Math.hypot(x - cx, z - cz);
+        if (d <= r) { for (let y = 0; y < SY; y++) this.data[this.idx(x, y, z)] = B.AIR; }       // open shaft to the void
+        else if (d <= r + 1) { const top = this.heightAt(x, z); if (top > 0) this.data[this.idx(x, top, z)] = B.BLACKSTONE; }  // subtle dark rim
+      }
+      this.blackHoles.push([cx, cz, r]);
+    }
+    // Floating asteroid islands above the moon — bounce up (low gravity!) to explore.
     const island = (cx, cz, r, ty, topId) => {
-      for (let dy = 0; dy < 5; dy++) {
+      for (let dy = 0; dy < 4; dy++) {
         const rr = r - dy * 1.1, y = ty - dy;
-        if (rr < 0.6 || y < 1) break;
+        if (rr < 0.6 || y < G + 5) break;
         for (let x = Math.max(1, Math.floor(cx - rr)); x <= Math.min(SX - 2, Math.ceil(cx + rr)); x++)
           for (let z = Math.max(1, Math.floor(cz - rr)); z <= Math.min(SZ - 2, Math.ceil(cz + rr)); z++) {
             if (Math.hypot(x - cx, z - cz) > rr) continue;
-            this.data[this.idx(x, y, z)] = dy === 0 ? topId : (dy <= 2 ? B.DEEPSLATE : B.STONE);
+            this.data[this.idx(x, y, z)] = dy === 0 ? topId : B.DEEPSLATE;
           }
       }
     };
-    island(cxC, czC, 8, 12, B.QUARTZ);                            // central spawn island
-    for (let i = 0; i < 24; i++) {
-      const cx = 5 + Math.floor(rand() * (SX - 10)), cz = 5 + Math.floor(rand() * (SZ - 10));
-      if (Math.hypot(cx - cxC, cz - czC) < 12) continue;
-      island(cx, cz, 2 + Math.floor(rand() * 4), 5 + Math.floor(rand() * 16), rand() < 0.3 ? B.STARRY : B.QUARTZ);
+    for (let i = 0; i < 14; i++) {
+      const cx = 6 + (rand() * (SX - 12) | 0), cz = 6 + (rand() * (SZ - 12) | 0);
+      const ty = G + 10 + (rand() * 12 | 0);
+      island(cx, cz, 2 + (rand() * 3 | 0), ty, rand() < 0.4 ? B.STARRY : B.QUARTZ);
+      if (rand() < 0.5 && this.heightAt(cx, cz) > 0) this.data[this.idx(cx, ty + 1, cz)] = B.GLOW_CRYSTAL;
     }
-    // Glow crystals dotted around as stars/lanterns.
-    for (let i = 0; i < 60; i++) {
-      const x = 2 + Math.floor(rand() * (SX - 4)), z = 2 + Math.floor(rand() * (SZ - 4));
-      const h = this.heightAt(x, z);
-      if (h > 0 && rand() < 0.5) this.data[this.idx(x, h + 1, z)] = B.GLOW_CRYSTAL;
-    }
-    this.spawn = [cxC + 0.5, 14, czC + 0.5];
+    this.spawn = [cxC + 0.5, hgt(cxC, czC) + 2, czC + 0.5];
   }
 
   // The Secret World: a bright festive plaza for the fun park. Flat quartz with

@@ -33,6 +33,8 @@ export const TILE = {
   TERRACOTTA: 103, MOSSY_BRICK: 104,
   // …and a Creative ✨ group for wild builds (NEON is tinted into many colours).
   NEON: 105, CLOUD: 106, STARRY: 107, CHECKER: 108, CANDY: 109, CHROME: 110, GLOW_CRYSTAL: 111,
+  // session 34: space-themed blocks
+  MOON_ROCK: 112, SPACE_METAL: 113, ALIEN_GOO: 114, METEOR: 115, PLASMA: 116, CRYSTAL_ORE: 117,
 };
 
 export function initGL(canvas) {
@@ -523,6 +525,14 @@ function buildAtlasCanvas() {
   { const q = at(TILE.CANDY); for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) { ctx.fillStyle = ((((x + y) >> 2) & 1)) ? '#f04a7a' : '#ffffff'; ctx.fillRect(q[0] + x, q[1] + y, 1, 1); } }
   { const q = at(TILE.CHROME); for (let y = 0; y < T; y++) { ctx.fillStyle = shade(0xc8ccd8, 0.6 + 0.4 * Math.sin(y * 0.8)); ctx.fillRect(q[0], q[1] + y, T, 1); } ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(q[0] + 3, q[1] + 2, 2, T - 4); }
   { const q = at(TILE.GLOW_CRYSTAL); noise(ctx, q[0], q[1], 0x3ad8e8, 0.12, 328); ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(q[0] + 5, q[1] + 3, 2, 4); ctx.fillRect(q[0] + 9, q[1] + 8, 2, 3); ctx.fillStyle = shade(0x1a98c8, 1); ctx.fillRect(q[0] + 3, q[1] + 10, 2, 2); ctx.fillRect(q[0] + 11, q[1] + 4, 2, 2); }
+
+  // ── session 34: space-themed blocks ──
+  { const q = at(TILE.MOON_ROCK); noise(ctx, q[0], q[1], 0x8e8e96, 0.16, 401); const r = rng(401); for (let i = 0; i < 5; i++) { const cx = q[0] + 2 + (r() * 11 | 0), cy = q[1] + 2 + (r() * 11 | 0); ctx.fillStyle = shade(0x5a5a62, 1); ctx.beginPath(); ctx.arc(cx, cy, 1.8, 0, 7); ctx.fill(); ctx.fillStyle = shade(0xb2b2ba, 1); ctx.fillRect(cx - 1, cy - 2, 2, 1); } }
+  metal(TILE.SPACE_METAL, 0x4a5570, 402);
+  { const q = at(TILE.ALIEN_GOO); noise(ctx, q[0], q[1], 0x3ad04a, 0.16, 403); const r = rng(403); for (let i = 0; i < 9; i++) { ctx.fillStyle = i % 2 ? 'rgba(180,255,160,0.8)' : shade(0x1a8a2a, 1); ctx.beginPath(); ctx.arc(q[0] + (r() * 14 | 0) + 1, q[1] + (r() * 14 | 0) + 1, 1.6, 0, 7); ctx.fill(); } }
+  { const q = at(TILE.METEOR); noise(ctx, q[0], q[1], 0x3a322e, 0.20, 404); ctx.strokeStyle = shade(0xff6a1a, 1); ctx.lineWidth = 1; for (const [a, b, cc, d] of [[2, 3, 8, 9], [10, 2, 13, 11], [3, 12, 9, 14]]) { ctx.beginPath(); ctx.moveTo(q[0] + a, q[1] + b); ctx.lineTo(q[0] + cc, q[1] + d); ctx.stroke(); } ctx.fillStyle = shade(0xffb030, 1); ctx.fillRect(q[0] + 7, q[1] + 7, 1, 1); }
+  glow(TILE.PLASMA, 0x7a2ad8, 0x33e0ff, 405);
+  { const q = at(TILE.CRYSTAL_ORE); noise(ctx, q[0], q[1], 0x6c6c76, 0.16, 406); for (const [gx, gy] of [[4, 4], [10, 6], [6, 11], [12, 12]]) { ctx.fillStyle = shade(0x33e0d8, 1); ctx.fillRect(q[0] + gx, q[1] + gy, 2, 2); ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(q[0] + gx, q[1] + gy, 1, 1); } }
 
   return c;
 }

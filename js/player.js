@@ -77,7 +77,10 @@ export class Player {
     if (wl > 1) { wx /= wl; wz /= wl; }
     this.moving = wl > 0.05;
     if (this.webT > 0) this.webT -= dt;                 // a spider web wears off
-    const slow = this.webT > 0 ? 0.5 : 1;               // sticky-web slow (harmless)
+    // Sticky alien goo (Space World): you walk across it slowly, like honey.
+    const feet = this.world.get(Math.floor(this.pos[0]), Math.floor(this.pos[1] - 0.05), Math.floor(this.pos[2]));
+    const sticky = feet === B.ALIEN_GOO;
+    const slow = (this.webT > 0 ? 0.5 : 1) * (sticky ? 0.4 : 1);   // sticky/web slow (harmless)
     this.vel[0] = wx * SPEED * this.speedMul * this.mountSpeed * slow;
     this.vel[2] = wz * SPEED * this.speedMul * this.mountSpeed * slow;
 

@@ -16,6 +16,8 @@ import { Spiders } from './spiders.js';
 import { Skeletons } from './skeletons.js';
 import { Villagers } from './villagers.js';
 import { Dragon } from './dragon.js';
+import { AlienCops } from './aliencops.js';
+import { Rover } from './rover.js';
 import { Controls } from './input.js';
 import { Sound } from './audio.js';
 import { Character, CHARACTERS, charById, charPreview } from './character.js';
@@ -81,6 +83,10 @@ let prevX = 0, prevZ = 0, goalToastTimer = 0;
 let shake = 0;            // camera kick from explosions
 let trailT = 0;           // throttle for the "Sparkle Trail" shop reward
 let riding = null;        // the pony Animal you're currently riding (or null)
+let rover = null;         // the Space Rover mesh (created on first space visit)
+let roving = false;       // currently driving the rover
+let roverSpeedIdx = 0;    // index into ROVER_SPEEDS (0 = parked/off)
+let roverT = 0;           // little timer for the rover's bob/wobble
 let ride = null;          // an active fun-park ride: { att, t, dur, returnPos }
 let pendingRide = null;   // a ride waiting on the "Ride for 💎?" prompt
 let fishing = null;       // an active cast: { wx, wy, wz, t } while waiting for a bite
@@ -158,6 +164,14 @@ function makeMobs(kind, w) {
       m.funpark = new SecretPark(gl, w);
       m.funpark.onFirework = (pos) => { spawnParticles(pos, ['🎆', '🎇', '✨'][Math.floor(Math.random() * 3)], 'puff', 5, 80); sound.note(Math.floor(Math.random() * 5)); };
       m.funpark.onApproachTicket = () => { if (!ride) openRideMenu(); };   // walk up to the booth → ride menu
+    } else if (t === 'aliencops') {
+      m.aliencops = new AlienCops(gl, w);
+      m.aliencops.onSiren = (pos) => {
+        sound.play('uhoh');
+        spawnParticles([pos[0], pos[1] + 0.6, pos[2]], '🚨', 'puff', 2, 40);
+        showToast('👽🚨 Space cop: "Whoa — slow down! Space speed limit!"', 3000);
+        if (roving && roverSpeedIdx >= 3) setRoverSpeed(2);   // ease off the gas (no harm)
+      };
     } else if (t === 'dragon') {
       m.dragon = new Dragon(gl, w);
       m.dragon.onEvent = (type, pos) => {
@@ -184,6 +198,7 @@ function populateMobs(m) {
   if (m.villagers) m.villagers.spawn(2);
   if (m.funpark) m.funpark.populate();
   if (m.nethermobs) m.nethermobs.populate(SX, SZ);
+  if (m.aliencops) m.aliencops.populate(2);
   if (m.dragon) m.dragon.populate();
   // creepers spawn lazily (paced) during update — no initial spawn
 }
@@ -197,6 +212,7 @@ function updateMobs(m, dt) {
   if (m.skeletons) m.skeletons.update(dt, player, night && dimension === 'over');
   if (m.villagers) m.villagers.update(dt, player);
   if (m.funpark) { try { m.funpark.update(dt, player); } catch (e) { softError(e); } }
+  if (m.aliencops) m.aliencops.update(dt, player, roving, roverSpeedIdx);
   if (m.dragon) m.dragon.update(dt, player);
 }
 function drawMobs(m) {
@@ -209,6 +225,7 @@ function drawMobs(m) {
   if (m.skeletons) m.skeletons.draw(worldProg);
   if (m.villagers) m.villagers.draw(worldProg);
   if (m.funpark) { try { m.funpark.draw(worldProg); } catch (e) { softError(e); } }
+  if (m.aliencops) { try { m.aliencops.draw(worldProg); } catch (e) { softError(e); } }
   if (m.dragon) m.dragon.draw(worldProg);
 }
 
@@ -227,7 +244,8 @@ function drawShadows(m) {
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
   gl.depthMask(false);
   gl.uniform1f(worldProg.u.uAlpha, 0.26);
-  if (!riding) shadowAt(player.pos[0], player.pos[2], 0.9);
+  if (roving) shadowAt(player.pos[0], player.pos[2], 1.5);    // the rover's footprint
+  else if (!riding) shadowAt(player.pos[0], player.pos[2], 0.9);
   if (stevePos && dimension === 'over') shadowAt(stevePos[0], stevePos[2], 0.9);
   if (buddy && dimension === 'over') shadowAt(buddy.pos[0], buddy.pos[2], 0.85);
   const groups = [
@@ -239,6 +257,7 @@ function drawShadows(m) {
     [m.ants, () => 0.55],
     [m.villagers, () => 0.85],
     [m.nethermobs, (a) => a.species === 'ghast' ? 1.7 : 1.0],
+    [m.aliencops, () => 1.3],
   ];
   for (const [grp, diamf] of groups) {
     if (!grp) continue;
@@ -291,6 +310,8 @@ function setDimension(key) {
   if (!player) player = new Player(world); else player.world = world;
   sky = WORLD_KINDS[key].sky;
   player.gravityScale = WORLD_KINDS[key].lowGrav ? 0.36 : 1;   // float + bounce sky-high in Space World
+  if (key !== 'space' && roving) stopRover();                  // the rover stays in Space World
+  updateRoverButton();
   minimapDirty = true;
 }
 
@@ -1097,6 +1118,55 @@ function updateRideButton() {
   if (b) b.classList.toggle('on', !!riding);
 }
 
+// --- Space Rover: a moon buggy you buy in the shop and drive across Space
+// World. The 🛸 button starts/stops it and cycles the speed. We reuse the pony's
+// `player.mountSpeed` to make the player move faster while driving. ---
+const ROVER_SPEEDS = [
+  { icon: '🛸', name: 'Park', mul: 1 },
+  { icon: '🐢', name: 'Slow', mul: 1.8 },
+  { icon: '🚗', name: 'Cruise', mul: 3.0 },
+  { icon: '🚀', name: 'Zoom', mul: 4.6 },   // over the space speed limit — cops notice!
+];
+function ensureRover() { if (!rover) rover = new Rover(gl); }
+function setRoverSpeed(i) {
+  roverSpeedIdx = ((i % ROVER_SPEEDS.length) + ROVER_SPEEDS.length) % ROVER_SPEEDS.length;
+  roving = roverSpeedIdx > 0;
+  if (player) player.mountSpeed = ROVER_SPEEDS[roverSpeedIdx].mul;
+  if (roving) { ensureRover(); goals.bump('rover'); sound.play('jump'); }
+  updateRoverButton();
+  const s = ROVER_SPEEDS[roverSpeedIdx];
+  showToast(roving ? ('🛸 ' + s.icon + ' ' + s.name + (roverSpeedIdx >= 3 ? ' — careful, space speed limit! 🚨' : '')) : '🛸 Rover parked.');
+}
+function stopRover() { roverSpeedIdx = 0; roving = false; if (player) player.mountSpeed = 1; updateRoverButton(); }
+// Tap the 🛸 button: hop on (Slow), then cycle Slow → Cruise → Zoom → Park.
+function toggleRover() {
+  if (!goals.hasUnlock('rover')) { showToast('🛸 Buy the Space Rover in the 💎 shop!'); return; }
+  if (dimension !== 'space') { showToast('🛸 Drive it in 🚀 Space World — tap 🌍 to go!'); return; }
+  setRoverSpeed(roving ? roverSpeedIdx + 1 : 1);
+  tip('rover', '🛸 Tap 🛸 to change speed. Watch for hidden black holes! 🕳️');
+}
+function updateRoverButton() {
+  const b = document.getElementById('btn-rover');
+  if (!b) return;
+  const show = goals.hasUnlock('rover') && dimension === 'space';
+  b.style.display = show ? '' : 'none';
+  b.textContent = roving ? ROVER_SPEEDS[roverSpeedIdx].icon : '🛸';
+  b.classList.toggle('on', roving);
+}
+
+// Space black holes: fall below the moon floor → whoosh safely back to the
+// launch pad. Never scary, always recover; ticks the "Black hole!" goal.
+function blackHoleWhoosh() {
+  if (roving) stopRover();
+  sound.play('portal');
+  spawnParticles([player.pos[0], player.pos[1], player.pos[2]], '🌀', 'puff', 8, 80);
+  spawnParticles([player.pos[0], player.pos[1] + 1, player.pos[2]], '🕳️', 'puff', 3, 64);
+  player.goHome(); player.vel = [0, 0, 0];
+  camYaw = player.yaw; portalCooldown = 1.2; saveDirty = true;
+  goals.bump('blackhole');
+  showToast('🕳️ A black hole! Whoosh — back to the launch pad! 🚀', 3200);
+}
+
 // --- Fishing: a calm activity at any water. Cast near water, wait for a bite,
 // reel in a fish (+💎), sometimes treasure, sometimes a silly old boot. ---
 function findWaterSpot() {
@@ -1193,6 +1263,7 @@ const SHOP = [
   { id: 'endworld', icon: '🐉', name: 'The End', cost: 30, desc: 'A floating world with a friendly dragon to tame!' },
   { id: 'legoworld', icon: '🧱', name: 'Lego World', cost: 50, desc: 'A giant Lego table + 12 shiny Lego bricks! (a big treasure goal)' },
   { id: 'spaceworld', icon: '🚀', name: 'Space World', cost: 100, desc: 'Bounce sky-high in a low-gravity world of floating islands in the stars! ✨ (the BIG 100💎 dream)' },
+  { id: 'rover', icon: '🛸', name: 'Space Rover', cost: 30, desc: 'Drive a moon buggy across Space World! Tap 🛸 to ride and pick your speed! 🚀' },
 ];
 function buildShop() {
   document.getElementById('shop-gems').textContent = 'You have 💎 ' + goals.gems;
@@ -1230,6 +1301,7 @@ function buyItem(it) {
   if (it.id === 'endworld') showToast('🐉 The End unlocked! Tap 🔥, choose The End, then walk in to meet the dragon!', 4600);
   if (it.id === 'legoworld') { buildPicker(); selected = B.LEGO_RED; refreshBlocksButton(); showToast('🧱 Lego World! Tap 🌍 → Lego World. New Lego bricks are in your blocks!', 4600); }
   if (it.id === 'spaceworld') showToast('🚀 SPACE WORLD unlocked! 🌟 Tap 🌍 → Space World — jump to bounce sky-high!', 5200);
+  if (it.id === 'rover') { updateRoverButton(); showToast(dimension === 'space' ? '🛸 Your Space Rover is ready — tap 🛸 to drive!' : '🛸 Take it for a spin in 🚀 Space World — tap 🛸 there!', 4600); }
   sound.play('treasure');
   updateGems(); buildShop();
   showToast('✨ Unlocked: ' + it.name + '!');
@@ -1613,6 +1685,7 @@ function buySnack(s) {
 
 // --- Start the current world fresh (asked for, behind a confirmation) ---
 function resetWorld() {
+  if (roving) stopRover();
   const key = dimension, W = worlds[key].world, kind = WORLD_KINDS[key];
   const hubDests = [...new Set(W.portals.filter((p) => HUB_DESTS.includes(p.dest)).map((p) => p.dest))];
   for (let i = saplings.length - 1; i >= 0; i--) if (saplings[i].world === W) saplings.splice(i, 1);
@@ -2089,6 +2162,7 @@ function wireUI() {
   });
 
   document.getElementById('btn-ride').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); toggleRide(); });
+  document.getElementById('btn-rover').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); toggleRover(); });
   document.getElementById('btn-fish').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); castLine(); });
   document.getElementById('btn-char').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); openChars(); });
   document.getElementById('chars-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeChars(); });
@@ -2278,6 +2352,9 @@ function frameBody(now) {
     }
   }
 
+  // Space World: drop below the moon floor (a hidden black hole) → whoosh home.
+  if (dimension === 'space' && portalCooldown === 0 && player.pos[1] < 3) blackHoleWhoosh();
+
   // Tick lit TNT fuses → detonate when they reach zero.
   for (let i = fuses.length - 1; i >= 0; i--) {
     fuses[i].t -= dt;
@@ -2398,8 +2475,11 @@ function frameBody(now) {
   }
   drawShadows(m);
   drawBuildPreview();                                      // green "build here" footprint
+  // The Space Rover sits at the player's feet; the kid is drawn seated on top.
+  if (roving) { roverT += dt; ensureRover(); rover.draw(worldProg, player.pos[0], player.pos[1], player.pos[2], player.yaw, player.moveAmt, roverT); }
   const seatRide = ride && ride.att.id !== 'balloon';     // sit in the gondola/carousel
-  character.draw(worldProg, player.pos[0], player.pos[1] + ((riding || seatRide) ? 0.62 : 0), player.pos[2], player.yaw, player.walkPhase, player.moveAmt, actionAnim, !!riding || !!seatRide);
+  const seated = !!riding || !!seatRide || roving;
+  character.draw(worldProg, player.pos[0], player.pos[1] + (seated ? 0.62 : 0), player.pos[2], player.yaw, player.walkPhase, player.moveAmt, actionAnim, seated);
   drawMobs(m);
   // Steve mans his Lava Chicken stand in the overworld, turning to face you.
   if (stevePos && dimension === 'over') {
@@ -2451,12 +2531,19 @@ function loadGame() {
         const w = new World(gl);
         w[WORLD_KINDS[k].gen]();              // fresh terrain first (so a grown world has land around old builds)
         if (!w.loadFrom(data)) { if (k === 'over') return false; continue; }
+        if (k === 'space') migrateSpaceIfOld(w);   // upgrade old floating-island space → the new moon (keeps builds)
         registerDim(k, w);
       }
       if (!worlds.over) return false;
       worlds.over.world.carveBeachIfClear();
       for (const k of Object.keys(worlds)) { tidyPortals(k); regroundHome(k); worlds[k].world.rebuildAll(); }
       Object.assign(positions, obj.pos || {});
+      // If a migrated Space World left the arrival point hanging over the void,
+      // drop it onto the new moon so you never load mid-fall.
+      if (worlds.space) {
+        const sw = worlds.space.world, p = positions.space;
+        if (!p || sw.heightAt(Math.floor(p[0]), Math.floor(p[2])) < 2) positions.space = sw.spawn.slice();
+      }
       setDimension(worlds[obj.dim] ? obj.dim : 'over');
       player.yaw = obj.yaw || 0;
       player.pos = (positions[dimension] || world.spawn).slice();
@@ -2491,6 +2578,20 @@ function loadGame() {
     }
   } catch (e) { console.error('loadGame failed (starting fresh):', e && e.stack || e); }
   return false;
+}
+
+// Space World got a big terrain redesign (sparse floating islands → a solid,
+// drivable moon with black holes). An old save would otherwise keep the old
+// terrain; detect it and rebuild the moon, but KEEP every block Ezra placed.
+function migrateSpaceIfOld(w) {
+  let solid = 0;
+  const pts = [[8, 8], [SX - 8, 8], [8, SZ - 8], [SX - 8, SZ - 8], [SX >> 2, SZ >> 2], [(SX * 3) >> 2, (SZ * 3) >> 2]];
+  for (const [x, z] of pts) if (w.heightAt(x, z) >= 4) solid++;
+  if (solid >= 4) return;                          // already the new moon — leave it alone
+  const keep = [];
+  for (const k of w.placed) keep.push([k, w.data[k]]);   // remember his builds
+  w.generateSpace();                               // fresh moon + black holes
+  for (const [k, id] of keep) if (id) { w.data[k] = id; w.placed.add(k); }   // stamp builds back
 }
 
 function freshStart() {
@@ -2536,6 +2637,7 @@ function init() {
   applyCharacter();
   ensurePet();
   ensurePony();
+  updateRoverButton();
   setupSteve();
   if (!goals.adv) startChapter(0);     // begin the adventure (captures "from now" baselines)
   setupBuddy();
@@ -2617,6 +2719,13 @@ function init() {
     lightFrame: (x, y, z, dest) => { const c = world.findFrame(x, y, z); if (!c) return false; pendingFrame = c; lightChosenFrame(dest); return true; },
     riding: () => !!riding,
     toggleRide: () => toggleRide(),
+    roving: () => roving,
+    roverSpeed: () => roverSpeedIdx,
+    toggleRover: () => toggleRover(),
+    setRoverSpeed: (i) => setRoverSpeed(i),
+    blackHoles: () => (world.blackHoles || []),
+    blackHole: () => blackHoleWhoosh(),
+    aliencops: () => { const a = mobs().aliencops; return a ? a.list : []; },
     fishing: () => !!fishing,
     castLine: () => castLine(),
     reelNow: () => { if (fishing) reelIn(true); },

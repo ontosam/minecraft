@@ -87,7 +87,7 @@ export const WORLD_KINDS = {
     name: 'Space World', emoji: '🚀',
     sky: [0.04, 0.03, 0.12], fog: [70, 180],   // deep starry void
     gen: 'generateSpace', ground: B.QUARTZ,
-    mobs: [],
+    mobs: ['aliencops'],        // friendly space cops keep your rover speed in check
     flint: true,
     locked: 'spaceworld',       // the big 100💎 dream reward
     lowGrav: true,              // float + bounce sky-high between the islands
