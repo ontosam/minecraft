@@ -96,9 +96,16 @@ const canvas = document.getElementById('game');
 let camYaw = 0, camPitch = 0.42;
 const CAM_LOOK = 0.005;
 // "Switch view" zoom: wide overview (default) → mid → zoomed-in close.
-const ZOOM_LEVELS = [7.0, 4.5, 3.0];
-let zoomIndex = 0;             // which level; remembered between sessions
-let camDist = ZOOM_LEVELS[0];  // target follow distance
+// View presets cycled by the 🔍 button: wide, close, far (zoomed out to navigate),
+// and a top-down map view. `pitch:null` keeps your current look angle.
+const VIEW_PRESETS = [
+  { dist: 7.0, pitch: null, icon: '🔍' },   // wide (default)
+  { dist: 4.5, pitch: null, icon: '🔎' },   // close up
+  { dist: 11.0, pitch: null, icon: '🔭' },  // far — see more around you
+  { dist: 13.0, pitch: 1.12, icon: '🗺️' },  // top-down map view (great for finding your way)
+];
+let zoomIndex = 0;             // which preset; remembered between sessions
+let camDist = VIEW_PRESETS[0].dist;  // target follow distance
 let camDistEased = camDist;    // smoothed toward camDist for a gentle zoom
 const REACH = 16;              // how far a build/dig tap can reach from the camera
 const camPos = [0, 0, 0], camDir = [0, 0, -1], camTarget = [0, 0, 0];
@@ -411,6 +418,23 @@ function tidyPortals(key) {
   }
   W.portals = W.portals.filter((p) => !HUB_DESTS.includes(p.dest));
   for (const dest of dests) placeHubPortal(W, kind, dest);
+}
+
+// Rebuild the always-there home/Nether gateway with the new flush, walk-straight-
+// in geometry, so older saves stop showing a "floating" sill-and-swirl portal.
+function regroundHome(key) {
+  const W = worlds[key].world, kind = WORLD_KINDS[key];
+  const dest = (key === 'over') ? 'nether' : 'over';
+  const p = W.portals.find((q) => q.dest === dest);
+  if (!p) return;
+  const [ox, oy, oz] = p.f;
+  const wasActive = p.active;
+  for (let dx = 0; dx <= 3; dx++) for (let dy = 0; dy <= 4; dy++) {
+    const id = W.get(ox + dx, oy + dy, oz);
+    if (id === B.OBSIDIAN || id === B.PORTAL) W.set(ox + dx, oy + dy, oz, B.AIR);
+  }
+  W.portals = W.portals.filter((q) => q !== p);
+  W.addPortal(ox, oz, kind.ground, dest, wasActive);
 }
 
 // The Nether portal is a reward: it opens once enough goal-stars are earned.
@@ -1807,14 +1831,18 @@ function holdButton(id, fn, repeat) {
 
 // --- "Switch view": cycle the camera from wide overview to zoomed-in close ---
 function cycleZoom() {
-  zoomIndex = (zoomIndex + 1) % ZOOM_LEVELS.length;
-  camDist = ZOOM_LEVELS[zoomIndex];
+  const wasTopDown = VIEW_PRESETS[zoomIndex].pitch != null;
+  zoomIndex = (zoomIndex + 1) % VIEW_PRESETS.length;
+  const v = VIEW_PRESETS[zoomIndex];
+  camDist = v.dist;
+  if (v.pitch != null) camPitch = v.pitch;            // snap up to look down for the map view
+  else if (wasTopDown) camPitch = 0.42;               // leaving top-down → back to a normal angle
   saveDirty = true;
   updateViewButton();
 }
 function updateViewButton() {
   const b = document.getElementById('btn-view');
-  if (b) b.textContent = zoomIndex < ZOOM_LEVELS.length - 1 ? '🔍' : '🗺️';
+  if (b) b.textContent = VIEW_PRESETS[zoomIndex].icon;
 }
 // While flying, the Jump button reads "Up" (hold to rise, let go to float down).
 function updateJumpLabel() {
@@ -2201,8 +2229,9 @@ function loadGame() {
   if (!obj) return false;
   if (typeof obj.sel === 'number' && BLOCKS[obj.sel]) selected = obj.sel;
   if (typeof obj.char === 'string') selectedChar = charById(obj.char).id;   // resolves old ids too
-  if (typeof obj.zoom === 'number' && ZOOM_LEVELS[obj.zoom] !== undefined) {
-    zoomIndex = obj.zoom; camDist = camDistEased = ZOOM_LEVELS[zoomIndex];
+  if (typeof obj.zoom === 'number' && VIEW_PRESETS[obj.zoom]) {
+    zoomIndex = obj.zoom; camDist = camDistEased = VIEW_PRESETS[zoomIndex].dist;
+    if (VIEW_PRESETS[zoomIndex].pitch != null) camPitch = VIEW_PRESETS[zoomIndex].pitch;
   }
   portalUnlocked = !!obj.pu;
   try {
@@ -2216,7 +2245,7 @@ function loadGame() {
       }
       if (!worlds.over) return false;
       worlds.over.world.carveBeachIfClear();
-      for (const k of Object.keys(worlds)) { tidyPortals(k); worlds[k].world.rebuildAll(); }
+      for (const k of Object.keys(worlds)) { tidyPortals(k); regroundHome(k); worlds[k].world.rebuildAll(); }
       Object.assign(positions, obj.pos || {});
       setDimension(worlds[obj.dim] ? obj.dim : 'over');
       player.yaw = obj.yaw || 0;

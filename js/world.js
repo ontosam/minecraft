@@ -671,17 +671,21 @@ export class World {
   // swirl interior is filled only when `active` (so it can be a locked reward).
   // `dest` is the world key this gateway leads to; returns the portal record.
   addPortal(ox, oz, groundBlock, dest, active) {
-    let oy = 1;
-    for (let dx = 0; dx < 4; dx++) oy = Math.max(oy, this.heightAt(ox + dx, oz) + 1, this.heightAt(ox + dx, oz + 1) + 1);
+    // Standing level = the first air cell above the highest ground under the frame.
+    let base = 1;
+    for (let dx = 0; dx < 4; dx++) base = Math.max(base, this.heightAt(ox + dx, oz) + 1, this.heightAt(ox + dx, oz + 1) + 1);
+    // Fill any dips so the doorway sits flush and there's solid footing right in front.
     for (let dx = 0; dx < 4; dx++) {
-      for (let yy = this.heightAt(ox + dx, oz) + 1; yy < oy; yy++) this.set(ox + dx, yy, oz, groundBlock);
-      for (let yy = this.heightAt(ox + dx, oz + 1) + 1; yy < oy; yy++) this.set(ox + dx, yy, oz + 1, groundBlock);
-      for (let dy = 0; dy < 5; dy++) {
-        const edge = (dx === 0 || dx === 3 || dy === 0 || dy === 4);
-        if (edge) this.set(ox + dx, oy + dy, oz, B.OBSIDIAN);
-      }
+      for (let yy = this.heightAt(ox + dx, oz) + 1; yy < base; yy++) this.set(ox + dx, yy, oz, groundBlock);
+      for (let yy = this.heightAt(ox + dx, oz + 1) + 1; yy < base; yy++) this.set(ox + dx, yy, oz + 1, groundBlock);
     }
-    const portal = { f: [ox, oy, oz], dest, a: [ox + 1.5, oy, oz + 1.5], active: false };
+    // Recess the frame one block so its bottom row is flush with the ground and the
+    // glowing swirl starts at FOOT level — you walk straight in, no hopping over a sill.
+    const fy = base - 1;
+    for (let dx = 0; dx < 4; dx++) for (let dy = 0; dy < 5; dy++) {
+      if (dx === 0 || dx === 3 || dy === 0 || dy === 4) this.set(ox + dx, fy + dy, oz, B.OBSIDIAN);
+    }
+    const portal = { f: [ox, fy, oz], dest, a: [ox + 1.5, base, oz + 1.5], active: false };
     this.portals.push(portal);
     this.setPortalActive(portal, !!active);
     return portal;

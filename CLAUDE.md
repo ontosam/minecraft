@@ -755,6 +755,34 @@ Now **47 goals**, **sw cache v12→v14**.
    regression green. (Ask the dad if the Oops is truly gone on the iPad — if a
    *specific* error text still shows in the console we can pin the iOS root cause.)
 
+## Status (session 27) — walk-in portals + far/top-down camera (dad feedback)
+Dad: portals were "floating in the air" and hard to walk into; wanted a more
+zoomed-out option + a top-down view for navigation. Shipped on
+**`claude/dreamy-mccarthy-g6wgjr`**, deployed to `main`. **sw cache v15→v16.**
+1. **Grounded, walk-straight-in portals.** `World.addPortal` used to put the
+   obsidian sill at foot level with the glowing swirl one block ABOVE it — so it
+   read as floating and you had to bump/auto-jump in. Now the frame is **recessed
+   one block** (`fy = base-1`): the bottom obsidian row sits flush with the ground
+   and the **swirl starts at FOOT level**, so you walk straight through. Updated
+   `portal.f`/`a` accordingly (`setPortalActive`/`isPortalBlock` unchanged — they
+   key off `f`). Existing saves are fixed on load by a new `regroundHome(key)`
+   (clears + rebuilds the home/Nether gateway grounded), run alongside the
+   existing `tidyPortals` (which already rebuilds the flint/hub row via
+   `addPortal`, so those reground for free).
+2. **Two new camera views (`VIEW_PRESETS`).** The 🔍 view button now cycles four
+   presets — **🔍 wide (default) → 🔎 close → 🔭 far (zoomed out) → 🗺️ top-down
+   map view** — each a `{dist, pitch, icon}`. Top-down snaps `camPitch` to 1.12
+   (looking down) and leaving it restores 0.42; the others keep your drag pitch.
+   Saved index still round-trips (now indexes `VIEW_PRESETS`, restoring dist +
+   any preset pitch). `ZOOM_LEVELS` → `VIEW_PRESETS` everywhere.
+   Verified: Node (16 portal-geometry asserts: flush sill, swirl at foot level,
+   walk-through, footing, still protected — overworld + secret) + headless
+   (view cycle hits all 4 icons with pitch 0.42/0.42/0.42/1.12; lit portal →
+   stand in swirl → travels; **save/reload regrounds the home portal + hub portal
+   still travels**; zero errors) with screenshots of the grounded portal, the
+   top-down map view, and the far view. Idea backlog offered: a "home/portal"
+   compass arrow, a bigger/clearer minimap, pinch-to-zoom.
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept
