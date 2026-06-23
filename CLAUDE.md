@@ -569,6 +569,41 @@ mirrored to `main`. **sw cache v7→v8.** Now **45 goals**.
   (not just the 📖 log), build-challenges that **check the real structure**, and
   repeatable per-friend activities to grow hearts further.
 
+## Status (session 22) — friends who walk up + bed + barrier + lantern (dad:
+Ezra's enjoying building; wants friends that approach gently, a Minecraft-style
+bed and barrier block, more build options). Shipped on
+**`claude/store-portal-bugs-hzcr72`**, mirrored to `main`. **sw cache v8→v9.**
+Now **56 block ids**, **46 goals**.
+1. **🧑‍🤝‍🧑 A friend strolls up (gently).** The current Adventure host now appears
+   in the overworld as a walking `Character` (`buddy`/`buddyChar`, skin synced to
+   `curChapter().friend`). It idles near home and, on a **long cooldown
+   (45–85s)** — or sooner when a chapter is **ready to claim** — ambles over
+   (`updateBuddy`: home→approach→leave), says hi with a chime + ⭐/👋, lingers
+   ~8–14s, then wanders back. **Never naggy** (no auto-popups; just a friendly
+   presence). Tap it → opens the 📖 Adventure. Drawn + shadowed in the overworld;
+   re-placed on reset. Debug: `__ezra.buddy/callBuddy()`.
+2. **🛏️ Bed** (`B.BED_FOOT`/`B.BED_HEAD`, in the House tab). Placed as a 2-block
+   unit lying along the way you face (`placeBed`, ground-supported, both halves
+   to `placed`). **Tap to sleep** (`sleepInBed`): night→morning (clears monsters),
+   **hearts refill**, and it **sets your 🏠 home here** (`world.spawn` = bed) —
+   just like Minecraft. Dig removes both halves. 'Sweet dreams' goal (`sleep`).
+3. **✨ Force Field / Barrier** (`B.BARRIER`, Fun tab) — a mostly-see-through but
+   **solid** block (`seethrough` cutout: faint cyan border + sparkle), great for
+   invisible-ish platforms/walls; monsters can't pass (it's solid). The MC barrier
+   with a friendly twist.
+4. **🏮 Lantern** (`B.LANTERN`, House tab) — a warm glowing decoration block, more
+   building variety.
+   Verified headless: picker tabs (House 6, Fun 3); bed sleep flips night→day +
+   full hearts + moves home + ticks the goal; barrier places (id 55, see-through
+   solid); buddy walks from home to ~2.2 blocks of the player and stops, tap opens
+   Adventure; new block ids save/reload; full world-hop (gold/nether/end/over)
+   green, zero errors. Screenshot of a friend stood by the player with the bed +
+   lantern on a build pad. Tuning candidates: buddy walks straight (no terrain
+   pathing — fine on mostly-open ground); barrier icon is faint in the picker (by
+   design). Backlog still open: build-challenges that check real structures;
+   repeatable per-friend activities; more decor (fences/stairs need sub-cube
+   geometry the voxel engine doesn't have yet).
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files

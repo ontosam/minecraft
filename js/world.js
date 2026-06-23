@@ -22,6 +22,7 @@ export const B = {
   DOOR: 39, DOOR_OPEN: 40, TNT: 41, RAINBOW: 42,
   LEVER: 43, LEVER_ON: 44, REDSTONE: 45, REDLAMP: 46, REDLAMP_ON: 47, SLIME: 48,
   SAPLING: 49, MEGA_TNT: 50, SANDSTONE: 51, END_STONE: 52,
+  BED_FOOT: 53, BED_HEAD: 54, BARRIER: 55, LANTERN: 56,
 };
 
 const W = [1, 1, 1]; // white tint for textured blocks
@@ -88,20 +89,24 @@ export const BLOCKS = {
   [B.MEGA_TNT]: nat3(TILE.MEGA_TNT_TOP, TILE.MEGA_TNT_SIDE, TILE.MEGA_TNT_TOP, '#8e1b12'),
   [B.SANDSTONE]: nat(TILE.SANDSTONE, '#e6d8a8'),
   [B.END_STONE]: nat(TILE.END_STONE, '#e6e6b0'),
+  [B.BED_FOOT]: nat3(TILE.BED_FOOT, TILE.BED_SIDE, TILE.PLANKS, '#c23a3a'),
+  [B.BED_HEAD]: nat3(TILE.BED_HEAD, TILE.BED_SIDE, TILE.PLANKS, '#e2dccb'),
+  [B.BARRIER]: { tiles: { top: TILE.BARRIER, side: TILE.BARRIER, bottom: TILE.BARRIER }, tint: W, ui: '#7be6f0', seethrough: true },
+  [B.LANTERN]: nat(TILE.LANTERN, '#ffe07a'),
 };
 
 // Build blocks grouped into categories for the pop-up picker.
 export const CATEGORIES = [
   { name: 'Nature', blocks: [B.GRASS, B.DIRT, B.SAND, B.GRAVEL, B.SNOW, B.SAPLING, B.LOG, B.BIRCH_LOG, B.LEAVES] },
   { name: 'Water 🪣', blocks: [B.WATER] },
-  { name: 'House 🏠', blocks: [B.DOOR, B.GLASS, B.PLANKS, B.BRICK] },
+  { name: 'House 🏠', blocks: [B.DOOR, B.BED_FOOT, B.GLASS, B.LANTERN, B.PLANKS, B.BRICK] },
   { name: 'Boom 💥', blocks: [B.TNT] },
   // Tap a lever → it powers redstone wire → wired-up lamps light up.
   { name: 'Redstone ⚙️', blocks: [B.LEVER, B.REDSTONE, B.REDLAMP] },
   { name: 'Stone', blocks: [B.STONE, B.COBBLE, B.STONE_BRICK, B.SANDSTONE, B.END_STONE, B.BRICK, B.OBSIDIAN, B.GLOWSTONE] },
   { name: 'Wood', blocks: [B.PLANKS, B.BIRCH_PLANKS, B.DARK_PLANKS, B.BOOKSHELF] },
   { name: 'Shiny', blocks: [B.GOLD, B.DIAMOND, B.ICE, B.GLASS] },
-  { name: 'Fun', blocks: [B.PUMPKIN, B.SLIME] },
+  { name: 'Fun', blocks: [B.PUMPKIN, B.SLIME, B.BARRIER] },
   // Shown in the picker only after it's bought in the 💎 shop.
   { name: 'Special ✨', blocks: [B.RAINBOW], locked: 'rainbow' },
   // Shown only once the Mega TNT upgrade is bought in the 💎 shop.

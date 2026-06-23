@@ -47,13 +47,14 @@ export const GOAL_DEFS = [
   { id: 'crystals', icon: '🔮', title: 'Crystal popper', desc: 'Pop 3 End crystals', metric: 'crystal', target: 3 },
   { id: 'dragontamer', icon: '🐉', title: 'Dragon tamer', desc: 'Tame the friendly End dragon', metric: 'dragon', target: 1 },
   { id: 'storyteller', icon: '📖', title: 'Adventurer', desc: 'Finish 5 adventure chapters with friends', metric: 'story', target: 5 },
+  { id: 'sleeper', icon: '🛏️', title: 'Sweet dreams', desc: 'Sleep in a bed you built', metric: 'sleep', target: 1 },
 ];
 
 const KEY = 'ezrablocks.goals.v1';
 
 export class Goals {
   constructor() {
-    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0, bought: 0, spider: 0, lamp: 0, monster: 0, lever: 0, bounce: 0, ride: 0, fish: 0, quest: 0, plant: 0, math: 0, snack: 0, skeleton: 0, crystal: 0, dragon: 0, story: 0 };
+    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0, bought: 0, spider: 0, lamp: 0, monster: 0, lever: 0, bounce: 0, ride: 0, fish: 0, quest: 0, plant: 0, math: 0, snack: 0, skeleton: 0, crystal: 0, dragon: 0, story: 0, sleep: 0 };
     this.usedTypes = new Set();
     this.done = {};
     this.stars = 0;

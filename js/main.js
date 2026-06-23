@@ -72,6 +72,7 @@ let fishing = null;       // an active cast: { wx, wy, wz, t } while waiting for
 let bobberEl = null;      // the on-screen bobber marker
 const saplings = [];      // planted saplings growing into trees: { world, x, y, z, t }
 let steveChar = null, stevePos = null, steveYaw = 0; // Steve at the Lava Chicken stand
+let buddyChar = null, buddy = null;       // the adventure-host friend who strolls up to say hi
 let mathQ = null;         // the current math question
 const MATH_POUCH_MAX = 6; // Steve only has so many 💎 to give before he runs out…
 let mathPouch = MATH_POUCH_MAX, mathRefillT = 0;  // …it refills slowly over time
@@ -199,6 +200,7 @@ function drawShadows(m) {
   gl.uniform1f(worldProg.u.uAlpha, 0.26);
   if (!riding) shadowAt(player.pos[0], player.pos[2], 0.9);
   if (stevePos && dimension === 'over') shadowAt(stevePos[0], stevePos[2], 0.9);
+  if (buddy && dimension === 'over') shadowAt(buddy.pos[0], buddy.pos[2], 0.85);
   const groups = [
     [m.animals, (a) => a.isPony ? 1.7 : (a.isPet ? 0.8 : 1.0)],
     [m.creepers, () => 1.0],
@@ -479,6 +481,7 @@ function overlapsPlayer(x, y, z) {
 function doBuild(hit) {
   if (!hit) return;
   if (selected === B.DOOR) { placeDoor(hit); return; }
+  if (selected === B.BED_FOOT) { placeBed(hit); return; }
   const [x, y, z] = hit.place;
   if (x < 0 || x >= SX || y < 0 || y >= SY || z < 0 || z >= SZ) return;
   if (world.get(x, y, z) !== B.AIR || overlapsPlayer(x, y, z)) { sound.play('deny'); return; }
@@ -525,6 +528,7 @@ function doDig(hit) {
   if (id === B.AIR || (BLOCKS[id] && BLOCKS[id].indestructible)) { sound.play('deny'); return; }
   if (world.isPortalBlock(x, y, z)) { sound.play('deny'); return; }   // portals can't be broken
   if (isDoor(id)) { removeDoor(x, y, z); return; }
+  if (isBed(id)) { removeBed(x, y, z); return; }
   const key = world.idx(x, y, z);
   const wasPlaced = world.placed.has(key);
   world.set(x, y, z, B.AIR);
@@ -576,6 +580,46 @@ function toggleDoor(x, y, z) {
 function removeDoor(x, y, z) {
   const by = doorBase(x, y, z);
   for (const yy of [by, by + 1]) if (isDoor(world.get(x, yy, z))) { world.set(x, yy, z, B.AIR); world.placed.delete(world.idx(x, yy, z)); }
+  sound.play('dig'); saveDirty = true; actionAnim = 1; minimapDirty = true; goals.onDig();
+}
+
+// --- Bed: place it (foot + head, lying along the way you face), tap to sleep ---
+// (turns night → morning, fills hearts, and sets your 🏠 home right here).
+function isBed(id) { return id === B.BED_FOOT || id === B.BED_HEAD; }
+function bedDir() {
+  const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
+  return Math.abs(fx) >= Math.abs(fz) ? [fx >= 0 ? 1 : -1, 0] : [0, fz >= 0 ? 1 : -1];
+}
+function placeBed(hit) {
+  const [x, y, z] = hit.place;
+  const [dx, dz] = bedDir();
+  const hx = x + dx, hz = z + dz;
+  const ok = (a, b, c) => a >= 0 && a < SX && b >= 0 && b < SZ && y >= 1 && y < SY;
+  if (!ok(x, y, z) || !ok(hx, y, hz)) { sound.play('deny'); return; }
+  if (world.get(x, y, z) !== B.AIR || world.get(hx, y, hz) !== B.AIR ||
+    world.get(x, y - 1, z) === B.AIR || world.get(hx, y - 1, hz) === B.AIR ||
+    overlapsPlayer(x, y, z) || overlapsPlayer(hx, y, hz)) { sound.play('deny'); return; }
+  world.set(x, y, z, B.BED_FOOT); world.set(hx, y, hz, B.BED_HEAD);
+  world.placed.add(world.idx(x, y, z)); world.placed.add(world.idx(hx, y, hz));
+  sound.play('door'); saveDirty = true; actionAnim = 1; minimapDirty = true;
+  goals.onBuild(B.BED_FOOT);
+  tip('bed', '🛏️ A bed! Tap it to sleep — it turns night into morning, fills your hearts, and sets your 🏠 home right here.');
+}
+function sleepInBed(x, y, z) {
+  night = false; updateNightButton();
+  hearts = effMax(); updateHearts();
+  world.spawn = [x + 0.5, y, z + 0.5];     // beds set your home, just like Minecraft
+  sound.play('coo');
+  spawnParticles([x + 0.5, y + 1.3, z + 0.5], '💤', 'heart', 3, 22);
+  goals.bump('sleep');
+  showToast('💤 …Zzz… ☀️ Good morning! Hearts full, and home set here!', 3200);
+  saveDirty = true; minimapDirty = true;
+}
+function removeBed(x, y, z) {
+  world.set(x, y, z, B.AIR); world.placed.delete(world.idx(x, y, z));
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    if (isBed(world.get(x + dx, y, z + dz))) { world.set(x + dx, y, z + dz, B.AIR); world.placed.delete(world.idx(x + dx, y, z + dz)); break; }
+  }
   sound.play('dig'); saveDirty = true; actionAnim = 1; minimapDirty = true; goals.onDig();
 }
 
@@ -1183,6 +1227,62 @@ function advOk() {
   renderAdventure();                      // show the next chapter (or finale) right away
 }
 
+// --- A friend who strolls up (gently!) ---
+// The current adventure host wanders near home and, now and then (long cooldown,
+// so it's never annoying) ambles over to say hi — especially when a chapter is
+// ready to claim. Tap the friend to open the Adventure. Overworld only.
+function buddyHostId() { const ch = curChapter(); return ch ? ch.friend : 'chris'; }
+function setupBuddy() {
+  if (!worlds.over) return;
+  if (!buddyChar) buddyChar = new Character(gl);
+  const W = worlds.over.world, sp = W.spawn;
+  const hx = Math.max(2, Math.min(SX - 2, Math.floor(sp[0]) + 4)), hz = Math.max(2, Math.min(SZ - 2, Math.floor(sp[2]) + 4));
+  buddy = { pos: [hx + 0.5, W.heightAt(hx, hz) + 1, hz + 0.5], home: [hx + 0.5, hz + 0.5], yaw: 0, mode: 'home', timer: 25 + Math.random() * 30, walk: 0, linger: 0, hostId: null, chimed: false };
+  syncBuddySkin();
+}
+function syncBuddySkin() {
+  const id = buddyHostId();
+  if (buddy && buddyChar && buddy.hostId !== id) { buddy.hostId = id; buddyChar.setCharacter(charById(id)); }
+}
+function updateBuddy(dt) {
+  if (!buddy || dimension !== 'over') return;
+  syncBuddySkin();
+  const W = world;
+  const dx = player.pos[0] - buddy.pos[0], dz = player.pos[2] - buddy.pos[2], dist = Math.hypot(dx, dz) || 1;
+  const claimable = (() => { const ch = curChapter(); return !!(ch && advDone(ch)); })();
+  buddy.timer -= dt;
+  if (buddy.mode === 'home') {
+    buddy.walk = 0;
+    if (dist < 6) buddy.yaw = Math.atan2(-dx, -dz);                 // turn to look if you're near
+    if ((buddy.timer <= 0 || claimable) && dist < 24 && dist > 2.6) { buddy.mode = 'approach'; buddy.chimed = false; buddy.linger = 0; }
+    else if (buddy.timer <= 0) buddy.timer = 45 + Math.random() * 40;
+  } else if (buddy.mode === 'approach') {
+    if (dist > 2.3) { buddy.yaw = Math.atan2(-dx, -dz); buddy.pos[0] += dx / dist * 2.1 * dt; buddy.pos[2] += dz / dist * 2.1 * dt; buddy.walk += dt * 8; }
+    else {
+      buddy.yaw = Math.atan2(-dx, -dz); buddy.walk = 0;
+      if (!buddy.chimed) {
+        buddy.chimed = true; sound.play('pet');
+        spawnParticles([buddy.pos[0], buddy.pos[1] + 1.9, buddy.pos[2]], claimable ? '⭐' : '👋', 'heart', 1, 12);
+        if (claimable) showToast('📖 ' + charById(buddy.hostId).name + ': you did it! Tap me! 🎉', 2800);
+      }
+      buddy.linger += dt;
+      if (buddy.linger > (claimable ? 14 : 8)) { buddy.mode = 'leave'; buddy.timer = 50 + Math.random() * 40; }
+    }
+  } else { // leave → wander home
+    const hx = buddy.home[0] - buddy.pos[0], hz = buddy.home[1] - buddy.pos[2], hd = Math.hypot(hx, hz) || 1;
+    if (hd > 0.5) { buddy.yaw = Math.atan2(-hx, -hz); buddy.pos[0] += hx / hd * 1.8 * dt; buddy.pos[2] += hz / hd * 1.8 * dt; buddy.walk += dt * 8; }
+    else { buddy.mode = 'home'; buddy.walk = 0; }
+  }
+  buddy.pos[0] = Math.max(2, Math.min(SX - 2, buddy.pos[0]));
+  buddy.pos[2] = Math.max(2, Math.min(SZ - 2, buddy.pos[2]));
+  buddy.pos[1] = W.heightAt(Math.floor(buddy.pos[0]), Math.floor(buddy.pos[2])) + 1;
+}
+function drawBuddy() {
+  if (!buddy || dimension !== 'over' || !buddyChar) return;
+  const moving = buddy.mode === 'approach' || buddy.mode === 'leave';
+  buddyChar.draw(worldProg, buddy.pos[0], buddy.pos[1], buddy.pos[2], buddy.yaw, buddy.walk, moving ? 1 : 0, 0, false);
+}
+
 // --- Steve's Lava Chicken stand: a math challenge that pays 💎 + 🍗 ---
 // Build a cute little stand (only into empty space, so it never wrecks a build).
 function buildLavaStand(w, sx, gy, sz) {
@@ -1309,7 +1409,7 @@ function resetWorld() {
   ensurePortalsFor(key);                 // keep the standard portal(s)
   for (const d of hubDests) placeHubPortal(W, kind, d);   // and re-lay any flint portals
   W.rebuildAll();
-  if (key === 'over') setupSteve();      // re-place Steve's stand after a fresh start
+  if (key === 'over') { setupSteve(); setupBuddy(); }   // re-place Steve + the friend
   player.world = W; player.goHome(); player.vel = [0, 0, 0];
   positions[key] = W.spawn.slice();
   minimapDirty = true; saveDirty = true;
@@ -1780,6 +1880,7 @@ function frame(now) {
   }
 
   updateAdventureButton();          // gold ring on 📖 when a chapter is ready to claim
+  updateBuddy(dt);                   // the friend strolls up now and then
 
   const m = mobs();
   updateMobs(m, dt);
@@ -1806,7 +1907,9 @@ function frame(now) {
     const sp = (!dg && !cr && !zb && m.spiders) ? m.spiders.pickRay(camPos, dir) : null;
     const sk = (!dg && !cr && !zb && !sp && m.skeletons) ? m.skeletons.pickRay(camPos, dir) : null;
     const vl = (!dg && !cr && !zb && !sp && !sk && m.villagers) ? m.villagers.pickRay(camPos, dir) : null;
-    const stv = (!dg && !cr && !zb && !sp && !sk && !vl && stevePos && dimension === 'over') &&
+    const bd = (!dg && !cr && !zb && !sp && !sk && !vl && buddy && dimension === 'over') &&
+      rayHitsSphere(camPos, dir, buddy.pos[0], buddy.pos[1] + 0.9, buddy.pos[2], 1.2);
+    const stv = (!dg && !cr && !zb && !sp && !sk && !vl && !bd && stevePos && dimension === 'over') &&
       rayHitsSphere(camPos, dir, stevePos[0], stevePos[1] + 0.9, stevePos[2], 1.2);
     if (dg) doDragonTap(dg);
     else if (cr) doDefend(cr);
@@ -1814,12 +1917,14 @@ function frame(now) {
     else if (sp) doBonkSpider(sp);
     else if (sk) doBonkSkeleton(sk);
     else if (vl) talkToVillager(vl);
+    else if (bd) openAdventure();
     else if (stv) openSteveMenu();
     else if (flintMode) flintTap(dir);     // flint & steel: light TNT / a portal frame
     else {
       const hit = world.raycast(camPos, dir, REACH);
       const bid = hit ? world.get(hit.block[0], hit.block[1], hit.block[2]) : 0;
       if (hit && isDoor(bid)) toggleDoor(hit.block[0], hit.block[1], hit.block[2]);
+      else if (hit && isBed(bid)) sleepInBed(hit.block[0], hit.block[1], hit.block[2]);
       else if (hit && (bid === B.LEVER || bid === B.LEVER_ON)) toggleLever(hit.block[0], hit.block[1], hit.block[2]);
       else if (hit && isTNT(bid)) lightTNT(hit.block[0], hit.block[1], hit.block[2]);
       else doAction(hit);
@@ -1874,6 +1979,7 @@ function frame(now) {
     steveYaw += dd * Math.min(1, dt * 4);
     steveChar.draw(worldProg, stevePos[0], stevePos[1], stevePos[2], steveYaw, 0, 0, 0, false);
   }
+  drawBuddy();
 
   drawMinimap();
 
@@ -2000,6 +2106,7 @@ function init() {
   ensurePony();
   setupSteve();
   if (!goals.adv) startChapter(0);     // begin the adventure (captures "from now" baselines)
+  setupBuddy();
   updateAdventureButton();
   updateHearts();
   updateNightButton();
@@ -2077,6 +2184,10 @@ function init() {
     mathQ: () => mathQ,
     mathPouch: () => mathPouch,
     steve: () => stevePos,
+    get buddy() { return buddy; },
+    callBuddy: () => { if (buddy) buddy.timer = 0; },
+    sleep: (x, y, z) => sleepInBed(x, y, z),
+    openAdventure: () => openAdventure(),
     openSteve: () => openSteveMenu(),
     plant: (x, y, z) => { world.set(x, y, z, B.SAPLING); saplings.push({ world, x, y, z, t: 14 + Math.random() * 14 }); goals.bump('plant'); },
     growNow: () => { for (const s of saplings) s.t = 0; },

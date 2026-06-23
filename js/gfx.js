@@ -17,6 +17,7 @@ export const TILE = {
   RAINBOW: 36, LEVER: 37, LEVER_ON: 38, REDSTONE: 39, REDLAMP: 40, REDLAMP_ON: 41,
   SLIME: 42, SAPLING: 43,
   MEGA_TNT_SIDE: 44, MEGA_TNT_TOP: 45, SANDSTONE: 46, END_STONE: 47,
+  BED_FOOT: 48, BED_HEAD: 49, BED_SIDE: 50, BARRIER: 51, LANTERN: 52,
 };
 
 export function initGL(canvas) {
@@ -328,6 +329,29 @@ function buildAtlasCanvas() {
   p = at(TILE.SANDSTONE); noise(ctx, p[0], p[1], 0xe6d8a8, 0.08, 76);
   ctx.fillStyle = shade(0xcab984, 1); ctx.fillRect(p[0], p[1] + 4, T, 1); ctx.fillRect(p[0], p[1] + 10, T, 1);
   ctx.fillStyle = shade(0xf2e8c4, 1); ctx.fillRect(p[0], p[1] + 5, T, 1); ctx.fillRect(p[0], p[1] + 11, T, 1);
+
+  // --- Bed (cozy, blocky): a red blanket, a white pillow on the head ---
+  p = at(TILE.BED_FOOT); noise(ctx, p[0], p[1], 0xc23a3a, 0.08, 80);
+  ctx.fillStyle = shade(0x9c2a2a, 1); ctx.fillRect(p[0], p[1] + 7, T, 1);            // a blanket fold
+  ctx.fillStyle = shade(0xe05a5a, 1); ctx.fillRect(p[0] + 2, p[1] + 2, T - 4, 3);    // soft highlight
+  p = at(TILE.BED_HEAD); noise(ctx, p[0], p[1], 0xc23a3a, 0.08, 81);
+  ctx.fillStyle = shade(0xf4f0e6, 1); ctx.fillRect(p[0] + 2, p[1] + 2, T - 4, 6);    // pillow
+  ctx.fillStyle = shade(0xdcd6c4, 1); ctx.fillRect(p[0] + 2, p[1] + 7, T - 4, 1);
+  p = at(TILE.BED_SIDE); noise(ctx, p[0], p[1], 0xc23a3a, 0.08, 82);
+  ctx.fillStyle = shade(0x7a4a28, 1); ctx.fillRect(p[0], p[1] + T - 4, T, 4);        // wooden base
+  ctx.fillStyle = shade(0x5a3618, 1); ctx.fillRect(p[0], p[1] + T - 1, T, 1);
+
+  // --- Force Field / Barrier: mostly see-through with a faint cyan shimmer ---
+  p = at(TILE.BARRIER); ctx.clearRect(p[0], p[1], T, T);
+  ctx.fillStyle = 'rgba(110,230,240,0.85)';
+  for (let i = 0; i < T; i++) { ctx.fillRect(p[0] + i, p[1], 1, 1); ctx.fillRect(p[0] + i, p[1] + T - 1, 1, 1); ctx.fillRect(p[0], p[1] + i, 1, 1); ctx.fillRect(p[0] + T - 1, p[1] + i, 1, 1); }
+  for (let i = 2; i < T - 1; i += 4) { ctx.fillRect(p[0] + i, p[1] + i, 1, 1); ctx.fillRect(p[0] + (T - 1 - i), p[1] + i, 1, 1); }   // a faint sparkle cross
+
+  // --- Lantern: a warm glowing light block (decoration) ---
+  p = at(TILE.LANTERN); noise(ctx, p[0], p[1], 0x4a3a22, 0.12, 83);
+  ctx.fillStyle = shade(0xffe07a, 1); ctx.fillRect(p[0] + 4, p[1] + 4, T - 8, T - 8);   // glowing core
+  ctx.fillStyle = shade(0xfff4c2, 1); ctx.fillRect(p[0] + 6, p[1] + 6, 4, 4);
+  ctx.fillStyle = shade(0x2a2018, 1); ctx.fillRect(p[0] + 3, p[1], T - 6, 2); ctx.fillRect(p[0] + 3, p[1] + T - 2, T - 6, 2);   // metal caps
 
   // --- End Stone (the pale, speckled ground of The End) ---
   p = at(TILE.END_STONE); noise(ctx, p[0], p[1], 0xe6e6b0, 0.06, 77);
