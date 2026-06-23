@@ -687,6 +687,87 @@ Shipped on **`claude/store-portal-bugs-hzcr72`**, mirrored to `main`.
    studs are as crisp as 16px + tint allows (glossy, rounded) — true HD or real
    3-D stud geometry would be an engine-level change (offered as a future step).
 
+## Status (session 25, addendum) — handoff prep for the Lego "Vegas" build
+Dad approved turning Lego World into the big fun hub (3-D studs + paid rides +
+NPCs + dazzle) but asked to **scope it to its own session**. So this turn added
+**`js/legoworld.js`** (an un-imported `LegoPark` skeleton — safe, zero runtime
+effect) and the **"NEXT SESSION" spec below**. No behaviour changed; nothing new
+shipped to players. Next session: implement per the spec + wire-in checklist.
+
+## NEXT SESSION — Lego World = the Fun Hub ("Vegas")  ⭐ START HERE
+Dad's brief (approved, build NEXT session — this session only **set up the repo +
+this handoff**; nothing below is built yet). He loved the Lego idea and wants it
+to become the **most fun world**: a dazzling amusement park you **visit to spend
+diamonds on fun**. Scaffold already in place: **`js/legoworld.js`** (a documented,
+**un-imported** `LegoPark` skeleton — zero runtime effect until wired).
+
+**Design pillars (keep these exact):**
+- 🎰 **It's "Vegas."** Lego World is a *spend-only fun hub*. You can **buy/play
+  here but NEVER earn diamonds here.** 💎 are earned by *working* in the other
+  worlds (mining, build challenges, math, fishing, goals). The grip the dad named:
+  **the feeling of achievement after hard work** — earn elsewhere, splurge here.
+- 🏎️ **Paid attractions** (each costs a few 💎 via `goals.spend`): **go-kart
+  racing, ice skating, hot-air-balloon rides** (+ maybe Ferris wheel, bumper
+  cars). Reward = **fun + a ⭐/trophy/cosmetic, NOT 💎** (so it stays a pure sink).
+- ✨ **Dazzle:** drifting balloons, fireworks, lights, music (audio `note`/blips),
+  a Ferris wheel turning.
+- 🧑‍🤝‍🧑 **Others having fun:** spawn the **friend roster** (Alex/Chip/Milo/Brexin/
+  Cora/…) as NPCs skating/karting/riding around (reuse `Character`+`charById`, like
+  the `buddy`/NetherMobs patterns). Makes it feel alive and social.
+- 🟩 **Higher-res / "better resolution":** implement **real 3-D Lego studs** (the
+  dad said yes). Approach: in `World.buildChunkArrays(cx,cz)` (js/world.js ~line
+  780), when a `B.LEGO_*` block's TOP face is exposed (air above), also emit **4
+  small raised stud boxes** on top (reuse the face-emit loop; respect the Uint16
+  guard `base+24>0xffff` — studs add verts, so budget them / consider a separate
+  stud mesh pass to avoid overflow on big builds). This is the headline visual.
+
+**Build it in verifiable increments (recommended order):**
+1. **3-D studs** for Lego blocks (mesher) — the "wow" resolution bump. Verify a
+   Lego build shows bumps; perf OK; no index overflow on a big Lego floor.
+2. **Park layout** in `LegoPark.populate()` (or extend `generateLego`): a kart
+   **track** (loop of a smooth block, e.g. ICE/quartz), an **ice rink** (B.ICE),
+   **balloon pads**, a **Ferris wheel** structure, decorative lights.
+3. **Attraction kiosks + pay-to-play:** tap a kiosk (`pickRay` ⟶ `rayHitsSphere`),
+   show a kid-friendly **"Ride for 💎X?"** prompt (new dialog, big short text per
+   the readability rules), `goals.spend(cost)` (deny politely if short), then run
+   the ride animation. New metrics + GOAL_DEFS (`kart`/`skate`/`balloon`), ⭐ only.
+4. **Rides themselves** (juicy but simple): go-kart = a fun auto-drive lap around
+   the track with the camera following; ice skating = low-friction movement on the
+   rink + a trick counter; balloon = ride a balloon up for a view, drift down.
+5. **NPC friends having fun** (`LegoPark.npcs`): a few roster `Character`s looping
+   the rides/rink. Draw + shadow like the buddy.
+6. **Dazzle pass:** fireworks (particle bursts on a timer), turning Ferris wheel,
+   balloon drift, a little music.
+
+**Wire-in checklist (so it "just works"):**
+- `import { LegoPark } from './legoworld.js'` in main.js.
+- In `makeMobs`, add a `'legopark'` entry (the lego kind's `mobs` list) →
+  `m.legopark = new LegoPark(gl,w)` with `onPlay` → the pay-prompt; handle it in
+  `populateMobs`/`updateMobs`/`drawMobs` (mirror `m.dragon`).
+- Add `'legopark'` to `WORLD_KINDS.lego.mobs` (js/worlds.js) — `makeMobs` already
+  loops `kind.mobs`.
+- Tap routing (main.js ~`tapPending`): add a `legopark.pickRay` check in the
+  Lego dimension (before `doAction`), like the dragon.
+- New goals in js/goals.js (`kart/skate/balloon/trophy` counters + GOAL_DEFS).
+- Bump `sw.js` CACHE (v12→v13) **and add `'js/legoworld.js'` to `CORE`**.
+- Keep the rule: **no `goals.addGems` anywhere in Lego World.**
+
+**Constraints / gotchas:**
+- World size is a global `SX=64,SY=32,SZ=64` (js/world.js:6). "Much bigger" can't
+  be per-world cheaply — options: (a) use the full 64×64 baseplate densely with
+  attractions (recommended, no engine change), or (b) a real size refactor (big:
+  arrays, minimap MM_SIZE, save format all key off SX/SZ — only if he insists).
+- Engine is **16px pixel-art atlas** (256 tiles, lots free). 3-D studs give the
+  "higher-res" feel without changing texture resolution.
+- Verify with the headless **CDP** harness (browser binary + `__ezra` hooks; see
+  "Debug & testing"); add `__ezra` debug hooks (`legoPark()`, `playRide(id)`).
+- Currency safety net already exists; just don't grant 💎 here.
+
+**Done-when (acceptance):** travel to Lego World shows 3-D studded bricks + a
+park; tapping a kiosk asks to pay 💎 and (if you can afford it) runs a fun ride
+that pays a ⭐/trophy but **0 💎**; friends are seen having fun; fireworks/dazzle
+play; full world-hop + reload regression green, zero errors; screenshots.
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files
