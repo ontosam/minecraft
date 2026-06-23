@@ -880,6 +880,35 @@ ids** (31 new), **77→108 picker tiles**, **16 picker categories**.
   showcase wall + the picker. **Next: the larger flat building world** (careful
   SX/SZ refactor with save migration so Ezra's builds are never lost).
 
+## Status (session 32) — BIGGER world (64→96) + a graphics glow-up + a flat
+Build World (dad: "open to what you make of the world, but make it even cooler
+with graphics we can support"). Shipped on **`claude/dreamy-mccarthy-g6wgjr`** →
+`main`. **sw v20→v22.** World is now **96×32×96** (2.25× the area).
+1. **Bigger world, builds kept safe.** `SX=SZ=64→96` (still ÷16 for chunks).
+   The save is now **RLE-compressed + carries its dims** (`serialize` v3:
+   `rleEncode` → ~17-25KB/world vs ~175KB, so the bigger world stays *way* under
+   the localStorage quota). `loadFrom` is **migration-aware**: an old 64-save's
+   bytes are overlaid at the same coords onto a freshly-generated 96 world
+   (loader now pre-generates each world before `loadFrom`), and `placed` indices
+   are remapped — **so every existing build survives and just gains open land
+   around it**. Far plane 120→220 + fog ×1.5/1.7 so you can see across.
+   `secretworld.js` park positions are now centre-relative (re-centred for 96).
+   Un-silenced the loader's catch (logs `loadGame failed` instead of hiding it).
+2. **🌍 Build World** — `generateBuild`: a big, perfectly-flat grass plain, wide
+   open and calm, just for building; free via the 🌍 menu (`WORLD_KINDS.build`).
+3. **✨ Graphics glow-up.** A **gradient sky** (new `makeSkyProgram`/`skyQuad` —
+   a cheap fullscreen quad, saturated up top → hazy horizon the fog blends into,
+   night-aware) and **softer ambient occlusion** (`AO_LEVEL` lifted) for a
+   gentler, prettier look. No FPS-heavy effects; 16px textures untouched.
+   Verified: Node (RLE round-trip exact; **migration preserves a diamond tower +
+   floor, remaps placed, fills the new region with terrain, 96 save ~17KB**) +
+   headless (96 boots 0 errors, world-hop, park re-centred at cx≈34, **real
+   in-browser migration of a 175KB old save keeps both towers + floor + placed**,
+   **explicit-save reload keeps tower/neon/placed/dim**, gradient-sky + Build
+   World screenshots). Debug: `__ezra.save()/saveSize()`. Tuning candidates: 96
+   terrain is ~2.25× geometry (fine on a real GPU; SwiftShader slow — watch FPS
+   on an old iPad); old↔new terrain seam at the 64 line is cosmetic (more land).
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept

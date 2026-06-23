@@ -77,7 +77,13 @@ export const WORLD_KINDS = {
     mobs: ['funpark'],          // the fun-park rides + friends having fun
     fun: true,                  // free to visit; you SPEND 💎 on rides here
   },
+  build: {
+    name: 'Build World', emoji: '🏗️',
+    sky: [0.55, 0.78, 0.98], fog: [80, 200],
+    gen: 'generateBuild', ground: B.GRASS,
+    mobs: [],                   // a calm, wide-open flat plain just for building
+  },
 };
 
 // Display order for menus/minimap.
-export const WORLD_ORDER = ['over', 'nether', 'gold', 'ant', 'tnt', 'sky', 'end', 'lego', 'secret'];
+export const WORLD_ORDER = ['over', 'nether', 'gold', 'ant', 'tnt', 'sky', 'end', 'lego', 'secret', 'build'];

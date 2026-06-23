@@ -112,6 +112,24 @@ void main() {
   gl_FragColor = vec4(c, uAlpha);
 }`;
 
+// --- Sky shader: a soft vertical gradient backdrop (cheap, no depth) ---
+const SKY_VS = `
+attribute vec2 aXY;
+varying float vY;
+void main() { vY = aXY.y * 0.5 + 0.5; gl_Position = vec4(aXY, 1.0, 1.0); }`;
+const SKY_FS = `
+precision mediump float;
+varying float vY;
+uniform vec3 uTop, uHorizon;
+void main() { gl_FragColor = vec4(mix(uHorizon, uTop, vY * vY), 1.0); }`;
+export function makeSkyProgram(gl) { return makeProgram(gl, SKY_VS, SKY_FS, ['aXY'], ['uTop', 'uHorizon']); }
+export function skyQuad(gl) {
+  const m = new GLMesh(gl);
+  m.setAttrib('aXY', new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]), 2);
+  m.setIndex(new Uint16Array([0, 1, 2, 0, 2, 3]));
+  return m;
+}
+
 // --- Line shader: solid color (block highlight) ---
 const LINE_VS = `
 attribute vec3 aPos;

@@ -3,7 +3,7 @@
 // (see worlds.js): adding a new place is a recipe, not a rewrite.
 
 import { mat4 } from './math.js';
-import { initGL, makeWorldProgram, makeAtlasTexture, GLMesh, blockPreview, shadowMesh, quadMesh } from './gfx.js';
+import { initGL, makeWorldProgram, makeAtlasTexture, GLMesh, blockPreview, shadowMesh, quadMesh, makeSkyProgram, skyQuad } from './gfx.js';
 import { World, BLOCKS, CATEGORIES, B, SX, SY, SZ, isLego } from './world.js';
 import { WORLD_KINDS, WORLD_ORDER } from './worlds.js';
 import { SecretPark, ATTRACTIONS, STANDS } from './secretworld.js';
@@ -59,6 +59,7 @@ window.addEventListener('error', (e) => softError(e.message || e.error || 'Unkno
 window.addEventListener('unhandledrejection', (e) => softError(e.reason && e.reason.message || e.reason || 'Promise error'));
 
 let gl, worldProg, atlas, world, player, controls, sound, character, goals;
+let skyProg, skyMesh;    // gradient-sky backdrop
 const worlds = {};                       // key -> { world, mobs, kind }; created lazily
 const positions = {};                    // key -> remembered player position
 let dimension = 'over';                  // active world key
@@ -2297,7 +2298,7 @@ function frameBody(now) {
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
   const aspect = canvas.width / Math.max(1, canvas.height);
-  mat4.perspective(proj, 1.05, aspect, 0.08, 120);
+  mat4.perspective(proj, 1.05, aspect, 0.08, 220);   // far plane reaches across the bigger world
   camDistEased += (camDist - camDistEased) * Math.min(1, dt * 8); // smooth zoom
   computeCamera();
   if (controls.tapPending && pendingBuild) { controls.tapPending = false; }   // placing a big build — taps do nothing (use the Build button)
@@ -2357,14 +2358,28 @@ function frameBody(now) {
     }
   }
 
+  // Gradient sky backdrop (drawn behind everything, no depth) — saturated up top,
+  // a soft hazy band near the horizon that the fog blends into.
+  {
+    const lift = 0.40 * (1 - 0.72 * nightAmt);
+    const sHor = [Math.min(1, rsky[0] * 0.62 + lift), Math.min(1, rsky[1] * 0.62 + lift), Math.min(1, rsky[2] * 0.62 + lift + 0.03)];
+    const sTop = [rsky[0] * 0.80, rsky[1] * 0.87, Math.min(1, rsky[2] * 1.06)];
+    gl.useProgram(skyProg.program);
+    gl.disable(gl.DEPTH_TEST);
+    gl.uniform3f(skyProg.u.uTop, sTop[0], sTop[1], sTop[2]);
+    gl.uniform3f(skyProg.u.uHorizon, sHor[0], sHor[1], sHor[2]);
+    skyMesh.draw(skyProg);
+    gl.enable(gl.DEPTH_TEST);
+  }
+
   const kind = WORLD_KINDS[dimension];
   gl.useProgram(worldProg.program);
   gl.uniformMatrix4fv(worldProg.u.uProj, false, proj);
   gl.uniformMatrix4fv(worldProg.u.uView, false, view);
   gl.uniformMatrix4fv(worldProg.u.uModel, false, identity);
   gl.uniform3f(worldProg.u.uFogColor, rsky[0], rsky[1], rsky[2]);
-  gl.uniform1f(worldProg.u.uFogNear, kind.fog[0]);
-  gl.uniform1f(worldProg.u.uFogFar, kind.fog[1]);
+  gl.uniform1f(worldProg.u.uFogNear, kind.fog[0] * 1.5);   // open up the view for the bigger world
+  gl.uniform1f(worldProg.u.uFogFar, kind.fog[1] * 1.7);
   gl.uniform1f(worldProg.u.uAlpha, 1);
   gl.uniform1f(worldProg.u.uDayLight, dayLight);
   gl.activeTexture(gl.TEXTURE0);
@@ -2430,6 +2445,7 @@ function loadGame() {
         const data = obj.worlds[k];
         if (!data || !WORLD_KINDS[k]) continue;
         const w = new World(gl);
+        w[WORLD_KINDS[k].gen]();              // fresh terrain first (so a grown world has land around old builds)
         if (!w.loadFrom(data)) { if (k === 'over') return false; continue; }
         registerDim(k, w);
       }
@@ -2443,12 +2459,12 @@ function loadGame() {
       return true;
     }
     if (obj.v === 3 && obj.over) {                         // older two-dimension save
-      const over = new World(gl);
+      const over = new World(gl); over.generate();
       if (!over.loadFrom(obj.over)) return false;
       over.carveBeachIfClear();
       registerDim('over', over);
-      const neth = new World(gl);
-      if (!obj.nether || !neth.loadFrom(obj.nether)) neth.generateNether();
+      const neth = new World(gl); neth.generateNether();
+      if (obj.nether) neth.loadFrom(obj.nether);
       registerDim('nether', neth);
       positions.over = (obj.overPos || over.spawn).slice();
       positions.nether = (obj.netherPos || neth.spawn).slice();
@@ -2458,7 +2474,7 @@ function loadGame() {
       return true;
     }
     if (obj.world) {                                       // oldest overworld-only save
-      const over = new World(gl);
+      const over = new World(gl); over.generate();
       if (!over.loadFrom(obj.world)) return false;
       over.carveBeachIfClear();
       registerDim('over', over);
@@ -2469,7 +2485,7 @@ function loadGame() {
       positions.over = player.pos.slice();
       return true;
     }
-  } catch (e) { /* fall through to a fresh world */ }
+  } catch (e) { console.error('loadGame failed (starting fresh):', e && e.stack || e); }
   return false;
 }
 
@@ -2484,6 +2500,7 @@ function freshStart() {
 function init() {
   gl = initGL(canvas);
   worldProg = makeWorldProgram(gl);
+  skyProg = makeSkyProgram(gl); skyMesh = skyQuad(gl);
   atlas = makeAtlasTexture(gl);
 
   identity = mat4.identity(mat4.create());
@@ -2579,6 +2596,8 @@ function init() {
     buyTreat: (i) => buyTreat(TREATS[i || 0]),
     placeBuild: (name) => { const b = BIG_BUILDS.find((x) => x.name === name); if (b) startPlacement(b); },
     confirmPlace: () => confirmPlacement(),
+    save: () => saveGame(),
+    saveSize: () => (localStorage.getItem(SAVE_KEY) || '').length,
     placing: () => (pendingBuild ? pendingBuild.name : null),
     endFunRide: () => { if (ride) endRide(); },
     funRiding: () => (ride ? ride.att.id : null),

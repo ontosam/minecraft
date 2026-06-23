@@ -3,7 +3,7 @@
 
 import { GLMesh, getUV, TILE } from './gfx.js';
 
-export const SX = 64, SY = 32, SZ = 64;   // world size in blocks
+export const SX = 96, SY = 32, SZ = 96;   // world size in blocks
 export const CHUNK = 16;                   // chunk footprint (CHUNK x CHUNK x SY)
 const CXN = SX / CHUNK, CZN = SZ / CHUNK;  // chunks per axis
 // The beach lagoon (overworld): centre, radius, and water surface height.
@@ -222,7 +222,7 @@ const FACES = [
   { n: [-1, 0, 0], shade: 0.65, slot: 'side', v: [{ o: [0, 0, 0], uv: [0, 0] }, { o: [0, 0, 1], uv: [1, 0] }, { o: [0, 1, 1], uv: [1, 1] }, { o: [0, 1, 0], uv: [0, 1] }] },
   { n: [1, 0, 0], shade: 0.80, slot: 'side', v: [{ o: [1, 0, 1], uv: [0, 0] }, { o: [1, 0, 0], uv: [1, 0] }, { o: [1, 1, 0], uv: [1, 1] }, { o: [1, 1, 1], uv: [0, 1] }] },
 ];
-const AO_LEVEL = [0.5, 0.7, 0.85, 1.0];
+const AO_LEVEL = [0.62, 0.76, 0.9, 1.0];   // gentle ambient occlusion (softer shadows)
 
 // 3-D Lego studs: four little raised bumps drawn on an exposed Lego top so the
 // bricks read as real Lego instead of flat cubes. Each stud is a tiny box (its
@@ -664,6 +664,21 @@ export class World {
     this.spawn = [SX / 2 + 0.5, base + 2, SZ / 2 + 0.5];
   }
 
+  // The Build World: a big, clean, perfectly-flat grass plain — wide open and
+  // calm, made for building anything. (Larger feel via the open flatness.)
+  generateBuild() {
+    this.data.fill(B.AIR);
+    this.placed = new Set();
+    this.portals = [];
+    const base = 6;
+    for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) {
+      this.data[this.idx(x, 0, z)] = B.BEDROCK;
+      for (let y = 1; y < base; y++) this.data[this.idx(x, y, z)] = B.DIRT;
+      this.data[this.idx(x, base, z)] = B.GRASS;
+    }
+    this.spawn = [SX / 2 + 0.5, base + 2, SZ / 2 + 0.5];
+  }
+
   // The Secret World: a bright festive plaza for the fun park. Flat quartz with
   // cheerful colour rings + glowing lamp posts. The rides (Ferris wheel,
   // carousel, balloons) are animated meshes drawn above this by SecretPark.
@@ -979,20 +994,62 @@ export class World {
 
   // --- Save / load (raw bytes, base64 into localStorage) ---
   serialize() {
-    return { v: 2, w: bytesToBase64(this.data), p: [...this.placed], portals: this.portals, cs: this.crystalSpots || null };
+    // v3: run-length-encoded bytes (tiny for flat/uniform worlds) + the world
+    // dims, so a future size change can migrate old saves without losing builds.
+    return { v: 3, d: [SX, SY, SZ], rle: 1, w: bytesToBase64(rleEncode(this.data)), p: [...this.placed], portals: this.portals, cs: this.crystalSpots || null };
   }
   loadFrom(obj) {
     if (!obj || !obj.w) return false;
-    const bytes = base64ToBytes(obj.w);
-    if (bytes.length !== this.data.length) return false;
-    this.data.set(bytes);
-    this.placed = new Set(obj.p || []);
-    // v2 saves carry a portal list; older saves get their portals re-added by
-    // the caller (the swirl blocks themselves live in the saved bytes).
+    const [osx, osy, osz] = obj.d || [64, 32, 64];     // old saves had no dims → 64³
+    const total = osx * osy * osz;
+    let bytes = base64ToBytes(obj.w);
+    if (obj.rle) bytes = rleDecode(bytes, total);
+    if (bytes.length !== total) return false;          // corrupt / wrong size
+    const sameSize = (osx === SX && osy === SY && osz === SZ);
+    if (sameSize) {
+      this.data.set(bytes);                            // exact: replace everything
+    } else {
+      // Migrate a smaller old world into this (already-generated) bigger one:
+      // overlay every old cell at the same coords, keeping fresh terrain around it.
+      const cx = Math.min(osx, SX), cy = Math.min(osy, SY), cz = Math.min(osz, SZ);
+      for (let y = 0; y < cy; y++) for (let z = 0; z < cz; z++) {
+        const ob = z * osx + y * osx * osz, nb = this.idx(0, y, z);
+        for (let x = 0; x < cx; x++) this.data[nb + x] = bytes[ob + x];
+      }
+    }
+    // Player-placed blocks (remap packed indices if the world grew).
+    this.placed = new Set();
+    for (const k of (obj.p || [])) {
+      if (sameSize) { this.placed.add(k); continue; }
+      const ox = k % osx, oz = Math.floor(k / osx) % osz, oy = Math.floor(k / (osx * osz));
+      if (ox < SX && oy < SY && oz < SZ) this.placed.add(this.idx(ox, oy, oz));
+    }
     this.portals = (obj.portals || []).map((p) => ({ f: p.f.slice(), dest: p.dest, a: p.a.slice(), active: !!p.active }));
     if (obj.cs) this.crystalSpots = obj.cs.map((c) => c.slice());   // End-world crystal pillars
     return true;
   }
+}
+
+// Run-length encode/decode the voxel array (3 bytes per run: value + 16-bit count).
+// Block worlds are full of long runs (air, floors, stone), so this shrinks saves
+// massively — which is what lets the world be bigger without blowing the quota.
+function rleEncode(bytes) {
+  const out = [];
+  for (let i = 0; i < bytes.length;) {
+    const v = bytes[i]; let run = 1;
+    while (i + run < bytes.length && bytes[i + run] === v && run < 65535) run++;
+    out.push(v, run & 0xff, (run >> 8) & 0xff);
+    i += run;
+  }
+  return new Uint8Array(out);
+}
+function rleDecode(rle, len) {
+  const out = new Uint8Array(len); let o = 0;
+  for (let i = 0; i + 2 < rle.length; i += 3) {
+    const v = rle[i], run = rle[i + 1] | (rle[i + 2] << 8);
+    for (let j = 0; j < run && o < len; j++) out[o++] = v;
+  }
+  return out;
 }
 
 function bytesToBase64(bytes) {

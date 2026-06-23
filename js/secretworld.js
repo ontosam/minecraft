@@ -11,6 +11,7 @@
 import { GLMesh, getUV, TILE } from './gfx.js';
 import { mat4 } from './math.js';
 import { Character, charById, CHARACTERS } from './character.js';
+import { SX, SZ } from './world.js';
 
 const SHADE = { top: 1.0, bottom: 0.6, pz: 0.9, nz: 0.74, px: 0.84, nx: 0.7 };
 
@@ -191,9 +192,11 @@ export class SecretPark {
     this.signs = [];                // { id, pos } — anchors for the floating signs
     this.onApproachTicket = null;   // called once when the player walks up to the ticket booth
     this.ticketArmed = true;
-    this.wheel = { cx: 18, cy: 14, cz: 32, R: WHEEL.R, angle: 0 };
-    this.carousel = { cx: 44, cy: 7, cz: 24, angle: 0 };
-    this.balloonPad = { cx: 40, cy: 7, cz: 44 };
+    // Lay the park out around the world centre so it sits near the spawn.
+    const mx = SX / 2, mz = SZ / 2;
+    this.wheel = { cx: mx - 14, cy: 14, cz: mz, R: WHEEL.R, angle: 0 };
+    this.carousel = { cx: mx + 12, cy: 7, cz: mz - 8, angle: 0 };
+    this.balloonPad = { cx: mx + 8, cy: 7, cz: mz + 12 };
     this.rideKind = null;           // set by main while a ride is running (pauses free-spin)
     this.rideBalloon = null;        // [x,y,z] of the balloon held above the player on a balloon ride
     this.fwTimer = 2.5;
@@ -216,20 +219,21 @@ export class SecretPark {
     this.signs = this.kiosks.map((k) => ({ id: k.id, pos: [k.pos[0], k.pos[1] + 2.5, k.pos[2]] }));
     // Ticket / Popcorn / Gift-shop booths in a tidy row near the spawn — the
     // Ticket booth is the easy, can't-miss way onto the rides.
-    const sx = [26, 32, 38];
-    this.stands = STANDS.map((s, i) => ({ id: s.id, pos: [sx[i], g, 36] }));
+    const mx = SX / 2, mz = SZ / 2;
+    const sx = [mx - 6, mx, mx + 6];
+    this.stands = STANDS.map((s, i) => ({ id: s.id, pos: [sx[i], g, mz + 6] }));
     for (const st of this.stands) this.signs.push({ id: st.id, pos: [st.pos[0], st.pos[1] + 2.7, st.pos[2]] });
     this.ticketArmed = true;
-    // A few drifting balloons up in the sky for dazzle.
+    // A few drifting balloons up in the sky for dazzle (spread across the world).
     this.balloons = [];
-    for (let i = 0; i < 5; i++) this.balloons.push({ x: 10 + i * 11, y: g + 12 + (i % 3) * 3, z: 14 + (i * 13) % 40, t: Math.random() * 6, mesh: this.balloonMeshes[i % this.balloonMeshes.length] });
+    for (let i = 0; i < 5; i++) this.balloons.push({ x: 10 + i * (SX - 20) / 5, y: g + 12 + (i % 3) * 3, z: 14 + (i * 17) % (SZ - 20), t: Math.random() * 6, mesh: this.balloonMeshes[i % this.balloonMeshes.length] });
     // Friends having fun: two ride the wheel (gondolas), the rest wander the plaza.
     this.list = [];
     const ids = CHARACTERS.map((c) => c.id).filter((id) => id !== 'ezra');
     const pick = () => ids[Math.floor(Math.random() * ids.length)];
     const riders = [pick(), pick()];
     for (let i = 0; i < riders.length; i++) { const n = new NPC(riders[i], 0, 0); n.seat = i === 0 ? 2 : 5; this.list.push(n); }
-    const spots = [[28, 30], [36, 36]];           // a couple of friends strolling (kept light for older iPads)
+    const spots = [[mx - 4, mz - 6], [mx + 4, mz]];   // a couple of friends strolling (kept light for older iPads)
     for (const [x, z] of spots) { const n = new NPC(pick(), x, z); n.pos[1] = g; this.list.push(n); }
     this.chars = {};
     for (const n of this.list) { if (!this.chars[n.id]) { const c = new Character(this.gl); c.setCharacter(charById(n.id)); this.chars[n.id] = c; } }
@@ -251,7 +255,7 @@ export class SecretPark {
       n.yaw += Math.max(-2.5 * dt, Math.min(2.5 * dt, d));
       if (n.moving) {
         const nx = n.pos[0] - Math.sin(n.yaw) * 1.1 * dt, nz = n.pos[2] - Math.cos(n.yaw) * 1.1 * dt;
-        if (nx > 6 && nx < 58 && nz > 6 && nz < 58) { n.pos[0] = nx; n.pos[2] = nz; n.walk += dt * 6; n.pos[1] = this.groundY(nx, nz); }
+        if (nx > 6 && nx < SX - 6 && nz > 6 && nz < SZ - 6) { n.pos[0] = nx; n.pos[2] = nz; n.walk += dt * 6; n.pos[1] = this.groundY(nx, nz); }
         else n.targetYaw = n.yaw + Math.PI;
       }
     }
