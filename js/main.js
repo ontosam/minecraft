@@ -285,6 +285,7 @@ function travelTo(dest) {
     sound.play('portal');
     if (dest === 'nether') goals.bump('nether'); // first trip completes "Find the portal"
     goals.bump('travel');
+    recheckBuild();                           // build challenges check the world you're now in
   } catch (e) {
     // A portal should never strand Ezra on the scary "Oops" screen. If anything
     // goes wrong mid-trip, log it for us and pop him safely back home instead.
@@ -494,6 +495,7 @@ function doBuild(hit) {
     world.updateRedstone();   // a new wire/lamp may light up
     tip('redstone', '⚙️ Redstone! Put a Lamp next to a Lever (or join them with Redstone wire), then tap the Lever to switch the light on and off!');
   }
+  recheckBuild();             // did this block finish a build challenge?
   if (selected === B.SAPLING) { saplings.push({ world, x, y, z, t: 14 + Math.random() * 14 }); goals.bump('plant'); }
 }
 
@@ -536,6 +538,7 @@ function doDig(hit) {
   sound.play('dig'); saveDirty = true; actionAnim = 1; minimapDirty = true;
   goals.onDig();
   if (isRedstone(id)) world.updateRedstone();   // removing wire can switch lamps off
+  recheckBuild();
   // Buried treasure! Natural gold/diamond the player dug up (not their own block).
   if (!wasPlaced && (id === B.GOLD || id === B.DIAMOND)) {
     goals.bump('treasure'); sound.play('treasure'); spawnSparkles([x + 0.5, y + 0.6, z + 0.5]);
@@ -677,6 +680,7 @@ function finishBigBuild(n, cx, cy, cz, label) {
   sound.play('place');
   spawnSparkles([cx + 0.5, cy + 1.5, cz + 0.5]);
   showToast(label, 2800);
+  recheckBuild();             // a big build may complete a build challenge
 }
 // A roomy house you can walk around inside: 5×5 floor, tall walls, a door
 // facing you, big windows, and a glowstone ceiling lamp.
@@ -1153,43 +1157,104 @@ function questOk() {
 // and sometimes a gift. The 📖 button is always there so he's never lost. ---
 const STORY = [
   { friend: 'chris', say: "Welcome to our big adventure, Ezra! 🎉 Let's start at home — build a cozy house so we have somewhere to play!", hint: "Tap 🏗️, then pick 'Cozy House'.", task: { metric: 'place', n: 20, mode: 'do', icon: '🏠', label: 'build a house' }, reward: 4 },
+  { friend: 'alex', say: "Hi! I'm Alex! 🗼 Let's build a TOWER together — stack blocks up nice and tall!", hint: 'Stack blocks up high, or tap 🏗️ → Long Wall (it counts!).', task: { kind: 'build', type: 'tower', n: 4, icon: '🗼', label: 'build a tower 4 tall' }, reward: 5 },
   { friend: 'vlad', say: "Every explorer needs animal friends! 🐾 Come and say hello to the animals with me.", hint: 'Walk up to a pig or sheep and tap 🐾 Pet.', task: { metric: 'pet', n: 3, mode: 'do', icon: '🐾', label: 'pet 3 animals' }, reward: 4, gift: 'pet' },
+  { friend: 'chip', say: "Chip here! 🌉 Let's build a long BRIDGE — a row of blocks across the ground (or the water)!", hint: 'Lay blocks in a line, or tap 🏗️ → Big Floor.', task: { kind: 'build', type: 'line', n: 7, icon: '🌉', label: 'build a bridge 7 long' }, reward: 5 },
   { friend: 'cora', say: "Let's make the world greener! 🌱 Plant a little sapling and we'll watch it grow into a tree.", hint: 'Pick the 🌱 sapling (Nature tab) and tap the grass.', task: { metric: 'plant', n: 1, mode: 'do', icon: '🌱', label: 'plant a sapling' }, reward: 4 },
+  { friend: 'milo', say: "I'm Milo! 🟫 Let's lay down a big FLOOR — a 4-by-4 square to dance on!", hint: 'Tap 🏗️ → Big Floor, or place blocks in a square.', task: { kind: 'build', type: 'floor', n: 4, icon: '🟫', label: 'build a 4×4 floor' }, reward: 5 },
   { friend: 'jovi', say: "I heard there's shiny treasure in the 🪙 Gold World! ✨ Let's go dig some up!", hint: 'Tap 🌍 → Gold World, then dig the shiny blocks.', task: { metric: 'treasure', n: 2, mode: 'do', icon: '💎', label: 'dig up 2 treasures' }, reward: 5 },
+  { friend: 'brexin', say: "I'm Brexin — your new friend! 🧱 Let's build a big WALL, 6 long and 3 tall!", hint: 'Tap 🏗️ → Long Wall (easy!), or stack a wall yourself.', task: { kind: 'build', type: 'wall', n: 6, n2: 3, icon: '🧱', label: 'build a wall 6 long, 3 tall' }, reward: 6, gift: 'sparkle' },
   { friend: 'steve', say: "Brain power time! 🧮 Answer some of my fun number questions and I'll cheer you on!", hint: 'Find Steve at his stand and tap him.', task: { metric: 'math', n: 3, mode: 'do', icon: '🍗', label: 'answer 3 math questions' }, reward: 5 },
-  { friend: 'cristiano', say: "Goooal! ⚽ Actually... let's BOUNCE! Put down a slime block and boing on it with me!", hint: 'Pick the 🟢 slime block (Fun tab), place it, and jump!', task: { metric: 'bounce', n: 1, mode: 'do', icon: '🟢', label: 'bounce on slime' }, reward: 4, gift: 'sparkle' },
-  { friend: 'hero', say: "Time to be BRAVE! 🦸 Turn on night and gently bonk a wobbly monster. I'm right beside you — you always wake up safe!", hint: 'Tap 🌙, then tap a zombie or spider.', task: { metric: 'monster', n: 1, mode: 'do', icon: '⚔️', label: 'bonk 1 night monster' }, reward: 6, gift: 'crown' },
+  { friend: 'cristiano', say: "Goooal! ⚽ Actually... let's BOUNCE! Put down a slime block and boing on it with me!", hint: 'Pick the 🟢 slime block (Fun tab), place it, and jump!', task: { metric: 'bounce', n: 1, mode: 'do', icon: '🟢', label: 'bounce on slime' }, reward: 4, gift: 'crown' },
+  { friend: 'hero', say: "Time to be BRAVE! 🦸 Turn on night and gently bonk a wobbly monster. I'm right beside you — you always wake up safe!", hint: 'Tap 🌙, then tap a zombie or spider.', task: { metric: 'monster', n: 1, mode: 'do', icon: '⚔️', label: 'bonk 1 night monster' }, reward: 6 },
   { friend: 'cora', say: "The GRAND finale! 🐉 Let's go to The End and tame the friendly dragon together. You can do it!", hint: 'Buy The End in the 💎 shop, tap 🌍 → The End, pop the crystals, then pet the dragon!', task: { metric: 'dragon', n: 1, mode: 'have', icon: '🐉', label: 'tame the dragon' }, reward: 12, gift: 'rainbow' },
 ];
 const ADV_FRIENDS = [...new Set(STORY.map((c) => c.friend))];
+
+// After the story, friends keep dropping by with endless BUILD CHALLENGES that
+// the game actually checks against what you've built.
+const BUILD_POOL = [
+  { type: 'tower', n: 5, icon: '🗼', label: 'build a tower 5 tall' },
+  { type: 'tower', n: 8, icon: '🗼', label: 'build a tall tower 8 high' },
+  { type: 'line', n: 8, icon: '🌉', label: 'build a bridge 8 long' },
+  { type: 'floor', n: 5, icon: '🟫', label: 'build a 5×5 floor' },
+  { type: 'wall', n: 7, n2: 4, icon: '🧱', label: 'build a wall 7 long, 4 tall' },
+];
+const BUILD_FRIENDS = ['alex', 'chip', 'milo', 'brexin'];
+function makeFreeChallenge() {
+  const b = BUILD_POOL[Math.floor(Math.random() * BUILD_POOL.length)];
+  const friend = BUILD_FRIENDS[Math.floor(Math.random() * BUILD_FRIENDS.length)];
+  return { friend, free: true, say: charById(friend).name + " wants to build with you! 🛠️ Can you " + b.label + "?", hint: 'Use your blocks (or the 🏗️ button) anywhere near you!', task: { kind: 'build', type: b.type, n: b.n, n2: b.n2, icon: b.icon, label: b.label }, reward: 4 };
+}
+
+// Scan the blocks the player has placed for a finished structure.
+let buildMet = false;
+function runBuildCheck(task) {
+  const P = world.placed;
+  if (!P || !P.size) return false;
+  const has = (x, y, z) => P.has(world.idx(x, y, z));
+  for (const i of P) {
+    const x = i % SX, y = Math.floor(i / (SX * SZ)), z = Math.floor(i / SX) % SZ;
+    if (task.type === 'tower') { let c = 1; while (has(x, y + c, z)) c++; if (c >= task.n) return true; }
+    else if (task.type === 'line') {
+      let c = 1; while (has(x + c, y, z)) c++; if (c >= task.n) return true;
+      c = 1; while (has(x, y, z + c)) c++; if (c >= task.n) return true;
+    } else if (task.type === 'floor') {
+      let ok = true; for (let dx = 0; dx < task.n && ok; dx++) for (let dz = 0; dz < task.n; dz++) if (!has(x + dx, y, z + dz)) { ok = false; break; }
+      if (ok) return true;
+    } else if (task.type === 'wall') {
+      const w = task.n, h = task.n2 || 3;
+      let ok = true; for (let a = 0; a < w && ok; a++) for (let b = 0; b < h; b++) if (!has(x + a, y + b, z)) { ok = false; break; }
+      if (ok) return true;
+      ok = true; for (let a = 0; a < w && ok; a++) for (let b = 0; b < h; b++) if (!has(x, y + b, z + a)) { ok = false; break; }
+      if (ok) return true;
+    }
+  }
+  return false;
+}
+
+function storyDone() { return goals.adv && goals.adv.i >= STORY.length; }
+// The chapter the player is on: a story chapter, then (after a one-time finale)
+// an endless build challenge.
+function activeChapter() {
+  if (!storyDone()) return STORY[goals.adv.i];
+  if (!goals.adv.fin) return null;                 // null = show the finale once
+  if (!goals.adv.fc) { goals.adv.fc = makeFreeChallenge(); goals.save(); }
+  return goals.adv.fc;
+}
 function startChapter(i) {
   const ch = STORY[i];
-  goals.adv = { i, base: ch ? (goals.counts[ch.task.metric] || 0) : 0 };
+  const metric = ch && ch.task.metric;
+  goals.adv = { i, base: metric ? (goals.counts[metric] || 0) : 0, fin: goals.adv && goals.adv.fin, fc: null };
   goals.save();
+  recheckBuild();
 }
-function curChapter() { return (goals.adv && goals.adv.i < STORY.length) ? STORY[goals.adv.i] : null; }
+function recheckBuild() { const ch = activeChapter(); buildMet = !!(ch && ch.task.kind === 'build' && runBuildCheck(ch.task)); }
 function advProgress(ch) {
-  const cur = goals.counts[ch.task.metric] || 0;
-  return ch.task.mode === 'have' ? Math.min(ch.task.n, cur) : Math.max(0, Math.min(ch.task.n, cur - goals.adv.base));
+  const t = ch.task;
+  if (t.kind === 'build') return buildMet ? t.n : 0;
+  const cur = goals.counts[t.metric] || 0;
+  return t.mode === 'have' ? Math.min(t.n, cur) : Math.max(0, Math.min(t.n, cur - goals.adv.base));
 }
-function advDone(ch) { return advProgress(ch) >= ch.task.n; }
+function advDone(ch) { return ch.task.kind === 'build' ? buildMet : (advProgress(ch) >= ch.task.n); }
 function heartsHtml(id) { const n = Math.min(3, goals.friends[id] || 0); let s = ''; for (let k = 0; k < 3; k++) s += k < n ? '❤️' : '🤍'; return s; }
+function advReady() { return (storyDone() && !goals.adv.fin) || (() => { const c = activeChapter(); return !!(c && advDone(c)); })(); }
 function updateAdventureButton() {
   const b = document.getElementById('btn-adventure');
-  if (b) { const ch = curChapter(); b.classList.toggle('on', !!(ch && advDone(ch))); }   // gold ring = ready to claim
+  if (b) b.classList.toggle('on', advReady());     // gold ring = something to claim
 }
-function openAdventure() { renderAdventure(); document.getElementById('adventure').classList.remove('hidden'); }
+function openAdventure() { recheckBuild(); renderAdventure(); document.getElementById('adventure').classList.remove('hidden'); }
 function closeAdventure() { document.getElementById('adventure').classList.add('hidden'); }
 function renderAdventure() {
   const body = document.getElementById('adv-body'), btn = document.getElementById('adv-ok');
   body.innerHTML = '';
-  const ch = curChapter();
-  if (!ch) {                         // the whole journey is finished — a happy finale
+  const ch = activeChapter();
+  if (!ch) {                         // the story is finished — a happy finale (then endless builds)
     const row = document.createElement('div'); row.className = 'adv-finale-row';
     for (const id of ADV_FRIENDS) row.appendChild(charPreview(charById(id), 48));
     body.appendChild(row);
     const t = document.createElement('div'); t.className = 'adv-text';
-    t.innerHTML = '🎉 You finished the Big Adventure with all your friends! 🎉<br>You are an amazing adventurer, Ezra! 💖';
+    t.innerHTML = '🎉 You finished the Big Adventure with all your friends! 🎉<br>You\'re an amazing adventurer, Ezra! 💖<br>Now your friends will keep dropping by with fun build challenges!';
     body.appendChild(t);
     btn.textContent = 'Yay! 🎉';
     return;
@@ -1200,7 +1265,11 @@ function renderAdventure() {
   const say = document.createElement('div'); say.className = 'adv-text'; say.innerHTML = ch.say; body.appendChild(say);
   const done = advDone(ch);
   const task = document.createElement('div'); task.className = 'adv-task' + (done ? ' done' : '');
-  task.innerHTML = (done ? '✅ ' : '') + ch.task.icon + ' <b>' + ch.task.label + '</b> — ' + advProgress(ch) + ' / ' + ch.task.n + (done ? '' : '<br><small>💡 ' + ch.hint + '</small>');
+  if (ch.task.kind === 'build') {
+    task.innerHTML = (done ? '✅ ' : '') + ch.task.icon + ' <b>' + ch.task.label + '</b>' + (done ? ' — done! 🎉' : '<br><small>💡 ' + ch.hint + '</small>');
+  } else {
+    task.innerHTML = (done ? '✅ ' : '') + ch.task.icon + ' <b>' + ch.task.label + '</b> — ' + advProgress(ch) + ' / ' + ch.task.n + (done ? '' : '<br><small>💡 ' + ch.hint + '</small>');
+  }
   body.appendChild(task);
   btn.textContent = done ? "Yay! What's next? 🎉" : 'Okay! 👍';
 }
@@ -1213,7 +1282,10 @@ function applyGift(id) {
   saveDirty = true;
 }
 function advOk() {
-  const ch = curChapter();
+  if (storyDone() && !goals.adv.fin) {     // acknowledge the finale, then start endless builds
+    goals.adv.fin = true; goals.save(); recheckBuild(); renderAdventure(); updateAdventureButton(); return;
+  }
+  const ch = activeChapter();
   if (!ch || !advDone(ch)) { closeAdventure(); return; }
   goals.addGems(ch.reward); updateGems();
   goals.bump('story');
@@ -1221,17 +1293,19 @@ function advOk() {
   sound.play('treasure');
   let giftMsg = '';
   if (ch.gift && !goals.hasUnlock(ch.gift)) { applyGift(ch.gift); giftMsg = ' 🎁 ' + charById(ch.friend).name + ' gave you a present!'; }
-  startChapter(goals.adv.i + 1);          // advance + capture the next baseline (also saves)
+  if (ch.free) { goals.adv.fc = makeFreeChallenge(); goals.save(); }   // a fresh build challenge
+  else startChapter(goals.adv.i + 1);                                  // advance the story
+  recheckBuild();
   showToast('🎉 +💎' + ch.reward + giftMsg, 3800);
   updateAdventureButton();
-  renderAdventure();                      // show the next chapter (or finale) right away
+  renderAdventure();
 }
 
 // --- A friend who strolls up (gently!) ---
 // The current adventure host wanders near home and, now and then (long cooldown,
 // so it's never annoying) ambles over to say hi — especially when a chapter is
 // ready to claim. Tap the friend to open the Adventure. Overworld only.
-function buddyHostId() { const ch = curChapter(); return ch ? ch.friend : 'chris'; }
+function buddyHostId() { const ch = activeChapter(); return ch ? ch.friend : 'chris'; }
 function setupBuddy() {
   if (!worlds.over) return;
   if (!buddyChar) buddyChar = new Character(gl);
@@ -1249,7 +1323,7 @@ function updateBuddy(dt) {
   syncBuddySkin();
   const W = world;
   const dx = player.pos[0] - buddy.pos[0], dz = player.pos[2] - buddy.pos[2], dist = Math.hypot(dx, dz) || 1;
-  const claimable = (() => { const ch = curChapter(); return !!(ch && advDone(ch)); })();
+  const claimable = advReady();
   buddy.timer -= dt;
   if (buddy.mode === 'home') {
     buddy.walk = 0;
@@ -2107,6 +2181,7 @@ function init() {
   setupSteve();
   if (!goals.adv) startChapter(0);     // begin the adventure (captures "from now" baselines)
   setupBuddy();
+  recheckBuild();
   updateAdventureButton();
   updateHearts();
   updateNightButton();

@@ -604,6 +604,37 @@ Now **56 block ids**, **46 goals**.
    repeatable per-friend activities; more decor (fences/stairs need sub-cube
    geometry the voxel engine doesn't have yet).
 
+## Status (session 23) — new friends + build challenges that check real builds
+(dad: added Ezra's real friends Alex/Chip/Milo/Brexin; "challenges sound great,
+pen is yours"). Shipped on **`claude/store-portal-bugs-hzcr72`**, mirrored to
+`main`. **sw cache v9→v10.** Roster now **12 characters**.
+1. **4 new friends** in `CHARACTERS` (alex/chip/milo/brexin, distinct skins) —
+   selectable in the 🙂 picker AND they host adventure chapters + walk up as the
+   buddy.
+2. **🏗️ Build challenges that detect real structures (the headline).** New
+   `task.kind:'build'` chapters where a friend asks for a TOWER / BRIDGE / FLOOR /
+   WALL and the game **scans `world.placed`** (`runBuildCheck`: vertical run =
+   tower, horizontal run = line/bridge, n×n = floor, w×h plane = wall) to know
+   when it's really built — re-checked on place/dig/big-build/travel/open (cached
+   in `buildMet`, never per-frame). Tuned so the **🏗️ Big Build** buttons satisfy
+   them (Long Wall → tower(4)+wall(6×3); Big Floor → bridge/floor) so a 6-yr-old
+   can always complete one. Woven into the STORY (Alex=tower, Chip=bridge,
+   Milo=floor, Brexin=wall, +gift sparkle) → now **12 chapters**.
+3. **Endless build mode after the story.** Once the finale is acknowledged
+   (`goals.adv.fin`), friends keep dropping by with random `BUILD_POOL`
+   challenges (`goals.adv.fc`, `makeFreeChallenge`) — repeatable 💎 + friendship
+   hearts, hosted by the new friends, so the build loop never ends.
+   `activeChapter()` unifies story + free; `advReady()` drives the 📖 badge + the
+   buddy "claimable" nudge.
+   Verified headless: 12-friend picker; a 4-tall placed column completes Alex's
+   tower → claim → advance; jump to finale → ack → endless build challenges
+   generate, complete (a floor/tower slab), pay 💎 + heart, and re-roll; all
+   persists across reload; zero errors. Screenshots of the roster + a build
+   challenge. (Fixed a stale `curChapter` ref in `updateBuddy` found in testing.)
+   Tuning candidates: build checks use "have such a structure" semantics, so a
+   pre-existing big build can satisfy a challenge instantly (intentional — it
+   rewards building); could later diff "new since the ask" if it feels too easy.
+
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
   **https://ontosam.github.io/minecraft/**. `.nojekyll` makes Pages serve files

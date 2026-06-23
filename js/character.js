@@ -57,6 +57,11 @@ export const CHARACTERS = [
   { id: 'cristiano', name: 'Cristiano', emoji: '⚽', skin: [0.82, 0.62, 0.46], shirt: [0.86, 0.16, 0.16], pants: [0.95, 0.95, 0.96], shoe: [0.10, 0.10, 0.12], hair: [0.15, 0.12, 0.10], ball: true },
   { id: 'steve', name: 'Steve', emoji: '⛏️', skin: [0.78, 0.60, 0.46], shirt: [0.18, 0.66, 0.66], pants: [0.30, 0.32, 0.62], shoe: [0.40, 0.40, 0.45], hair: [0.30, 0.20, 0.12], beard: true },
   { id: 'hero', name: 'Super Hero', emoji: '🦸', skin: [0.97, 0.80, 0.67], shirt: [0.20, 0.42, 0.85], pants: [0.20, 0.25, 0.60], shoe: [0.75, 0.62, 0.20], hair: [0.20, 0.15, 0.10], cape: true, capeColor: [0.88, 0.18, 0.20] },
+  // Ezra's real friends.
+  { id: 'alex', name: 'Alex', emoji: '🧒', skin: [0.98, 0.82, 0.66], shirt: [0.32, 0.72, 0.42], pants: [0.34, 0.32, 0.45], shoe: [0.30, 0.25, 0.22], hair: [0.86, 0.50, 0.20], long: true },
+  { id: 'chip', name: 'Chip', emoji: '🧒', skin: [0.86, 0.66, 0.50], shirt: [0.96, 0.80, 0.26], pants: [0.26, 0.40, 0.62], shoe: [0.30, 0.30, 0.34], hair: [0.26, 0.18, 0.10] },
+  { id: 'milo', name: 'Milo', emoji: '🧒', skin: [0.95, 0.78, 0.62], shirt: [0.22, 0.62, 0.70], pants: [0.30, 0.28, 0.42], shoe: [0.22, 0.20, 0.24], hair: [0.14, 0.11, 0.09] },
+  { id: 'brexin', name: 'Brexin', emoji: '🧒', skin: [0.70, 0.52, 0.38], shirt: [0.86, 0.30, 0.30], pants: [0.20, 0.20, 0.24], shoe: [0.30, 0.20, 0.20], hair: [0.10, 0.08, 0.07] },
 ];
 // Older saves may still hold the previous ids — map them so a saved pick sticks.
 const CHAR_ALIAS = { mama: 'chris', dada: 'vlad' };
