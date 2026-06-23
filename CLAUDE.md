@@ -857,6 +857,29 @@ walls / hard to make a 4-walled building"). Shipped on
    group; a **larger flat high-res building world** (do carefully w/ save
    migration so builds are never lost).
 
+## Status (session 31) — a TON more blocks + a Creative ✨ group (dad: "load him
+up with fun MC blocks + creative group, then the world"). Shipped on
+**`claude/dreamy-mccarthy-g6wgjr`** → `main`. **sw v19→v20.** Now **126 block
+ids** (31 new), **77→108 picker tiles**, **16 picker categories**.
+- **20 recognizable MC blocks** (tiles 84-104, ids 95-114), drawn with the
+  session-24 helpers (`noise`/`shade`/`metal`/`speckle`): Crafting Table,
+  Furnace, Chest, Cherry Planks + see-through **Cherry Leaves**, Bamboo, Crimson
+  & Warped planks, Soul Sand, Bone Block, Copper + Oxidized Copper, Sculk,
+  Blackstone, Smooth Stone, Packed Ice, Honey, Target, Terracotta, Mossy Stone
+  Brick. Slotted into Nature/House/Wood/Stone/Shiny/Decor/Redstone tabs.
+- **Creative ✨ group (11, ids 115-125)** — wild blocks for crazy builds, in a
+  new freely-available picker tab: **Neon ×5** (one bright `TILE.NEON` tinted via
+  `colored()`), **Glow Crystal**, **Starry** (night sky), **Cloud**, **Checker**,
+  **Candy** (stripes), **Chrome** (mirror). (RAINBOW stays shop-gated in Special.)
+- New ids are plain bytes so the existing base64 save round-trips them for free;
+  `isLego` (83-94) is unaffected.
+  Verified: Node (20 asserts — ids unique + in-byte-range, every category block
+  has a def with valid UVs, Cherry Leaves see-through, Creative free) + headless
+  (atlas builds **0 errors**, Creative tab present, 108 picker tiles, a 31-block
+  showcase renders, picker swatches show real colours). Screenshots of the
+  showcase wall + the picker. **Next: the larger flat building world** (careful
+  SX/SZ refactor with save migration so Ezra's builds are never lost).
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept

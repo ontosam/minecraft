@@ -25,6 +25,14 @@ export const TILE = {
   NETHER_BRICK: 74, MAGMA: 75,
   MELON_TOP: 76, MELON_SIDE: 77, HAY_TOP: 78, HAY_SIDE: 79, NOTE_BLOCK: 80, SPONGE: 81,
   LEGO_TOP: 82, LEGO_SIDE: 83,
+  // session 31: a big batch of recognizable Minecraft blocks…
+  CRAFT_TOP: 84, CRAFT_SIDE: 85, FURNACE: 86, CHEST: 87,
+  CHERRY_PLANKS: 88, CHERRY_LEAVES: 89, BAMBOO: 90, CRIMSON_PLANKS: 91, WARPED_PLANKS: 92,
+  SOUL_SAND: 93, BONE_BLOCK: 94, COPPER: 95, COPPER_OX: 96, SCULK: 97,
+  BLACKSTONE: 98, SMOOTH_STONE: 99, PACKED_ICE: 100, HONEY: 101, TARGET: 102,
+  TERRACOTTA: 103, MOSSY_BRICK: 104,
+  // …and a Creative ✨ group for wild builds (NEON is tinted into many colours).
+  NEON: 105, CLOUD: 106, STARRY: 107, CHECKER: 108, CANDY: 109, CHROME: 110, GLOW_CRYSTAL: 111,
 };
 
 export function initGL(canvas) {
@@ -465,6 +473,38 @@ function buildAtlasCanvas() {
     ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(q[0] + 2, q[1] + 3, 2, T - 5);  // soft left highlight
     ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(q[0], q[1] + T - 2, T, 2);    // bottom shade
   }
+
+  // ── session 31: a big batch of recognizable Minecraft blocks ──
+  { const q = at(TILE.CRAFT_TOP); noise(ctx, q[0], q[1], 0xb98a4e, 0.12, 301); ctx.fillStyle = shade(0x6a4a22, 1); for (const i of [5, 10]) { ctx.fillRect(q[0] + i, q[1], 1, T); ctx.fillRect(q[0], q[1] + i, T, 1); } }
+  { const q = at(TILE.CRAFT_SIDE); noise(ctx, q[0], q[1], 0xc99a5b, 0.12, 302); ctx.fillStyle = shade(0x8a6a3a, 1); for (let y = 4; y < T; y += 5) ctx.fillRect(q[0], q[1] + y, T, 1); ctx.fillStyle = shade(0x5a3a1c, 1); ctx.fillRect(q[0] + 3, q[1] + 3, 3, 2); ctx.fillRect(q[0] + 9, q[1] + 9, 4, 1); }
+  { const q = at(TILE.FURNACE); noise(ctx, q[0], q[1], 0x6c6c72, 0.16, 303); ctx.fillStyle = shade(0x4a4a50, 1); ctx.fillRect(q[0] + 3, q[1] + 3, T - 6, 2); ctx.fillStyle = shade(0x2a2a2e, 1); ctx.fillRect(q[0] + 4, q[1] + 7, 8, 6); ctx.fillStyle = shade(0xff8a1a, 1); ctx.fillRect(q[0] + 5, q[1] + 10, 6, 3); ctx.fillStyle = shade(0xffd83a, 1); ctx.fillRect(q[0] + 6, q[1] + 11, 4, 2); }
+  { const q = at(TILE.CHEST); noise(ctx, q[0], q[1], 0xb07a3a, 0.12, 304); ctx.fillStyle = shade(0x6a4a22, 1); ctx.strokeRect(q[0] + 0.5, q[1] + 0.5, T - 1, T - 1); ctx.fillRect(q[0], q[1] + 5, T, 1); ctx.fillStyle = shade(0x3a2a14, 1); ctx.fillRect(q[0] + 6, q[1] + 4, 4, 4); ctx.fillStyle = shade(0xd8c050, 1); ctx.fillRect(q[0] + 7, q[1] + 5, 2, 2); }
+  { const q = at(TILE.CHERRY_PLANKS); noise(ctx, q[0], q[1], 0xe8b8c8, 0.10, 305); ctx.fillStyle = shade(0xc88aa0, 1); for (let y = 4; y < T; y += 5) ctx.fillRect(q[0], q[1] + y, T, 1); }
+  { const q = at(TILE.CHERRY_LEAVES); noise(ctx, q[0], q[1], 0xf2a8c8, 0.30, 306); const r = rng(3061); for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) if (r() < 0.22) ctx.clearRect(q[0] + x, q[1] + y, 1, 1); }
+  { const q = at(TILE.BAMBOO); noise(ctx, q[0], q[1], 0x6a9a3a, 0.10, 307); ctx.fillStyle = shade(0x4a7a24, 1); for (let x = 2; x < T; x += 5) ctx.fillRect(q[0] + x, q[1], 2, T); ctx.fillStyle = shade(0x8aba5a, 1); for (let x = 2; x < T; x += 5) { ctx.fillRect(q[0] + x, q[1] + 5, 2, 1); ctx.fillRect(q[0] + x, q[1] + 11, 2, 1); } }
+  { const q = at(TILE.CRIMSON_PLANKS); noise(ctx, q[0], q[1], 0x8a3a52, 0.10, 308); ctx.fillStyle = shade(0x5a2435, 1); for (let y = 4; y < T; y += 5) ctx.fillRect(q[0], q[1] + y, T, 1); }
+  { const q = at(TILE.WARPED_PLANKS); noise(ctx, q[0], q[1], 0x2a8a8a, 0.10, 309); ctx.fillStyle = shade(0x1a5a5a, 1); for (let y = 4; y < T; y += 5) ctx.fillRect(q[0], q[1] + y, T, 1); }
+  { const q = at(TILE.SOUL_SAND); noise(ctx, q[0], q[1], 0x4a3a2e, 0.18, 310); ctx.fillStyle = shade(0x2a2018, 1); ctx.fillRect(q[0] + 4, q[1] + 5, 2, 3); ctx.fillRect(q[0] + 10, q[1] + 5, 2, 3); ctx.fillRect(q[0] + 6, q[1] + 10, 4, 2); }
+  { const q = at(TILE.BONE_BLOCK); noise(ctx, q[0], q[1], 0xe8e4d2, 0.08, 311); ctx.fillStyle = shade(0xc8c0a0, 1); for (let x = 2; x < T; x += 4) ctx.fillRect(q[0] + x, q[1], 1, T); ctx.fillStyle = shade(0xa89870, 1); ctx.fillRect(q[0], q[1] + 1, T, 1); ctx.fillRect(q[0], q[1] + T - 2, T, 1); }
+  metal(TILE.COPPER, 0xc87a4a, 312);
+  metal(TILE.COPPER_OX, 0x4aa88a, 313);
+  { const q = at(TILE.SCULK); noise(ctx, q[0], q[1], 0x16323a, 0.18, 314); const r = rng(314); for (let i = 0; i < 12; i++) { ctx.fillStyle = shade(0x2ad8d0, 1); ctx.fillRect(q[0] + (r() * 14 | 0), q[1] + (r() * 14 | 0), 1, 1); } }
+  speckle(TILE.BLACKSTONE, 0x2a2830, 0.18, 315, 0x16141a, 0x3a3842);
+  { const q = at(TILE.SMOOTH_STONE); noise(ctx, q[0], q[1], 0xa8a8ae, 0.06, 316); ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(q[0] + 2, q[1] + 2, T - 4, 1); }
+  { const q = at(TILE.PACKED_ICE); noise(ctx, q[0], q[1], 0x8ac0f0, 0.10, 317); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(q[0] + 2, q[1] + 3, 5, 1); ctx.fillRect(q[0] + 9, q[1] + 9, 4, 1); }
+  { const q = at(TILE.HONEY); noise(ctx, q[0], q[1], 0xf0a82a, 0.12, 318); ctx.fillStyle = shade(0xc88010, 1); ctx.fillRect(q[0], q[1] + 5, T, 2); ctx.fillRect(q[0], q[1] + 11, T, 2); ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(q[0] + 3, q[1] + 2, 3, 1); }
+  { const q = at(TILE.TARGET); ctx.fillStyle = shade(0xe8e0d0, 1); ctx.fillRect(q[0], q[1], T, T); const cx = q[0] + 8, cy = q[1] + 8; for (const [r, c] of [[7, 0xd03030], [5, 0xe8e0d0], [3, 0xd03030], [1.5, 0xe8e0d0]]) { ctx.fillStyle = shade(c, 1); ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fill(); } }
+  { const q = at(TILE.TERRACOTTA); noise(ctx, q[0], q[1], 0xb06848, 0.10, 320); ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(q[0] + 2, q[1] + T - 3, T - 4, 1); }
+  { const q = at(TILE.MOSSY_BRICK); noise(ctx, q[0], q[1], 0x86868c, 0.14, 321); ctx.fillStyle = shade(0x5a5a60, 1); ctx.fillRect(q[0], q[1] + 7, T, 1); for (let x = 0; x < T; x += 8) ctx.fillRect(q[0] + x, q[1], 1, 7); for (let x = 4; x < T; x += 8) ctx.fillRect(q[0] + x, q[1] + 8, 1, T); const r = rng(321); for (let i = 0; i < 14; i++) { ctx.fillStyle = shade(0x4a7a34, 1); ctx.fillRect(q[0] + (r() * 15 | 0), q[1] + (r() * 15 | 0), 2, 2); } }
+
+  // ── Creative ✨ group: wild blocks for crazy builds ──
+  { const q = at(TILE.NEON); ctx.fillStyle = '#fbfbfb'; ctx.fillRect(q[0], q[1], T, T); ctx.fillStyle = 'rgba(0,0,0,0.10)'; for (let i = 4; i < T; i += 4) { ctx.fillRect(q[0] + i, q[1], 1, T); ctx.fillRect(q[0], q[1] + i, T, 1); } ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.fillRect(q[0] + 2, q[1] + 2, 5, 1); }
+  { const q = at(TILE.CLOUD); noise(ctx, q[0], q[1], 0xeef2ff, 0.04, 323); ctx.fillStyle = 'rgba(255,255,255,0.7)'; const r = rng(323); for (let i = 0; i < 8; i++) ctx.fillRect(q[0] + (r() * 12 | 0), q[1] + (r() * 12 | 0), 4, 3); }
+  { const q = at(TILE.STARRY); noise(ctx, q[0], q[1], 0x121a3a, 0.14, 324); const r = rng(324); for (let i = 0; i < 11; i++) { ctx.fillStyle = i % 3 ? '#ffffff' : '#aac8ff'; ctx.fillRect(q[0] + (r() * 15 | 0), q[1] + (r() * 15 | 0), 1, 1); } ctx.fillStyle = '#fff4c0'; ctx.fillRect(q[0] + 4, q[1] + 3, 2, 2); }
+  { const q = at(TILE.CHECKER); for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) { ctx.fillStyle = (((x >> 2) + (y >> 2)) & 1) ? '#1a1a1e' : '#f0f0f0'; ctx.fillRect(q[0] + x, q[1] + y, 1, 1); } }
+  { const q = at(TILE.CANDY); for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) { ctx.fillStyle = ((((x + y) >> 2) & 1)) ? '#f04a7a' : '#ffffff'; ctx.fillRect(q[0] + x, q[1] + y, 1, 1); } }
+  { const q = at(TILE.CHROME); for (let y = 0; y < T; y++) { ctx.fillStyle = shade(0xc8ccd8, 0.6 + 0.4 * Math.sin(y * 0.8)); ctx.fillRect(q[0], q[1] + y, T, 1); } ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(q[0] + 3, q[1] + 2, 2, T - 4); }
+  { const q = at(TILE.GLOW_CRYSTAL); noise(ctx, q[0], q[1], 0x3ad8e8, 0.12, 328); ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(q[0] + 5, q[1] + 3, 2, 4); ctx.fillRect(q[0] + 9, q[1] + 8, 2, 3); ctx.fillStyle = shade(0x1a98c8, 1); ctx.fillRect(q[0] + 3, q[1] + 10, 2, 2); ctx.fillRect(q[0] + 11, q[1] + 4, 2, 2); }
 
   return c;
 }

@@ -31,6 +31,13 @@ export const B = {
   MELON: 79, HAY: 80, NOTE_BLOCK: 81, SPONGE: 82,
   LEGO_RED: 83, LEGO_ORANGE: 84, LEGO_YELLOW: 85, LEGO_GREEN: 86, LEGO_BLUE: 87, LEGO_CYAN: 88,
   LEGO_PURPLE: 89, LEGO_PINK: 90, LEGO_WHITE: 91, LEGO_BLACK: 92, LEGO_BROWN: 93, LEGO_LIME: 94,
+  // session 31: a big block batch (95-114) + a Creative ✨ group (115-125).
+  CRAFTING: 95, FURNACE: 96, CHEST: 97, CHERRY_PLANKS: 98, CHERRY_LEAVES: 99, BAMBOO: 100,
+  CRIMSON_PLANKS: 101, WARPED_PLANKS: 102, SOUL_SAND: 103, BONE_BLOCK: 104, COPPER: 105, COPPER_OX: 106,
+  SCULK: 107, BLACKSTONE: 108, SMOOTH_STONE: 109, PACKED_ICE: 110, HONEY: 111, TARGET: 112,
+  TERRACOTTA: 113, MOSSY_BRICK: 114,
+  NEON_PINK: 115, NEON_GREEN: 116, NEON_BLUE: 117, NEON_ORANGE: 118, NEON_PURPLE: 119,
+  CLOUD: 120, STARRY: 121, CHECKER: 122, CANDY: 123, CHROME: 124, GLOW_CRYSTAL: 125,
 };
 
 const W = [1, 1, 1]; // white tint for textured blocks
@@ -143,20 +150,55 @@ export const BLOCKS = {
   [B.LEGO_BLACK]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.20, 0.20, 0.23], '#33333a'),
   [B.LEGO_BROWN]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.55, 0.36, 0.20], '#8a5a32'),
   [B.LEGO_LIME]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.55, 0.80, 0.25], '#8ccc40'),
+  // session 31: more Minecraft blocks
+  [B.CRAFTING]: nat3(TILE.CRAFT_TOP, TILE.CRAFT_SIDE, TILE.PLANKS, '#b98a4e'),
+  [B.FURNACE]: nat(TILE.FURNACE, '#5a5a60'),
+  [B.CHEST]: nat(TILE.CHEST, '#a06a30'),
+  [B.CHERRY_PLANKS]: nat(TILE.CHERRY_PLANKS, '#e0a0b8'),
+  [B.CHERRY_LEAVES]: { tiles: { top: TILE.CHERRY_LEAVES, side: TILE.CHERRY_LEAVES, bottom: TILE.CHERRY_LEAVES }, tint: W, ui: '#f2a8c8', seethrough: true },
+  [B.BAMBOO]: nat(TILE.BAMBOO, '#6a9a3a'),
+  [B.CRIMSON_PLANKS]: nat(TILE.CRIMSON_PLANKS, '#8a3a52'),
+  [B.WARPED_PLANKS]: nat(TILE.WARPED_PLANKS, '#2a8a8a'),
+  [B.SOUL_SAND]: nat(TILE.SOUL_SAND, '#4a3a2e'),
+  [B.BONE_BLOCK]: nat(TILE.BONE_BLOCK, '#e8e4d2'),
+  [B.COPPER]: nat(TILE.COPPER, '#c87a4a'),
+  [B.COPPER_OX]: nat(TILE.COPPER_OX, '#4aa88a'),
+  [B.SCULK]: nat(TILE.SCULK, '#16323a'),
+  [B.BLACKSTONE]: nat(TILE.BLACKSTONE, '#2a2830'),
+  [B.SMOOTH_STONE]: nat(TILE.SMOOTH_STONE, '#a8a8ae'),
+  [B.PACKED_ICE]: nat(TILE.PACKED_ICE, '#8ac0f0'),
+  [B.HONEY]: nat(TILE.HONEY, '#f0a82a'),
+  [B.TARGET]: nat(TILE.TARGET, '#d03030'),
+  [B.TERRACOTTA]: nat(TILE.TERRACOTTA, '#b06848'),
+  [B.MOSSY_BRICK]: nat(TILE.MOSSY_BRICK, '#7a8a5a'),
+  // Creative ✨ group — wild blocks (NEON is one bright tile, tinted per colour).
+  [B.NEON_PINK]: colored(TILE.NEON, [1.0, 0.18, 0.62], '#ff2e9e'),
+  [B.NEON_GREEN]: colored(TILE.NEON, [0.28, 1.0, 0.34], '#3aff55'),
+  [B.NEON_BLUE]: colored(TILE.NEON, [0.24, 0.6, 1.0], '#3a99ff'),
+  [B.NEON_ORANGE]: colored(TILE.NEON, [1.0, 0.55, 0.12], '#ff8c1e'),
+  [B.NEON_PURPLE]: colored(TILE.NEON, [0.72, 0.32, 1.0], '#b850ff'),
+  [B.CLOUD]: nat(TILE.CLOUD, '#eef2ff'),
+  [B.STARRY]: nat(TILE.STARRY, '#1a2450'),
+  [B.CHECKER]: nat(TILE.CHECKER, '#888890'),
+  [B.CANDY]: nat(TILE.CANDY, '#f04a7a'),
+  [B.CHROME]: nat(TILE.CHROME, '#c8ccd8'),
+  [B.GLOW_CRYSTAL]: nat(TILE.GLOW_CRYSTAL, '#3ad8e8'),
 };
 
 // Build blocks grouped into categories for the pop-up picker.
 export const CATEGORIES = [
-  { name: 'Nature', blocks: [B.GRASS, B.DIRT, B.SAND, B.GRAVEL, B.SNOW, B.MOSS, B.MUD, B.SAPLING, B.LOG, B.BIRCH_LOG, B.LEAVES, B.CACTUS, B.MUSHROOM_RED, B.MUSHROOM_BROWN] },
+  { name: 'Nature', blocks: [B.GRASS, B.DIRT, B.SAND, B.GRAVEL, B.SNOW, B.MOSS, B.MUD, B.SOUL_SAND, B.SAPLING, B.LOG, B.BIRCH_LOG, B.BAMBOO, B.LEAVES, B.CHERRY_LEAVES, B.CACTUS, B.MUSHROOM_RED, B.MUSHROOM_BROWN, B.BONE_BLOCK] },
   { name: 'Water 🪣', blocks: [B.WATER] },
-  { name: 'House 🏠', blocks: [B.DOOR, B.BED_FOOT, B.GLASS, B.LANTERN, B.PLANKS, B.BRICK] },
+  { name: 'House 🏠', blocks: [B.DOOR, B.BED_FOOT, B.GLASS, B.LANTERN, B.PLANKS, B.BRICK, B.CRAFTING, B.FURNACE, B.CHEST] },
   { name: 'Boom 💥', blocks: [B.TNT] },
   // Tap a lever → it powers redstone wire → wired-up lamps light up.
-  { name: 'Redstone ⚙️', blocks: [B.LEVER, B.REDSTONE, B.REDLAMP] },
-  { name: 'Stone 🪨', blocks: [B.STONE, B.COBBLE, B.STONE_BRICK, B.DEEPSLATE, B.GRANITE, B.ANDESITE, B.DIORITE, B.QUARTZ, B.PRISMARINE, B.SANDSTONE, B.END_STONE, B.BRICK, B.OBSIDIAN] },
-  { name: 'Shiny 💎', blocks: [B.IRON_BLOCK, B.GOLD_BLOCK, B.DIAMOND_BLOCK, B.EMERALD_BLOCK, B.LAPIS_BLOCK, B.REDSTONE_BLOCK, B.COAL_BLOCK, B.AMETHYST, B.GOLD, B.DIAMOND, B.ICE] },
-  { name: 'Wood', blocks: [B.PLANKS, B.BIRCH_PLANKS, B.DARK_PLANKS, B.BOOKSHELF] },
-  { name: 'Decor 🪑', blocks: [B.MELON, B.HAY, B.NOTE_BLOCK, B.SPONGE, B.PUMPKIN, B.GLOWSTONE, B.SEA_LANTERN] },
+  { name: 'Redstone ⚙️', blocks: [B.LEVER, B.REDSTONE, B.REDLAMP, B.TARGET] },
+  { name: 'Stone 🪨', blocks: [B.STONE, B.SMOOTH_STONE, B.COBBLE, B.STONE_BRICK, B.MOSSY_BRICK, B.DEEPSLATE, B.BLACKSTONE, B.GRANITE, B.ANDESITE, B.DIORITE, B.QUARTZ, B.PRISMARINE, B.SANDSTONE, B.TERRACOTTA, B.END_STONE, B.BRICK, B.OBSIDIAN] },
+  { name: 'Shiny 💎', blocks: [B.IRON_BLOCK, B.GOLD_BLOCK, B.DIAMOND_BLOCK, B.EMERALD_BLOCK, B.LAPIS_BLOCK, B.REDSTONE_BLOCK, B.COAL_BLOCK, B.COPPER, B.COPPER_OX, B.AMETHYST, B.GOLD, B.DIAMOND, B.ICE, B.PACKED_ICE] },
+  { name: 'Wood', blocks: [B.PLANKS, B.BIRCH_PLANKS, B.DARK_PLANKS, B.CHERRY_PLANKS, B.CRIMSON_PLANKS, B.WARPED_PLANKS, B.BOOKSHELF] },
+  { name: 'Decor 🪑', blocks: [B.MELON, B.HAY, B.HONEY, B.NOTE_BLOCK, B.SPONGE, B.SCULK, B.PUMPKIN, B.GLOWSTONE, B.SEA_LANTERN] },
+  // A special group of wild blocks for crazy builds!
+  { name: 'Creative ✨', blocks: [B.NEON_PINK, B.NEON_GREEN, B.NEON_BLUE, B.NEON_ORANGE, B.NEON_PURPLE, B.GLOW_CRYSTAL, B.STARRY, B.CLOUD, B.CHECKER, B.CANDY, B.CHROME] },
   { name: 'Fun', blocks: [B.PUMPKIN, B.SLIME, B.BARRIER] },
   // Shown in the picker only after it's bought in the 💎 shop.
   { name: 'Special ✨', blocks: [B.RAINBOW], locked: 'rainbow' },
