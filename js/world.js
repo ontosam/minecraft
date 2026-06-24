@@ -41,6 +41,7 @@ export const B = {
   // session 34: space blocks (126-131) — rocky moon stuff, shiny metal, glowy
   // plasma, gem ore, and a sticky alien goo that's hard to walk across.
   MOON_ROCK: 126, SPACE_METAL: 127, ALIEN_GOO: 128, METEOR: 129, PLASMA: 130, CRYSTAL_ORE: 131,
+  PILLOW: 132,                 // a soft cushion you can tap to lie down on
 };
 
 const W = [1, 1, 1]; // white tint for textured blocks
@@ -194,13 +195,14 @@ export const BLOCKS = {
   [B.METEOR]: nat(TILE.METEOR, '#4a403a'),
   [B.PLASMA]: nat(TILE.PLASMA, '#7a2ad8'),
   [B.CRYSTAL_ORE]: nat(TILE.CRYSTAL_ORE, '#33e0d8'),
+  [B.PILLOW]: nat3(TILE.PILLOW_TOP, TILE.PILLOW_SIDE, TILE.PILLOW_SIDE, '#c7cdf0'),
 };
 
 // Build blocks grouped into categories for the pop-up picker.
 export const CATEGORIES = [
   { name: 'Nature', blocks: [B.GRASS, B.DIRT, B.SAND, B.GRAVEL, B.SNOW, B.MOSS, B.MUD, B.SOUL_SAND, B.SAPLING, B.LOG, B.BIRCH_LOG, B.BAMBOO, B.LEAVES, B.CHERRY_LEAVES, B.CACTUS, B.MUSHROOM_RED, B.MUSHROOM_BROWN, B.BONE_BLOCK] },
   { name: 'Water 🪣', blocks: [B.WATER] },
-  { name: 'House 🏠', blocks: [B.DOOR, B.BED_FOOT, B.GLASS, B.LANTERN, B.PLANKS, B.BRICK, B.CRAFTING, B.FURNACE, B.CHEST] },
+  { name: 'House 🏠', blocks: [B.DOOR, B.BED_FOOT, B.PILLOW, B.GLASS, B.LANTERN, B.PLANKS, B.BRICK, B.CRAFTING, B.FURNACE, B.CHEST] },
   { name: 'Boom 💥', blocks: [B.TNT] },
   // Tap a lever → it powers redstone wire → wired-up lamps light up.
   { name: 'Redstone ⚙️', blocks: [B.LEVER, B.REDSTONE, B.REDLAMP, B.TARGET] },

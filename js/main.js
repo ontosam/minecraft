@@ -108,6 +108,7 @@ let rocketBoost = 0;      // eased 0..1 engine-flame intensity
 let rocketKick = 0;       // brief blast-off window that lifts him skyward at launch
 let spaceRace = null;     // the glowing-ring race course in Space World
 let ride = null;          // an active fun-park ride: { att, t, dur, returnPos }
+let resting = null;       // lying on a pillow: { x, y, z, zt } — cozy heart regen
 let pendingRide = null;   // a ride waiting on the "Ride for 💎?" prompt
 let fishing = null;       // an active cast: { wx, wy, wz, t } while waiting for a bite
 let bobberEl = null;      // the on-screen bobber marker
@@ -272,6 +273,7 @@ function drawShadows(m) {
   if (dragonRiding) shadowAt(player.pos[0], player.pos[2], 2.0);   // the dragon's big shadow below
   else if (rocketState !== 'off') shadowAt(player.pos[0], player.pos[2], 1.6);
   else if (roving) shadowAt(player.pos[0], player.pos[2], 1.5);    // the rover's footprint
+  else if (resting) shadowAt(player.pos[0], player.pos[2], 1.4);   // lying down spreads the shadow
   else if (!riding) shadowAt(player.pos[0], player.pos[2], 0.9);
   if (stevePos && dimension === 'over') shadowAt(stevePos[0], stevePos[2], 0.9);
   if (buddy && dimension === 'over') shadowAt(buddy.pos[0], buddy.pos[2], 0.85);
@@ -354,6 +356,7 @@ function travelTo(dest) {
     if (dragonRiding) dismountDragon();       // land the dragon before traveling
     if (rocketState !== 'off') stopRocket(false);   // park the rocket before traveling
     if (ride) { const fp = mobs().funpark; if (fp) { fp.rideKind = null; fp.rideBalloon = null; } ride = null; } // end any ride safely
+    if (resting) getUp();                      // hop off the pillow before traveling
     if (pendingBuild) cancelPlacement();      // cancel a half-placed big build
     fuses.length = 0;                         // cancel any fuses lit in the world we're leaving
     positions[dimension] = player.pos.slice();
@@ -389,6 +392,7 @@ function recoverHome() {
   if (dragonRiding) dismountDragon();
   if (rocketState !== 'off') stopRocket(false);
   if (ride) { const fp = mobs().funpark; if (fp) { fp.rideKind = null; fp.rideBalloon = null; } ride = null; }
+  resting = null;
   ensureDim('over');
   setDimension('over');
   player.world = world;
@@ -748,6 +752,24 @@ function removeBed(x, y, z) {
     if (isBed(world.get(x + dx, y, z + dz))) { world.set(x + dx, y, z + dz, B.AIR); world.placed.delete(world.idx(x + dx, y, z + dz)); break; }
   }
   sound.play('dig'); saveDirty = true; actionAnim = 1; minimapDirty = true; goals.onDig();
+}
+
+// --- Pillows: tap one to lie down for a cozy rest (gentle heart regen). Tap
+// again, move, or press Up to get back up. No night-skip — just a comfy nap. ---
+function lieDown(x, y, z) {
+  if (resting || ride || riding || dragonRiding || rocketState !== 'off' || roving) return;
+  if (pendingBuild) cancelPlacement();
+  resting = { x, y, z, zt: 0 };
+  player.flying = false; player.vel = [0, 0, 0];
+  player.pos = [x + 0.5, y + 1, z + 0.5];     // rest on top of the cushion
+  sound.play('coo');
+  spawnParticles([x + 0.5, y + 1.6, z + 0.5], '💤', 'heart', 2, 18);
+  tip('pillow', '🛌 Nighty-night! Resting fills your hearts. Tap or move to get up.');
+}
+function getUp() {
+  if (!resting) return;
+  resting = null;
+  sound.play('jump');
 }
 
 // --- Big Builds: one-tap structures so building isn't a one-block-at-a-time
@@ -1966,6 +1988,7 @@ function resetWorld() {
   if (roving) stopRover();
   if (dragonRiding) dismountDragon();
   if (rocketState !== 'off') stopRocket(false);
+  resting = null;
   const key = dimension, W = worlds[key].world, kind = WORLD_KINDS[key];
   const hubDests = [...new Set(W.portals.filter((p) => HUB_DESTS.includes(p.dest)).map((p) => p.dest))];
   for (let i = saplings.length - 1; i >= 0; i--) if (saplings[i].world === W) saplings.splice(i, 1);
@@ -1999,6 +2022,7 @@ function knockout() {
   if (dragonRiding) dismountDragon();
   if (rocketState !== 'off') stopRocket(false);
   if (fishing) reelIn(false);
+  resting = null;
   heartBuff = 0; heartBuffT = 0;          // bonus hearts end on a knockout
   showToast('💤 Oof! You got sleepy — back home, safe and sound.', 3400);
   night = false; nightAuto = false; autoNightT = AUTO_NIGHT_EVERY; updateNightButton();
@@ -2644,7 +2668,15 @@ function frameBody(now) {
 
   controls.frame();
   applyLook();
-  if (ride) updateRide(dt); else player.update(dt, controls, camYaw);
+  // Resting on a pillow: hold still and fill hearts; any move/jump gets you up.
+  if (resting && (Math.hypot(controls.moveX, controls.moveY) > 0.2 || controls.jump)) getUp();
+  if (resting) {
+    player.vel = [0, 0, 0];
+    resting.zt += dt;
+    if (hearts < effMax()) { hearts = Math.min(effMax(), hearts + dt * 0.7); updateHearts(); }
+    if (resting.zt >= 2.4) { resting.zt = 0; spawnParticles([player.pos[0], player.pos[1] + 1.0, player.pos[2]], '💤', 'heart', 1, 14); }
+  } else if (ride) updateRide(dt);
+  else player.update(dt, controls, camYaw);
   // Rocket blast-off: lift him skyward for ~1s so launch really feels like LIFTOFF
   // (fly physics resets vel each frame, so we nudge the position directly).
   if (rocketKick > 0) { rocketKick = Math.max(0, rocketKick - dt); player.pos[1] = Math.min(SY - 2, player.pos[1] + 12 * dt); player.onGround = false; }
@@ -2720,6 +2752,7 @@ function frameBody(now) {
   camDistEased += (camDist - camDistEased) * Math.min(1, dt * 8); // smooth zoom
   computeCamera();
   if (controls.tapPending && pendingBuild) { controls.tapPending = false; }   // placing a big build — taps do nothing (use the Build button)
+  if (controls.tapPending && resting) { controls.tapPending = false; getUp(); }   // tap anywhere to get off the pillow
   if (controls.tapPending) {
     controls.tapPending = false;
     const dir = screenRay(controls.tapX, controls.tapY);
@@ -2752,6 +2785,7 @@ function frameBody(now) {
       const bid = hit ? world.get(hit.block[0], hit.block[1], hit.block[2]) : 0;
       if (hit && isDoor(bid)) toggleDoor(hit.block[0], hit.block[1], hit.block[2]);
       else if (hit && isBed(bid)) sleepInBed(hit.block[0], hit.block[1], hit.block[2]);
+      else if (hit && bid === B.PILLOW) lieDown(hit.block[0], hit.block[1], hit.block[2]);
       else if (hit && (bid === B.LEVER || bid === B.LEVER_ON)) toggleLever(hit.block[0], hit.block[1], hit.block[2]);
       else if (hit && bid === B.NOTE_BLOCK) playNoteBlock(hit.block[0], hit.block[1], hit.block[2]);
       else if (hit && isTNT(bid)) lightTNT(hit.block[0], hit.block[1], hit.block[2]);
@@ -2832,7 +2866,7 @@ function frameBody(now) {
   if (wantEngine !== engineLevel) { engineLevel = wantEngine; sound.engine(engineLevel); }
   const seatRide = ride && ride.att.id !== 'balloon';     // sit in the gondola/carousel
   const seated = !!riding || !!seatRide || roving || dragonRiding || rocketState !== 'off';
-  character.draw(worldProg, player.pos[0], player.pos[1] + (seated ? 0.62 : 0), player.pos[2], player.yaw, player.walkPhase, player.moveAmt, actionAnim, seated);
+  character.draw(worldProg, player.pos[0], player.pos[1] + (seated ? 0.62 : 0), player.pos[2], player.yaw, player.walkPhase, player.moveAmt, actionAnim, seated, !!resting);
   drawMobs(m);
   if (dimension === 'space') { ensureSpaceRace(); spaceRace.draw(worldProg, now / 1000); }
   // Steve mans his Lava Chicken stand in the overworld, turning to face you.
@@ -3107,6 +3141,9 @@ function init() {
     astronaut: () => { const a = mobs().astronaut; return a ? a.list : []; },
     talkAstronaut: () => { const a = mobs().astronaut; if (a && a.list.length) talkToAstronaut(a.list[0]); },
     astroOk: () => astroOk(),
+    lieDown: (x, y, z) => lieDown(x != null ? x : Math.floor(player.pos[0]), y != null ? y : Math.floor(player.pos[1]) - 1, z != null ? z : Math.floor(player.pos[2])),
+    getUp: () => getUp(),
+    resting: () => !!resting,
     setCharacter: (id) => { selectedChar = id; applyCharacter(); saveDirty = true; },
     character: () => selectedChar,
     openMath: () => openMath(),

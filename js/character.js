@@ -178,10 +178,14 @@ export class Character {
   }
   setCharacter(def) { this.def = def || CHARACTERS[0]; this._buildParts(); this._assignParts(); }
 
-  draw(prog, x, y, z, yaw, phase, amt, act, seated) {
+  draw(prog, x, y, z, yaw, phase, amt, act, seated, lying) {
     const gl = this.gl;
-    mat4.model(this._P, x, y, z, yaw, 1, 1, 1);
-    if (act > 0) {
+    mat4.model(this._P, x, y + (lying ? 0.42 : 0), z, yaw, 1, 1, 1);
+    if (lying) {
+      // Tip the whole body flat onto its back so he's resting on the pillow.
+      mat4.rotateX(this._R, Math.PI / 2);
+      mat4.multiply(this._P, this._P, this._R);
+    } else if (act > 0) {
       mat4.rotateX(this._R, -0.32 * Math.sin(act * Math.PI));
       mat4.multiply(this._P, this._P, this._R);
     }
@@ -189,7 +193,8 @@ export class Character {
     for (const p of this.parts) {
       let swing = p.swing ? Math.sin(phase) * 0.5 * amt * p.dir : 0;
       if (p.action && act > 0) swing = chop;
-      if (seated) {
+      if (lying) swing = p.armp ? -0.25 : 0;   // arms slightly out, legs straight — relaxed
+      else if (seated) {
         if (p.leg) swing = 1.3;
         else if (p.armp && !(p.action && act > 0)) swing = -0.45;
       }

@@ -35,6 +35,8 @@ export const TILE = {
   NEON: 105, CLOUD: 106, STARRY: 107, CHECKER: 108, CANDY: 109, CHROME: 110, GLOW_CRYSTAL: 111,
   // session 34: space-themed blocks
   MOON_ROCK: 112, SPACE_METAL: 113, ALIEN_GOO: 114, METEOR: 115, PLASMA: 116, CRYSTAL_ORE: 117,
+  // session: a cozy cushion to lie down on
+  PILLOW_TOP: 118, PILLOW_SIDE: 119,
 };
 
 export function initGL(canvas) {
@@ -533,6 +535,17 @@ function buildAtlasCanvas() {
   { const q = at(TILE.METEOR); noise(ctx, q[0], q[1], 0x3a322e, 0.20, 404); ctx.strokeStyle = shade(0xff6a1a, 1); ctx.lineWidth = 1; for (const [a, b, cc, d] of [[2, 3, 8, 9], [10, 2, 13, 11], [3, 12, 9, 14]]) { ctx.beginPath(); ctx.moveTo(q[0] + a, q[1] + b); ctx.lineTo(q[0] + cc, q[1] + d); ctx.stroke(); } ctx.fillStyle = shade(0xffb030, 1); ctx.fillRect(q[0] + 7, q[1] + 7, 1, 1); }
   glow(TILE.PLASMA, 0x7a2ad8, 0x33e0ff, 405);
   { const q = at(TILE.CRYSTAL_ORE); noise(ctx, q[0], q[1], 0x6c6c76, 0.16, 406); for (const [gx, gy] of [[4, 4], [10, 6], [6, 11], [12, 12]]) { ctx.fillStyle = shade(0x33e0d8, 1); ctx.fillRect(q[0] + gx, q[1] + gy, 2, 2); ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(q[0] + gx, q[1] + gy, 1, 1); } }
+
+  // A soft pastel cushion. Top: a rounded highlight + four corner tufts (stitch
+  // buttons). Side: the same colour with a stuffed seam line across the middle.
+  { const q = at(TILE.PILLOW_TOP); noise(ctx, q[0], q[1], 0xc7cdf0, 0.05, 420);
+    ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.arc(q[0] + 8, q[1] + 7, 4.5, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(90,96,150,0.5)'; for (const [tx, ty] of [[3, 3], [12, 3], [3, 12], [12, 12]]) ctx.fillRect(q[0] + tx, q[1] + ty, 1, 1);
+    ctx.fillStyle = 'rgba(120,126,180,0.35)'; ctx.strokeStyle = 'rgba(120,126,180,0.35)'; ctx.lineWidth = 1; ctx.strokeRect(q[0] + 1.5, q[1] + 1.5, T - 3, T - 3); }
+  { const q = at(TILE.PILLOW_SIDE); noise(ctx, q[0], q[1], 0xbcc3ea, 0.05, 421);
+    ctx.fillStyle = 'rgba(255,255,255,0.30)'; ctx.fillRect(q[0] + 1, q[1] + 2, T - 2, 3);
+    ctx.fillStyle = 'rgba(90,96,150,0.40)'; ctx.fillRect(q[0], q[1] + 7, T, 1);
+    for (let x = 2; x < T; x += 4) { ctx.fillStyle = 'rgba(120,126,180,0.5)'; ctx.fillRect(q[0] + x, q[1] + 6, 1, 1); } }
 
   return c;
 }
