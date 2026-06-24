@@ -351,7 +351,7 @@ function setDimension(key) {
 function travelTo(dest) {
   if (!WORLD_KINDS[dest]) return;
   try {
-    if (fishing) reelIn(false);               // reel in before leaving
+    if (fishing) reelIn();               // reel in before leaving
     if (riding) dismount();                   // the pony stays home in the overworld
     if (dragonRiding) dismountDragon();       // land the dragon before traveling
     if (rocketState !== 'off') stopRocket(false);   // park the rocket before traveling
@@ -1433,13 +1433,17 @@ function findWaterSpot() {
   return best;
 }
 function castLine() {
-  if (fishing) { reelIn(false); return; }      // tapping again reels in early
+  if (fishing) {                               // tapping 🎣 again…
+    if (fishing.phase === 'bite') hookCatch(); // …HOOKS the fish if one's biting!
+    else reelIn();                        // …otherwise just reels the empty line in
+    return;
+  }
   const spot = findWaterSpot();
   if (!spot) { showToast('🎣 Find some water to fish in! 🌊  (try the beach)'); return; }
-  fishing = { wx: spot[0], wy: spot[1], wz: spot[2], t: 1.6 + Math.random() * 2.4 };
+  fishing = { wx: spot[0], wy: spot[1], wz: spot[2], phase: 'wait', t: 1.5 + Math.random() * 2.2, catch: null };
   sound.play('splash');
   updateFishButton();
-  tip('fishing', '🎣 Big water = big fish + more 💎!');
+  tip('fishing', '🎣 Watch the bobber! When a 🐟 bites, TAP to catch it. Bigger water = bigger fish!');
 }
 // How big is the body of water at (x,y,z)? A flood-fill, capped — bigger water
 // has bigger fish worth more 💎 (so a 1-block puddle can't farm diamonds).
@@ -1456,31 +1460,61 @@ function waterBodySize(x, y, z) {
   }
   return n;
 }
-function reelIn(caught) {
-  const f = fishing; fishing = null; hideBobber(); updateFishButton();
-  if (!f || !caught) { if (f) sound.play('splash'); return; }
-  const size = waterBodySize(f.wx, f.wy - 1, f.wz);
+// Roll what's nibbling, based on the size of the water. Bigger water hides
+// bigger, rarer fish: they're worth more 💎 but bite for a SHORTER time, so
+// you have to be quicker to hook them. Missing just lets you try again.
+function rollCatch(size) {
   const r = Math.random();
-  let icon, msg, gems;
-  if (size < 8) {                 // a tiny puddle — only little minnows, no 💎 here
-    if (r < 0.45) { icon = '🐟'; msg = 'a tiny minnow!'; }
-    else if (r < 0.8) { icon = '🌿'; msg = 'some seaweed!'; }
-    else { icon = '🥾'; msg = 'an old boot! Ha!'; }
-    gems = 0;
-  } else if (size < 32) {         // a decent pond
-    if (r < 0.18) { icon = '🥾'; msg = 'an old boot! Ha!'; gems = 0; }
-    else if (r < 0.38) { icon = '💎'; msg = 'sunken treasure! +2 💎'; gems = 2; goals.bump('treasure'); }
-    else { icon = '🐟'; msg = 'a fish! +1 💎'; gems = 1; }
-  } else {                        // a big lake or the ocean — BIG fish!
-    if (r < 0.5) { icon = '🐠'; msg = 'a BIG fish! +2 💎'; gems = 2; }
-    else if (r < 0.8) { icon = '💎'; msg = 'sunken treasure! +3 💎'; gems = 3; goals.bump('treasure'); }
-    else { icon = '🐡'; msg = 'a HUGE fish! +3 💎'; gems = 3; }
+  if (size < 8) {                 // a puddle: easy little nibbles, no 💎
+    if (r < 0.5) return { icon: '🐟', msg: 'a tiny minnow!', gems: 0, win: 1.5 };
+    if (r < 0.8) return { icon: '🌿', msg: 'some seaweed!', gems: 0, win: 1.6 };
+    return { icon: '🥾', msg: 'an old boot! Ha!', gems: 0, win: 1.6 };
   }
+  if (size < 32) {                // a decent pond
+    if (r < 0.15) return { icon: '🥾', msg: 'an old boot! Ha!', gems: 0, win: 1.3 };
+    if (r < 0.55) return { icon: '🐟', msg: 'a fish! +💎1', gems: 1, win: 1.15 };
+    if (r < 0.8) return { icon: '🐠', msg: 'a BIG fish! +💎2', gems: 2, win: 0.85 };
+    return { icon: '💎', msg: 'sunken treasure! +💎2', gems: 2, treasure: true, win: 1.0 };
+  }
+  // a big lake or the ocean — the trophies live here
+  if (r < 0.35) return { icon: '🐠', msg: 'a BIG fish! +💎2', gems: 2, win: 0.85 };
+  if (r < 0.6) return { icon: '🐡', msg: 'a HUGE fish! +💎3', gems: 3, win: 0.7 };
+  if (r < 0.8) return { icon: '💎', msg: 'sunken treasure! +💎3', gems: 3, treasure: true, win: 0.9 };
+  return { icon: '🐋', msg: 'a GIANT fish!! +💎4', gems: 4, win: 0.6 };   // the rare, hard, big one
+}
+// A fish takes the bait: show the bite and open a short window to tap-to-hook.
+function startBite() {
+  if (!fishing) return;
+  const size = waterBodySize(fishing.wx, fishing.wy - 1, fishing.wz);
+  fishing.catch = rollCatch(size);
+  fishing.phase = 'bite';
+  fishing.biteT = fishing.catch.win;
+  sound.play('pet');             // a soft "plip" cue
+  showToast('🐟❗ A bite! TAP to catch it!', 1100);
+  spawnParticles([fishing.wx, fishing.wy + 0.1, fishing.wz], '💦', 'puff', 2, 12);
+}
+// Too slow — the fish wriggles off the hook. No penalty; keep watching.
+function missBite() {
+  if (!fishing) return;
+  sound.play('deny');
+  showToast('🐟💨 Aw, it wiggled off! Keep watching…', 1300);
+  fishing.phase = 'wait'; fishing.t = 1.0 + Math.random() * 1.6; fishing.catch = null;
+}
+// Tapped in time! Land whatever was biting and pay out.
+function hookCatch() {
+  const f = fishing, c = f && f.catch; fishing = null; hideBobber(); updateFishButton();
+  if (!c) { if (f) sound.play('splash'); return; }
   goals.bump('fish');
-  if (gems > 0) { goals.addGems(gems); updateGems(); }
-  sound.play(gems > 0 ? 'treasure' : 'deny');
-  spawnParticles([f.wx, f.wy + 0.4, f.wz], icon, 'heart', 1, 8);
-  showToast('🎣 You caught ' + msg);
+  if (c.treasure) goals.bump('treasure');
+  if (c.gems > 0) { goals.addGems(c.gems); updateGems(); }
+  sound.play(c.gems > 0 ? 'treasure' : 'pet');
+  spawnParticles([f.wx, f.wy + 0.5, f.wz], c.icon, 'heart', 2, 12);
+  showToast('🎣 You caught ' + c.msg + ' ' + c.icon);
+}
+// Reel the (empty) line in — used when you cancel, travel, or get knocked out.
+function reelIn() {
+  if (!fishing) return;
+  fishing = null; hideBobber(); updateFishButton(); sound.play('splash');
 }
 function positionBobber(f) {
   if (!bobberEl) bobberEl = document.getElementById('bobber');
@@ -1490,9 +1524,11 @@ function positionBobber(f) {
   bobberEl.style.display = 'block';
   bobberEl.style.left = (scratch4[0] / scratch4[3] * 0.5 + 0.5) * canvas.clientWidth + 'px';
   bobberEl.style.top = (1 - (scratch4[1] / scratch4[3] * 0.5 + 0.5)) * canvas.clientHeight + 'px';
-  bobberEl.textContent = (f.t < 0.6) ? '🐠' : '🔴';   // a nibble! near the end
+  const biting = f.phase === 'bite';
+  bobberEl.textContent = biting ? '🐟' : '🔴';        // a real bite — TAP to hook it!
+  bobberEl.classList.toggle('bite', biting);
 }
-function hideBobber() { if (!bobberEl) bobberEl = document.getElementById('bobber'); if (bobberEl) bobberEl.style.display = 'none'; }
+function hideBobber() { if (!bobberEl) bobberEl = document.getElementById('bobber'); if (bobberEl) { bobberEl.style.display = 'none'; bobberEl.classList.remove('bite'); } }
 function updateFishButton() { const b = document.getElementById('btn-fish'); if (b) b.classList.toggle('on', !!fishing); }
 
 // --- Treasure shop: spend 💎 (mined + earned from goals) on fun unlocks ---
@@ -2021,7 +2057,7 @@ function knockout() {
   if (riding) dismount();
   if (dragonRiding) dismountDragon();
   if (rocketState !== 'off') stopRocket(false);
-  if (fishing) reelIn(false);
+  if (fishing) reelIn();
   resting = null;
   heartBuff = 0; heartBuffT = 0;          // bonus hearts end on a knockout
   showToast('💤 Oof! You got sleepy — back home, safe and sound.', 3400);
@@ -2753,6 +2789,7 @@ function frameBody(now) {
   computeCamera();
   if (controls.tapPending && pendingBuild) { controls.tapPending = false; }   // placing a big build — taps do nothing (use the Build button)
   if (controls.tapPending && resting) { controls.tapPending = false; getUp(); }   // tap anywhere to get off the pillow
+  if (controls.tapPending && fishing && fishing.phase === 'bite') { controls.tapPending = false; hookCatch(); }   // tap anywhere to hook a biting fish
   if (controls.tapPending) {
     controls.tapPending = false;
     const dir = screenRay(controls.tapX, controls.tapY);
@@ -2796,9 +2833,9 @@ function frameBody(now) {
 
   // Fishing: count down to a bite, keep the bobber on the water.
   if (fishing) {
-    fishing.t -= dt;
-    if (fishing.t <= 0) reelIn(true);
-    else positionBobber(fishing);
+    if (fishing.phase === 'wait') { fishing.t -= dt; if (fishing.t <= 0) startBite(); }
+    else if (fishing.phase === 'bite') { fishing.biteT -= dt; if (fishing.biteT <= 0) missBite(); }
+    positionBobber(fishing);
   }
 
   updateRideSigns();   // floating "Tap to ride!" signs over Secret World attractions
@@ -3132,9 +3169,11 @@ function init() {
     setNightTimer: (s) => { autoNightT = s; },
     nightInfo: () => ({ night, nightAuto, autoNightT, autoNightLeft }),
     aliencops: () => { const a = mobs().aliencops; return a ? a.list : []; },
-    fishing: () => !!fishing,
+    fishing: () => (fishing ? fishing.phase : false),
     castLine: () => castLine(),
-    reelNow: () => { if (fishing) reelIn(true); },
+    bite: () => { if (fishing && fishing.phase === 'wait') startBite(); return fishing && fishing.catch; },
+    catchFish: () => { if (fishing) { if (fishing.phase !== 'bite') startBite(); hookCatch(); } },
+    reelNow: () => { if (fishing) reelIn(); },
     waterSize: (x, y, z) => waterBodySize(x, y, z),
     talkVillager: () => { const v = mobs().villagers; if (v && v.list.length) talkToVillager(v.list[0]); },
     questOk: () => questOk(),

@@ -637,6 +637,12 @@ body {
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .5));
   z-index: 6;
 }
+/* A fish is biting — pulse big so a 6-year-old knows to TAP right now. */
+#bobber.bite { animation: bobberbite .32s ease-in-out infinite; }
+@keyframes bobberbite {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -64%) scale(1.7); }
+}
 
 /* Floating "Tap to ride!" signs over Secret World attractions (positioned each
    frame from JS). Big, bright and tappable so a 6-year-old can't miss them. */
