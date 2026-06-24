@@ -1002,6 +1002,18 @@ sticky + rock ones. Go crazy."). Shipped on **`claude/dreamy-mccarthy-g6wgjr`** 
    moving, stops on park/leave). **sw v24→v25.** Verified headless: 98 natural
    crystals; a real Dig-button mine pays +1💎 + ticks Space miner + removes the
    ore; rover drive (engine on) + park + world-hop all **zero errors**.
+7. **Follow-up increment ("keep going"): two space-themed Big Builds.** Added
+   **🚀 Rocket** (`buildRocket`: a 5×5 SPACE_METAL launch pad + a hollow tube body
+   with a GLASS window band, a nose cone, a glowing PLASMA tip, 4 METEOR fins,
+   PLASMA engine glow, and a walk-in DOOR) and **🛖 Moon Base** (`buildDome`: a
+   SPACE_METAL silo wall + a real **voxel glass dome** cap via a sphere-shell test,
+   a door, a PLASMA core + SEA_LANTERN floor light) to the 🏗️ Big Builds menu —
+   one-tap, walk-and-confirm like the others, available in every world (a rocket
+   in the backyard is half the fun). They put the new space blocks to use.
+   **sw v25→v26.** Verified headless: both place via placeBuild→confirmPlace
+   (Rocket 87 blocks = 66 metal/4 glass/2 door/6 plasma/8 meteor; Moon Base 136 =
+   79 metal/53 glass dome/2 door/plasma+lantern), placebar hides after, zero
+   errors; screenshots of the rocket + the glass dome.
 
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world

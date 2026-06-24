@@ -856,6 +856,47 @@ function stampWall(s) {
   for (let i = -3; i <= 3; i++) for (let dy = 1; dy <= 4; dy++) n += horiz ? bigSet(cx, g + dy, cz + i, id) : bigSet(cx + i, g + dy, cz, id);
   finishBigBuild(n, cx, g + 2, cz, '🧱 A whole wall, done!');
 }
+// A space rocket: a metal launch pad + a hollow tube body with a window, a nose
+// cone, fins, and glowing plasma engines. Walk in the door and look up!
+function buildRocket(s) {
+  const { cx, cz, g, fx, fz, horiz } = s, r = 1, H = 6;
+  let n = levelPad(cx, cz, 2, g, B.SPACE_METAL);          // a 5×5 metal launch pad
+  const y0 = g + 1;
+  for (let dy = 0; dy < H; dy++) for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
+    const edge = Math.abs(dx) === r || Math.abs(dz) === r;
+    if (edge) n += bigSet(cx + dx, y0 + dy, cz + dz, B.SPACE_METAL); else bigSet(cx + dx, y0 + dy, cz + dz, B.AIR);
+  }
+  for (const [dx, dz] of [[0, -r], [0, r], [-r, 0], [r, 0]]) bigSet(cx + dx, y0 + 3, cz + dz, B.GLASS, true);  // window band
+  for (const [dx, dz] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) n += bigSet(cx + dx, y0 + H, cz + dz, B.SPACE_METAL); // nose
+  n += bigSet(cx, y0 + H + 1, cz, B.PLASMA);              // glowing tip
+  for (const [dx, dz] of [[2, 0], [-2, 0], [0, 2], [0, -2]]) { n += bigSet(cx + dx, y0, cz + dz, B.METEOR); n += bigSet(cx + dx, y0 + 1, cz + dz, B.METEOR); } // fins
+  for (const [dx, dz] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) bigSet(cx + dx, g, cz + dz, B.PLASMA, true);  // engine glow
+  const dX = horiz ? cx - r * sgn(fx) : cx, dZ = horiz ? cz : cz - r * sgn(fz);
+  bigSet(dX, y0, dZ, B.DOOR, true); bigSet(dX, y0 + 1, dZ, B.DOOR, true);
+  goals.bump('doors');
+  finishBigBuild(n, cx, y0 + H, cz, '🚀 A rocket ship! Walk in the door!');
+}
+// A moon-base dome: a metal silo wall with a glass dome roof, a door, and lights.
+function buildDome(s) {
+  const { cx, cz, g, fx, fz, horiz } = s, R = 3, WH = 2;
+  let n = levelPad(cx, cz, R, g, B.SPACE_METAL);
+  const y0 = g + 1;
+  for (let dx = -R; dx <= R; dx++) for (let dz = -R; dz <= R; dz++) {
+    const d = Math.sqrt(dx * dx + dz * dz);
+    if (d > R - 0.5 && d <= R + 0.45) { for (let dy = 0; dy < WH; dy++) n += bigSet(cx + dx, y0 + dy, cz + dz, B.SPACE_METAL); }
+    else if (d < R - 0.5) { for (let dy = 0; dy < WH + R; dy++) bigSet(cx + dx, y0 + dy, cz + dz, B.AIR); }
+  }
+  for (let dx = -R; dx <= R; dx++) for (let dy = 0; dy <= R; dy++) for (let dz = -R; dz <= R; dz++) {
+    const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (d > R - 0.55 && d <= R + 0.45) n += bigSet(cx + dx, y0 + WH + dy, cz + dz, B.GLASS);
+  }
+  const dX = horiz ? cx - R * sgn(fx) : cx, dZ = horiz ? cz : cz - R * sgn(fz);
+  bigSet(dX, y0, dZ, B.DOOR, true); bigSet(dX, y0 + 1, dZ, B.DOOR, true);
+  goals.bump('doors');
+  bigSet(cx, y0 + WH + R - 1, cz, B.PLASMA, true);        // glowing core in the dome
+  bigSet(cx, y0, cz, B.SEA_LANTERN, true);                // floor light
+  finishBigBuild(n, cx, y0 + WH + R, cz, '🛖 A moon-base dome! Walk inside!');
+}
 
 const BIG_BUILDS = [
   { emoji: '🏠', name: 'House', rad: 3, dist: 5, fn: buildHouse, hint: 'A room with 4 walls + a door' },
@@ -863,6 +904,8 @@ const BIG_BUILDS = [
   { emoji: '🗼', name: 'Tower', rad: 1, dist: 4, fn: buildTower, hint: 'A tall tower with windows' },
   { emoji: '🏰', name: 'Castle', rad: 5, dist: 7, fn: buildCastle, hint: 'Walls + corner towers' },
   { emoji: '🔺', name: 'Pyramid', rad: 4, dist: 6, fn: buildPyramid, hint: 'A sandstone pyramid' },
+  { emoji: '🚀', name: 'Rocket', rad: 2, dist: 5, fn: buildRocket, hint: 'A space rocket with fins!' },
+  { emoji: '🛖', name: 'Moon Base', rad: 3, dist: 6, fn: buildDome, hint: 'A dome base with a glass roof' },
   { emoji: '🌉', name: 'Bridge', rad: 1, dist: 3, fn: buildBridge, hint: 'A long walkway — pick a block!' },
   { emoji: '🟫', name: 'Big Floor', rad: 3, dist: 5, fn: stampFloor, hint: 'A big floor — pick a block!' },
   { emoji: '🧱', name: 'Long Wall', rad: 3, dist: 4, fn: stampWall, hint: 'A whole wall — pick a block!' },
