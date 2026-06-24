@@ -1081,8 +1081,21 @@ increments on **`claude/dreamy-mccarthy-g6wgjr`** → `main`.
    countdown, the lift kick) must be checked by **pumping frames** (repeated
    `Page.captureScreenshot`) or a `_liftoff` debug hook — plain `sleep` leaves the
    countdown stuck. Anti-throttle flags (`--disable-renderer-backgrounding` etc.)
-   help only partially. Still open from the dad's list: explicit **race
-   rings/time-trial** + a manual takeoff flourish for the dragon (offered next).
+   help only partially.
+4. **🏁 Space Race (`js/spacerace.js`) — the racing payoff.** A loop of **7 glowing
+   ring-gates** floating among the asteroids; fly through them **in order** (rocket,
+   dragon, or plain Fly) and the **next ring pulses gold** (passed=dim, upcoming=
+   cyan; three baked hoop meshes since the world shader has no tint uniform).
+   Forgiving **proximity** detection (`HIT_R=2.8`, so a 6-yr-old flies *near* a ring,
+   not through a pixel). Each ring → a climbing chime + ⭐ + "Ring n/7"; finishing
+   the loop pays **+💎3** + a new **🏁 Space racer** goal + the time. A **fresh course
+   each take-off** (`startSpaceRace` on rocket liftoff / dragon-mount-in-space /
+   arriving in Space). A **gold minimap marker** points to the next ring. **sw
+   v29→v30.** Debug: `__ezra.race()/nextGate()/flyThroughGate()`. Verified headless:
+   travel resets to gate 0; flying through all 7 advances 0→7→finished, pays the
+   reward (+💎 incl. the goal bonus) + ticks the goal; minimap marker; zero errors;
+   screenshot of the gold "next" ring + a cyan upcoming ring over the moon. Still
+   open: a manual takeoff flourish for the dragon; a best-time leaderboard.
 
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world

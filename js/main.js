@@ -20,6 +20,7 @@ import { AlienCops } from './aliencops.js';
 import { Rover } from './rover.js';
 import { DragonMount } from './dragonmount.js';
 import { RocketShip } from './rocketship.js';
+import { SpaceRace } from './spacerace.js';
 import { Controls } from './input.js';
 import { Sound } from './audio.js';
 import { Character, CHARACTERS, charById, charPreview } from './character.js';
@@ -104,6 +105,7 @@ let rocketCountT = 0;     // launch countdown timer
 let rocketT = 0;          // rocket animation timer
 let rocketBoost = 0;      // eased 0..1 engine-flame intensity
 let rocketKick = 0;       // brief blast-off window that lifts him skyward at launch
+let spaceRace = null;     // the glowing-ring race course in Space World
 let ride = null;          // an active fun-park ride: { att, t, dur, returnPos }
 let pendingRide = null;   // a ride waiting on the "Ride for 💎?" prompt
 let fishing = null;       // an active cast: { wx, wy, wz, t } while waiting for a bite
@@ -365,7 +367,7 @@ function travelTo(dest) {
     if (dest === 'lego' && !isLego(selected)) selected = B.LEGO_RED; // arrive holding a Lego brick
     buildPicker(); refreshBlocksButton();     // Lego World shows a Lego-only palette
     if (dest === 'secret') tip('tickets', '🎟️ Walk up to the Ticket booth to pick a ride! There\'s a Popcorn stand and Gift Shop too. 🍿🛍️');
-    if (dest === 'space') { goals.bump('space'); tip('space', '🚀 Welcome to Space! Jump to bounce sky-high, and hop between the floating islands! 🌟'); }
+    if (dest === 'space') { goals.bump('space'); startSpaceRace(); tip('space', '🚀 Welcome to Space! Jump to bounce sky-high. Fly to race the glowing rings! 🌟'); }
   } catch (e) {
     // A portal should never strand Ezra on the scary "Oops" screen. If anything
     // goes wrong mid-trip, log it for us and pop him safely back home instead.
@@ -1264,6 +1266,7 @@ function toggleDragon() {
   syncFlyButton(); updateJumpLabel(); updateDragonButton();
   sound.play('roar');
   goals.bump('dragonfly');
+  if (dimension === 'space') startSpaceRace();   // the dragon can race the rings too
   tip('dragon', '🐉 Hold Up to fly higher, let go to glide down. Tap 🐉 to land!');
 }
 function dismountDragon() {
@@ -1323,7 +1326,8 @@ function rocketLiftoff() {
   spawnParticles([p[0], p[1] + 0.1, p[2]], '🔥', 'puff', 10, 70);
   spawnParticles([p[0], p[1] + 0.1, p[2]], '💨', 'puff', 8, 80);
   goals.bump('rocketfly');
-  showToast('🚀 BLAST OFF! Hold Up to soar — dodge the asteroids! ✨', 3600);
+  startSpaceRace();                              // fresh ring course each launch
+  showToast('🚀 BLAST OFF! Hold Up to soar — dodge the asteroids + race the rings! ✨', 3600);
 }
 function stopRocket(crashed) {
   if (rocketState === 'off') return;
@@ -1360,6 +1364,27 @@ function crashFlight() {
   showToast(wasRocket ? '💥 Crash! Watch the asteroids! Back to the pad — tap 🚀 to try again! 🚀'
     : '💥 Oof — the dragon bonked an asteroid! Back to the pad. 🐉', 3400);
 }
+
+// --- Space Race: fly through the glowing rings in order. The next ring pulses
+// gold; finishing the loop pays 💎. Fresh course each time you take off. ---
+function ensureSpaceRace() {
+  if (!spaceRace) {
+    spaceRace = new SpaceRace(gl);
+    spaceRace.onPass = (n, total, pos) => {
+      sound.note(Math.min(6, n));                 // a climbing chime per ring
+      spawnParticles([pos[0], pos[1], pos[2]], '⭐', 'puff', 5, 50);
+      if (n < total) showToast('🏁 Ring ' + n + '/' + total + '! Fly to the next gold ring! ✨', 1800);
+    };
+    spaceRace.onFinish = (time) => {
+      goals.addGems(3); updateGems(); goals.bump('spacerace');
+      sound.play('treasure');
+      spawnParticles([player.pos[0], player.pos[1] + 1, player.pos[2]], '🎉', 'puff', 14, 90);
+      showToast('🏁🎉 Race finished in ' + time.toFixed(1) + 's! +💎3 — fly again to beat it!', 4200);
+    };
+  }
+  return spaceRace;
+}
+function startSpaceRace() { ensureSpaceRace().reset(); tip('race', '🏁 Fly through the glowing rings in order! The next one glows gold. ✨'); }
 
 // --- Fishing: a calm activity at any water. Cast near water, wait for a bite,
 // reel in a fish (+💎), sometimes treasure, sometimes a silly old boot. ---
@@ -2488,6 +2513,14 @@ function drawMinimap() {
       }
     }
   }
+  // Space World: a gold marker for the next race ring to fly through.
+  if (dimension === 'space' && spaceRace) {
+    const g = spaceRace.nextGate();
+    if (g) {
+      mmCtx.fillStyle = '#ffd11a'; mmCtx.strokeStyle = '#7a5a00'; mmCtx.lineWidth = 1.5;
+      mmCtx.beginPath(); mmCtx.arc(g[0] * s, g[2] * s, 4.5, 0, Math.PI * 2); mmCtx.fill(); mmCtx.stroke();
+    }
+  }
   // player arrow (points the way you face)
   const px = player.pos[0] * s, pz = player.pos[2] * s;
   const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), rx = -fz, rz = fx;
@@ -2604,6 +2637,7 @@ function frameBody(now) {
 
   const m = mobs();
   updateMobs(m, dt);
+  if (dimension === 'space') { ensureSpaceRace(); spaceRace.update(dt, player, player.flying); }
   growSaplings(dt);
   world.flushDirty(fuses.length ? 6 : 2);   // catch up faster while things are blowing up
 
@@ -2731,6 +2765,7 @@ function frameBody(now) {
   const seated = !!riding || !!seatRide || roving || dragonRiding || rocketState !== 'off';
   character.draw(worldProg, player.pos[0], player.pos[1] + (seated ? 0.62 : 0), player.pos[2], player.yaw, player.walkPhase, player.moveAmt, actionAnim, seated);
   drawMobs(m);
+  if (dimension === 'space') { ensureSpaceRace(); spaceRace.draw(worldProg, now / 1000); }
   // Steve mans his Lava Chicken stand in the overworld, turning to face you.
   if (stevePos && dimension === 'over') {
     let dd = Math.atan2(-(player.pos[0] - stevePos[0]), -(player.pos[2] - stevePos[2])) - steveYaw;
@@ -2985,6 +3020,9 @@ function init() {
     crashFlight: () => crashFlight(),
     flightCrash: () => flightCrashCheck(),
     _liftoff: () => { ensureRocket(); rocketState = 'ready'; rocketLiftoff(); },
+    race: () => spaceRace && { current: spaceRace.current, total: spaceRace.gates.length, finished: spaceRace.finished, time: spaceRace.time },
+    nextGate: () => spaceRace && spaceRace.nextGate(),
+    flyThroughGate: () => { if (spaceRace) { const g = spaceRace.nextGate(); if (g) { player.pos = [g[0], g[1], g[2]]; player.flying = true; } } },
     forceNight: () => startAutoNight(),
     endNight: () => endAutoNight(),
     autoNightT: () => autoNightT,
