@@ -1097,6 +1097,52 @@ increments on **`claude/dreamy-mccarthy-g6wgjr`** → `main`.
    screenshot of the gold "next" ring + a cyan upcoming ring over the moon. Still
    open: a manual takeoff flourish for the dragon; a best-time leaderboard.
 
+## Status (session 37) — Space gets a face, cozy pillows, real fishing, puzzles
+Dad said "keep going" ("what forms next") → full creative freedom, then after
+the first ship handed a wishlist: **lie-down pillows, a real fishing process
+(bigger fish = more 💎, harder), and puzzles/mini-games in all worlds for 💎**.
+Shipped as four verified increments on **`claude/dazzling-rubin-tabkcg`** →
+deployed to `main` (each mirrored). **sw v30→v34.** Now **52 goals**, **134 block
+ids** (PILLOW 132, PUZZLE 133).
+1. **🧑‍🚀 Captain Nova — an astronaut for Space World (`js/astronaut.js`).** Space
+   World had terrain/rides/mining but no *face* (every other big world has
+   villagers/Steve/the buddy). A friendly astronaut (white suit, golden visor,
+   pack, blinking antenna) stands near the moon launch pad, turns to greet you,
+   floats a little (low-grav) + blob shadow. **Tap her for a space mission** —
+   mine crystals / dig moon rocks / build on the moon / race the rings — finish
+   for 💎 (baseline-relative tracking like the villager quests; `ASTRO_MISSIONS`,
+   `talkToAstronaut`/`showAstro`/`astroOk`, `#astro` dialog). Wired as a `space`
+   mob (`WORLD_KINDS.space.mobs += 'astronaut'`), white minimap marker, arrival
+   tip. New 'Nova's helper' goal (`spacemission`). `__ezra.astronaut()/talkAstronaut()/astroOk()`.
+2. **🛌 Pillow blocks you can lie down on (`B.PILLOW`, House tab).** Soft pastel
+   cushion (2 new atlas tiles). **Tap → lie down**: a new `lying` pose in
+   character.js (tips the rig flat onto its back), `resting` state pauses physics
+   + **slowly refills hearts** (cozy, never skips night), wider blob shadow, 💤.
+   Get up by tapping/moving/Jump; travel/knockout/reset always stand him up.
+   Lay a row to stretch out. `lieDown`/`getUp`; `__ezra.lieDown()/getUp()/resting()`.
+3. **🎣 Fishing is now a catch-it game.** Cast → WAIT → a fish **BITES** (bobber
+   becomes a pulsing 🐟 + "A bite! TAP to catch it!"), tap (🎣 button or anywhere)
+   within a short window to hook it. **Bigger water hides bigger, rarer fish that
+   pay more 💎 but bite for a SHORTER time** (harder): minnow(0)→fish/big(1–2)→
+   HUGE/GIANT 🐋 + treasure(2–4). Miss = it wiggles off, re-waits (no penalty).
+   `rollCatch`/`startBite`/`missBite`/`hookCatch`; `#bobber.bite` CSS pulse;
+   `__ezra.bite()/catchFish()`.
+4. **🧩 Color Puzzle cubes — a memory mini-game in every world (`B.PUZZLE`,
+   Creative tab).** One auto-placed near each world's spawn (`placePuzzleFixture`,
+   idempotent — only fills air, never stacks, respawns if dug) + placeable
+   anywhere. **Tap → watch the colors flash (each a musical note), tap them back**
+   (Simon-style). Right → +💎 (1→3, capped) + harder next round; wrong → forgiving
+   replay, no penalty. `#puzzle` dialog (2×2 color pad), 'Puzzle solver' goal
+   (`puzzle`). `__ezra.openPuzzle()/puzzleState()/puzzleSolve()/puzzleMiss()`.
+   All verified headless (CDP) with screenshots: Nova spawn/mission/claim/persist;
+   pillow lie-down + heart regen + save-reload; fishing bite→hook→exact reward +
+   water-size scaling + forgiving miss; puzzle open→solve→💎→difficulty-up +
+   forgiving miss + fixture in over & gold + no-stacking across reload; full
+   11-world hop green, **zero errors**. Tuning candidates: rare 🐋 fish window
+   (0.6s) is a real challenge (forgiving, so fine); puzzle fixture sits at
+   spawn+3 (fills only air — could rarely perch on a portal/build, cosmetic);
+   pillow body overhangs a single cushion (lay a row — intentional).
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept
