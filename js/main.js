@@ -735,16 +735,36 @@ function placeBed(hit) {
   world.placed.add(world.idx(x, y, z)); world.placed.add(world.idx(hx, y, hz));
   sound.play('door'); saveDirty = true; actionAnim = 1; minimapDirty = true;
   goals.onBuild(B.BED_FOOT);
-  tip('bed', '🛏️ Tap to sleep! Night → morning, full hearts, home set.');
+  tip('bed', '🛏️ Tap to lie down! You can nap, sleep through the night, and it sets your home.');
 }
+// Tapping a bed now LAYS Ezra down on it (like Minecraft) — he visibly rests,
+// hearts refill, and it sets home. At night, lying down also sleeps the night
+// away to a safe morning. Reuses the pillow `resting` system; tap/move to get up.
 function sleepInBed(x, y, z) {
-  night = false; nightAuto = false; autoNightT = AUTO_NIGHT_EVERY; updateNightButton();   // sleeping skips the night
-  hearts = effMax(); updateHearts();
+  if (resting || ride || riding || dragonRiding || rocketState !== 'off' || roving) return;
+  if (pendingBuild) cancelPlacement();
+  // Orient + center along the two bed halves so he lies neatly along the bed.
+  let mx = x + 0.5, mz = z + 0.5, yaw = player.yaw;
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    if (isBed(world.get(x + dx, y, z + dz))) { mx = x + 0.5 + dx * 0.5; mz = z + 0.5 + dz * 0.5; yaw = Math.atan2(-dx, -dz); break; }
+  }
+  resting = { x, y, z, zt: 0, bed: true };
+  player.flying = false; player.vel = [0, 0, 0];
+  player.pos = [mx, y + 1, mz]; player.yaw = yaw;
   world.spawn = [x + 0.5, y, z + 0.5];     // beds set your home, just like Minecraft
   sound.play('coo');
-  spawnParticles([x + 0.5, y + 1.3, z + 0.5], '💤', 'heart', 3, 22);
+  spawnParticles([x + 0.5, y + 1.4, z + 0.5], '💤', 'heart', 3, 22);
   goals.bump('sleep');
-  showToast('💤 …Zzz… ☀️ Good morning! Hearts full, and home set here!', 3200);
+  if (night || nightAuto) {                // lying down at night sleeps it away to morning
+    night = false; nightAuto = false; autoNightT = AUTO_NIGHT_EVERY; updateNightButton();
+    const om = worlds.over && worlds.over.mobs;
+    if (om) { if (om.zombies) om.zombies.list.length = 0; if (om.spiders) om.spiders.list.length = 0; if (om.skeletons) om.skeletons.list.length = 0; }
+    hearts = effMax(); updateHearts();
+    showToast('💤 …Zzz… ☀️ Good morning! Hearts full, home set here. Tap to get up.', 3400);
+  } else {
+    hearts = effMax(); updateHearts();
+    showToast('🛌 Cozy! Resting in your bed — home set here. Tap or move to get up.', 2800);
+  }
   saveDirty = true; minimapDirty = true;
 }
 function removeBed(x, y, z) {
@@ -3264,8 +3284,10 @@ function init() {
     talkAstronaut: () => { const a = mobs().astronaut; if (a && a.list.length) talkToAstronaut(a.list[0]); },
     astroOk: () => astroOk(),
     lieDown: (x, y, z) => lieDown(x != null ? x : Math.floor(player.pos[0]), y != null ? y : Math.floor(player.pos[1]) - 1, z != null ? z : Math.floor(player.pos[2])),
+    sleepBed: (x, y, z) => sleepInBed(x, y, z),
     getUp: () => getUp(),
     resting: () => !!resting,
+    restingBed: () => !!(resting && resting.bed),
     openPuzzle: () => openPuzzle(),
     puzzleState: () => (puzzle ? { level: puzzle.level, seq: puzzle.seq.slice(), pos: puzzle.pos, showing: puzzle.showing } : null),
     puzzleSolve: () => { if (!puzzle) return; puzzle.showing = false; const s = puzzle.seq.slice(); for (const c of s) puzzleTap(c); },
