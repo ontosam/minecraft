@@ -145,6 +145,10 @@ export class Sound {
         this.blip(700, 0.10, 'sawtooth', 0.10, 900);
         setTimeout(() => this.blip(560, 0.18, 'sawtooth', 0.09, 420), 90);
         break;
+      case 'roar': // a friendly (not scary) dragon roar — a warm rising rumble
+        this.blip(180, 0.32, 'sawtooth', 0.12, 320);
+        setTimeout(() => this.blip(300, 0.26, 'triangle', 0.10, 480), 120);
+        break;
     }
   }
 }

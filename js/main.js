@@ -18,6 +18,7 @@ import { Villagers } from './villagers.js';
 import { Dragon } from './dragon.js';
 import { AlienCops } from './aliencops.js';
 import { Rover } from './rover.js';
+import { DragonMount } from './dragonmount.js';
 import { Controls } from './input.js';
 import { Sound } from './audio.js';
 import { Character, CHARACTERS, charById, charPreview } from './character.js';
@@ -88,6 +89,9 @@ let roving = false;       // currently driving the rover
 let roverSpeedIdx = 0;    // index into ROVER_SPEEDS (0 = parked/off)
 let roverT = 0;           // little timer for the rover's bob/wobble
 let engineLevel = 0;      // current rover engine-hum level (so we only change it on change)
+let dragonMount = null;   // the Ride-On Dragon mesh (created on first ride)
+let dragonRiding = false; // currently soaring on the dragon
+let dragonT = 0;          // wing-flap timer
 let ride = null;          // an active fun-park ride: { att, t, dur, returnPos }
 let pendingRide = null;   // a ride waiting on the "Ride for 💎?" prompt
 let fishing = null;       // an active cast: { wx, wy, wz, t } while waiting for a bite
@@ -245,7 +249,8 @@ function drawShadows(m) {
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
   gl.depthMask(false);
   gl.uniform1f(worldProg.u.uAlpha, 0.26);
-  if (roving) shadowAt(player.pos[0], player.pos[2], 1.5);    // the rover's footprint
+  if (dragonRiding) shadowAt(player.pos[0], player.pos[2], 2.0);   // the dragon's big shadow below
+  else if (roving) shadowAt(player.pos[0], player.pos[2], 1.5);    // the rover's footprint
   else if (!riding) shadowAt(player.pos[0], player.pos[2], 0.9);
   if (stevePos && dimension === 'over') shadowAt(stevePos[0], stevePos[2], 0.9);
   if (buddy && dimension === 'over') shadowAt(buddy.pos[0], buddy.pos[2], 0.85);
@@ -322,6 +327,7 @@ function travelTo(dest) {
   try {
     if (fishing) reelIn(false);               // reel in before leaving
     if (riding) dismount();                   // the pony stays home in the overworld
+    if (dragonRiding) dismountDragon();       // land the dragon before traveling
     if (ride) { const fp = mobs().funpark; if (fp) { fp.rideKind = null; fp.rideBalloon = null; } ride = null; } // end any ride safely
     if (pendingBuild) cancelPlacement();      // cancel a half-placed big build
     fuses.length = 0;                         // cancel any fuses lit in the world we're leaving
@@ -1217,6 +1223,42 @@ function blackHoleWhoosh() {
   showToast('🕳️ A black hole! Whoosh — back to the launch pad! 🚀', 3200);
 }
 
+// --- Ride-On Dragon: a flying mount. Tap 🐉 to hop on and soar (it reuses the
+// Fly physics: hold Up to climb, let go to glide down gently). ---
+function ensureDragonMount() { if (!dragonMount) dragonMount = new DragonMount(gl); }
+function updateDragonButton() {
+  const b = document.getElementById('btn-dragon');
+  if (!b) return;
+  b.style.display = goals.hasUnlock('dragonride') ? '' : 'none';
+  b.classList.toggle('on', dragonRiding);
+}
+function toggleDragon() {
+  if (!goals.hasUnlock('dragonride')) { showToast('🐉 Buy the Flying Dragon in the 💎 shop!'); return; }
+  if (dragonRiding) { dismountDragon(); return; }
+  if (riding) dismount();           // can't ride a pony and a dragon at once
+  if (roving) stopRover();
+  ensureDragonMount();
+  dragonRiding = true;
+  player.flying = true;             // soar! (hold Up to climb, release to glide down)
+  player.mountSpeed = 1.7; player.vel = [0, 0, 0];
+  syncFlyButton(); updateJumpLabel(); updateDragonButton();
+  sound.play('roar');
+  goals.bump('dragonfly');
+  tip('dragon', '🐉 Hold Up to fly higher, let go to glide down. Tap 🐉 to land!');
+}
+function dismountDragon() {
+  if (!dragonRiding) return;
+  dragonRiding = false;
+  player.flying = false;            // glide gently back down to the ground
+  player.mountSpeed = 1;
+  syncFlyButton(); updateJumpLabel(); updateDragonButton();
+  sound.play('roar');
+}
+function syncFlyButton() {
+  const b = document.getElementById('btn-fly');
+  if (b) b.classList.toggle('on', !!player.flying);
+}
+
 // --- Fishing: a calm activity at any water. Cast near water, wait for a bite,
 // reel in a fish (+💎), sometimes treasure, sometimes a silly old boot. ---
 function findWaterSpot() {
@@ -1314,6 +1356,7 @@ const SHOP = [
   { id: 'legoworld', icon: '🧱', name: 'Lego World', cost: 50, desc: 'A giant Lego table + 12 shiny Lego bricks! (a big treasure goal)' },
   { id: 'spaceworld', icon: '🚀', name: 'Space World', cost: 100, desc: 'Bounce sky-high in a low-gravity world of floating islands in the stars! ✨ (the BIG 100💎 dream)' },
   { id: 'rover', icon: '🛸', name: 'Space Rover', cost: 30, desc: 'Drive a moon buggy across Space World! Tap 🛸 to ride and pick your speed! 🚀' },
+  { id: 'dragonride', icon: '🐉', name: 'Flying Dragon', cost: 45, desc: 'Your very own dragon — tap 🐉 to hop on and soar through the sky! ✨' },
 ];
 function buildShop() {
   document.getElementById('shop-gems').textContent = 'You have 💎 ' + goals.gems;
@@ -1352,6 +1395,7 @@ function buyItem(it) {
   if (it.id === 'legoworld') { buildPicker(); selected = B.LEGO_RED; refreshBlocksButton(); showToast('🧱 Lego World! Tap 🌍 → Lego World. New Lego bricks are in your blocks!', 4600); }
   if (it.id === 'spaceworld') showToast('🚀 SPACE WORLD unlocked! 🌟 Tap 🌍 → Space World — jump to bounce sky-high!', 5200);
   if (it.id === 'rover') { updateRoverButton(); showToast(dimension === 'space' ? '🛸 Your Space Rover is ready — tap 🛸 to drive!' : '🛸 Take it for a spin in 🚀 Space World — tap 🛸 there!', 4600); }
+  if (it.id === 'dragonride') { updateDragonButton(); showToast('🐉 Your Flying Dragon is here — tap 🐉 to hop on and soar!', 4600); }
   sound.play('treasure');
   updateGems(); buildShop();
   showToast('✨ Unlocked: ' + it.name + '!');
@@ -1736,6 +1780,7 @@ function buySnack(s) {
 // --- Start the current world fresh (asked for, behind a confirmation) ---
 function resetWorld() {
   if (roving) stopRover();
+  if (dragonRiding) dismountDragon();
   const key = dimension, W = worlds[key].world, kind = WORLD_KINDS[key];
   const hubDests = [...new Set(W.portals.filter((p) => HUB_DESTS.includes(p.dest)).map((p) => p.dest))];
   for (let i = saplings.length - 1; i >= 0; i--) if (saplings[i].world === W) saplings.splice(i, 1);
@@ -1766,6 +1811,7 @@ function hurt(n) {
 }
 function knockout() {
   if (riding) dismount();
+  if (dragonRiding) dismountDragon();
   if (fishing) reelIn(false);
   heartBuff = 0; heartBuffT = 0;          // bonus hearts end on a knockout
   showToast('💤 Oof! You got sleepy — back home, safe and sound.', 3400);
@@ -2213,6 +2259,7 @@ function wireUI() {
 
   document.getElementById('btn-ride').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); toggleRide(); });
   document.getElementById('btn-rover').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); toggleRover(); });
+  document.getElementById('btn-dragon').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); toggleDragon(); });
   document.getElementById('btn-fish').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); castLine(); });
   document.getElementById('btn-char').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); openChars(); });
   document.getElementById('chars-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeChars(); });
@@ -2527,11 +2574,17 @@ function frameBody(now) {
   drawBuildPreview();                                      // green "build here" footprint
   // The Space Rover sits at the player's feet; the kid is drawn seated on top.
   if (roving) { roverT += dt; ensureRover(); rover.draw(worldProg, player.pos[0], player.pos[1], player.pos[2], player.yaw, player.moveAmt, roverT); }
+  // The Flying Dragon — wings beat faster while climbing/moving.
+  if (dragonRiding) {
+    dragonT += dt; ensureDragonMount();
+    const climb = (controls.jump ? 1 : 0.3) + player.moveAmt * 0.5;
+    dragonMount.draw(worldProg, player.pos[0], player.pos[1], player.pos[2], player.yaw, dragonT, climb);
+  }
   // Engine hum: idles when seated, revs up as you drive. Only touch it on change.
   const wantEngine = roving ? (player.moveAmt > 0.15 ? roverSpeedIdx + 1 : 1) : 0;
   if (wantEngine !== engineLevel) { engineLevel = wantEngine; sound.engine(engineLevel); }
   const seatRide = ride && ride.att.id !== 'balloon';     // sit in the gondola/carousel
-  const seated = !!riding || !!seatRide || roving;
+  const seated = !!riding || !!seatRide || roving || dragonRiding;
   character.draw(worldProg, player.pos[0], player.pos[1] + (seated ? 0.62 : 0), player.pos[2], player.yaw, player.walkPhase, player.moveAmt, actionAnim, seated);
   drawMobs(m);
   // Steve mans his Lava Chicken stand in the overworld, turning to face you.
@@ -2691,6 +2744,7 @@ function init() {
   ensurePet();
   ensurePony();
   updateRoverButton();
+  updateDragonButton();
   setupSteve();
   if (!goals.adv) startChapter(0);     // begin the adventure (captures "from now" baselines)
   setupBuddy();
@@ -2778,6 +2832,8 @@ function init() {
     setRoverSpeed: (i) => setRoverSpeed(i),
     blackHoles: () => (world.blackHoles || []),
     blackHole: () => blackHoleWhoosh(),
+    dragonRiding: () => dragonRiding,
+    toggleDragon: () => toggleDragon(),
     aliencops: () => { const a = mobs().aliencops; return a ? a.list : []; },
     fishing: () => !!fishing,
     castLine: () => castLine(),

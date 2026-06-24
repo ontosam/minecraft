@@ -1015,6 +1015,34 @@ sticky + rock ones. Go crazy."). Shipped on **`claude/dreamy-mccarthy-g6wgjr`** 
    79 metal/53 glass dome/2 door/plasma+lantern), placebar hides after, zero
    errors; screenshots of the rocket + the glass dome.
 
+## Status (session 35) — 🐉 the Flying Dragon (dad: "flying dragon it is")
+A rideable **flying mount** — the dad's pick. Shipped on
+**`claude/dreamy-mccarthy-g6wgjr`** → `main`. **sw v26→v27.** Now **53 goals**,
+**17 shop items**.
+- **`js/dragonmount.js` `DragonMount`** — a friendly purple box-mesh dragon (head,
+  neck, horns, tapering tail, back ridge, tucked legs) with **two flapping wings**
+  drawn as separate meshes rotated about the forward axis (new **`mat4.rotateZ`**;
+  `body·rotateZ(±a)`), beating faster while climbing/moving. Drawn at the player's
+  feet with the kid **seated** on top (reuses the pony/rover seated pose, +0.62)
+  and a big blob **shadow on the ground below** so the height reads.
+- **Reuses the Fly physics.** Mounting sets `player.flying=true` + `mountSpeed=1.7`,
+  so **hold Up to climb, let go to glide down gently** (the Jump button already
+  relabels to "Up"). Verified: holding Up climbs ~4 blocks/sec, releasing drifts
+  down. A **🐉 topbar button** (shown when owned) hops on/off; `syncFlyButton`
+  keeps the 🕊️ button in sync. Works in **any world** (it's a summon-style mount —
+  no per-world entity), so he can soar over his builds, the moon, Sky World…
+- Bought in the 💎 shop (`dragonride`, **45💎** — a dream reward). New **🐉 Dragon
+  rider** goal (`dragonfly`), friendly **`roar`** sound (warm, not scary).
+  Auto-lands (dismounts) on travel/knockout/reset; `__ezra.toggleDragon()/
+  dragonRiding()`.
+  Verified headless: hidden→buy→button shows→mount (flying+1.7×, goal ticks)→hold
+  Up climbs +4.1→release glides −1.5→dismount (flying off, speed 1)→travel
+  auto-dismounts; **save/reload keeps the unlock + button**; over→space→sky→over
+  hop + a flight soak, **zero errors**; screenshots of the dragon in flight + an
+  aerial soar over the world. Tuning candidates: wings flap about a fixed root
+  (no fold on glide); dragon is a fixed size (frames fine in 3rd-person); flight
+  uses the gentle Fly speeds — could add a faster "dive."
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept

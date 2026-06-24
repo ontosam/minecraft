@@ -104,6 +104,16 @@ export const mat4 = {
     return out;
   },
 
+  // Roll about the forward (z) axis — used to flap the dragon's wings.
+  rotateZ(out, rad) {
+    const c = Math.cos(rad), s = Math.sin(rad);
+    out[0] = c; out[1] = s; out[2] = 0; out[3] = 0;
+    out[4] = -s; out[5] = c; out[6] = 0; out[7] = 0;
+    out[8] = 0; out[9] = 0; out[10] = 1; out[11] = 0;
+    out[12] = 0; out[13] = 0; out[14] = 0; out[15] = 1;
+    return out;
+  },
+
   // Transform (x,y,z,1) by m, writing [x,y,z,w] into out4. Used to project to screen.
   transformPoint(out4, m, x, y, z) {
     out4[0] = m[0] * x + m[4] * y + m[8] * z + m[12];
