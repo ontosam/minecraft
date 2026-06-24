@@ -1058,8 +1058,31 @@ increments on **`claude/dreamy-mccarthy-g6wgjr`** → `main`.
    Debug: `__ezra.forceNight()/endNight()/setNightTimer(s)/nightInfo()`. Verified
    headless: timer counts down, does NOT fire in space, fires on return to the
    overworld (night+nightAuto), dawn + manual toggle + knockout all reset cleanly,
-   zero errors. (Still to come this pass: launchable/crashable rocket + dragon
-   flight challenge + manual ignition.)
+   zero errors.
+2. **🚀 Rideable Rocket + crash challenge (`js/rocketship.js`).** A 🚀 topbar
+   button (shown in Space World). Tap to **board** (`rocketState` off→ready), tap
+   again to **LAUNCH** — a manual **3-2-1 countdown** (he's in charge of blast-off)
+   → `rocketLiftoff`: a `rocketKick=1.1s` window lifts him **skyward** (applied
+   after `player.update` since fly physics resets vel each frame), `flying=true`,
+   `mountSpeed=2.6` (fast = racing), big boom + shake. Tap 🛬 to land. Engine
+   flames (a glow mesh on `rocketship.js`) stretch with the boost. **sw v28→v29.**
+3. **💥 Crash physics, shared by rocket + dragon** (`flightCrashCheck`). Flying
+   *fast* into an asteroid (any solid block ~0.55 ahead at chest height) in Space
+   World → a **harmless boom** + 💥 particles + back to the launch pad
+   (`crashFlight` → `goHome`), so it's a real "dodge the asteroids" challenge that
+   never hurts/strands him. Applies to the dragon too (the dad's "same physics").
+   New **🚀 Rocket pilot** goal. Auto-parks on travel/knockout/reset/black-hole.
+   Debug: `__ezra.toggleRocket()/rocketState()/_liftoff()/flightCrash()`.
+   Verified headless (CDP): board→countdown→**flying** + goal + 2.6× speed; the
+   blast-off kick lifts him; **rocket crash → off + back on the pad**; **dragon
+   crash recovers** too; land + travel auto-stop + button hides outside space;
+   zero errors; screenshot of the rocket on the moon. **Testing note:** headless
+   Chrome starves rAF during plain sleeps, so sustained-frame behavior (the 3-2-1
+   countdown, the lift kick) must be checked by **pumping frames** (repeated
+   `Page.captureScreenshot`) or a `_liftoff` debug hook — plain `sleep` leaves the
+   countdown stuck. Anti-throttle flags (`--disable-renderer-backgrounding` etc.)
+   help only partially. Still open from the dad's list: explicit **race
+   rings/time-trial** + a manual takeoff flourish for the dragon (offered next).
 
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world

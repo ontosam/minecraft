@@ -19,6 +19,7 @@ import { Dragon } from './dragon.js';
 import { AlienCops } from './aliencops.js';
 import { Rover } from './rover.js';
 import { DragonMount } from './dragonmount.js';
+import { RocketShip } from './rocketship.js';
 import { Controls } from './input.js';
 import { Sound } from './audio.js';
 import { Character, CHARACTERS, charById, charPreview } from './character.js';
@@ -97,6 +98,12 @@ let engineLevel = 0;      // current rover engine-hum level (so we only change i
 let dragonMount = null;   // the Ride-On Dragon mesh (created on first ride)
 let dragonRiding = false; // currently soaring on the dragon
 let dragonT = 0;          // wing-flap timer
+let rocketShip = null;    // the rideable Rocket mesh (created on first ride)
+let rocketState = 'off';  // 'off' | 'ready' (on pad) | 'countdown' | 'flying'
+let rocketCountT = 0;     // launch countdown timer
+let rocketT = 0;          // rocket animation timer
+let rocketBoost = 0;      // eased 0..1 engine-flame intensity
+let rocketKick = 0;       // brief blast-off window that lifts him skyward at launch
 let ride = null;          // an active fun-park ride: { att, t, dur, returnPos }
 let pendingRide = null;   // a ride waiting on the "Ride for 💎?" prompt
 let fishing = null;       // an active cast: { wx, wy, wz, t } while waiting for a bite
@@ -255,6 +262,7 @@ function drawShadows(m) {
   gl.depthMask(false);
   gl.uniform1f(worldProg.u.uAlpha, 0.26);
   if (dragonRiding) shadowAt(player.pos[0], player.pos[2], 2.0);   // the dragon's big shadow below
+  else if (rocketState !== 'off') shadowAt(player.pos[0], player.pos[2], 1.6);
   else if (roving) shadowAt(player.pos[0], player.pos[2], 1.5);    // the rover's footprint
   else if (!riding) shadowAt(player.pos[0], player.pos[2], 0.9);
   if (stevePos && dimension === 'over') shadowAt(stevePos[0], stevePos[2], 0.9);
@@ -322,7 +330,9 @@ function setDimension(key) {
   sky = WORLD_KINDS[key].sky;
   player.gravityScale = WORLD_KINDS[key].lowGrav ? 0.36 : 1;   // float + bounce sky-high in Space World
   if (key !== 'space' && roving) stopRover();                  // the rover stays in Space World
+  if (key !== 'space' && rocketState !== 'off') stopRocket(false); // the rocket flies in Space World
   updateRoverButton();
+  updateRocketButton();
   minimapDirty = true;
 }
 
@@ -333,6 +343,7 @@ function travelTo(dest) {
     if (fishing) reelIn(false);               // reel in before leaving
     if (riding) dismount();                   // the pony stays home in the overworld
     if (dragonRiding) dismountDragon();       // land the dragon before traveling
+    if (rocketState !== 'off') stopRocket(false);   // park the rocket before traveling
     if (ride) { const fp = mobs().funpark; if (fp) { fp.rideKind = null; fp.rideBalloon = null; } ride = null; } // end any ride safely
     if (pendingBuild) cancelPlacement();      // cancel a half-placed big build
     fuses.length = 0;                         // cancel any fuses lit in the world we're leaving
@@ -366,6 +377,8 @@ function travelTo(dest) {
 
 // Safety net: get the player back to a known-good spot in the overworld.
 function recoverHome() {
+  if (dragonRiding) dismountDragon();
+  if (rocketState !== 'off') stopRocket(false);
   if (ride) { const fp = mobs().funpark; if (fp) { fp.rideKind = null; fp.rideBalloon = null; } ride = null; }
   ensureDim('over');
   setDimension('over');
@@ -1219,6 +1232,8 @@ function updateRoverButton() {
 // launch pad. Never scary, always recover; ticks the "Black hole!" goal.
 function blackHoleWhoosh() {
   if (roving) stopRover();
+  if (rocketState !== 'off') stopRocket(false);
+  if (dragonRiding) dismountDragon();
   sound.play('portal');
   spawnParticles([player.pos[0], player.pos[1], player.pos[2]], '🌀', 'puff', 8, 80);
   spawnParticles([player.pos[0], player.pos[1] + 1, player.pos[2]], '🕳️', 'puff', 3, 64);
@@ -1262,6 +1277,88 @@ function dismountDragon() {
 function syncFlyButton() {
   const b = document.getElementById('btn-fly');
   if (b) b.classList.toggle('on', !!player.flying);
+}
+
+// --- The Rocket: a launch-and-fly challenge in Space World. Tap 🚀 to board, tap
+// again to LAUNCH (a 3-2-1 countdown — he's in charge), then fly fast through the
+// asteroids. Crashing into one is a harmless boom + back to the pad to try again. ---
+const rocketRiding = () => rocketState !== 'off';
+function ensureRocket() { if (!rocketShip) rocketShip = new RocketShip(gl); }
+function updateRocketButton() {
+  const b = document.getElementById('btn-rocket');
+  if (!b) return;
+  b.style.display = (dimension === 'space') ? '' : 'none';
+  b.textContent = rocketState === 'flying' ? '🛬' : '🚀';
+  b.classList.toggle('on', rocketRiding());
+}
+function toggleRocket() {
+  if (dimension !== 'space') { showToast('🚀 The rocket launches from 🚀 Space World — tap 🌍 to go!'); return; }
+  if (riding) dismount(); if (roving) stopRover(); if (dragonRiding) dismountDragon();
+  if (rocketState === 'off') {                 // board it on the pad
+    ensureRocket();
+    rocketState = 'ready'; rocketBoost = 0;
+    player.flying = false; player.vel = [0, 0, 0]; player.mountSpeed = 1;
+    updateRocketButton();
+    sound.play('door');
+    showToast('🚀 Buckle up! Tap 🚀 again to LAUNCH! 🔥', 3600);
+    tip('rocket', '🚀 Tap 🚀 to blast off, then fly! Dodge the asteroids or BOOM! Tap 🛬 to land.');
+  } else if (rocketState === 'ready') {         // ignite → countdown
+    rocketState = 'countdown'; rocketCountT = 3.2;
+    sound.play('fuse');
+    showToast('🚀 3…', 1000);
+  } else if (rocketState === 'flying') {        // land it
+    stopRocket(false);
+  }
+}
+function rocketLiftoff() {
+  rocketState = 'flying';
+  player.flying = true;
+  player.vel = [0, 0, 0];
+  rocketKick = 1.1;                             // BLAST OFF — lifts him skyward for ~1s
+  player.mountSpeed = 2.6;                      // fast (racing!)
+  shake = Math.min(0.9, shake + 0.7);
+  syncFlyButton(); updateJumpLabel(); updateRocketButton();
+  sound.play('boom');
+  const p = player.pos;
+  spawnParticles([p[0], p[1] + 0.1, p[2]], '🔥', 'puff', 10, 70);
+  spawnParticles([p[0], p[1] + 0.1, p[2]], '💨', 'puff', 8, 80);
+  goals.bump('rocketfly');
+  showToast('🚀 BLAST OFF! Hold Up to soar — dodge the asteroids! ✨', 3600);
+}
+function stopRocket(crashed) {
+  if (rocketState === 'off') return;
+  rocketState = 'off'; rocketBoost = 0; rocketKick = 0;
+  player.flying = false; player.mountSpeed = 1;
+  syncFlyButton(); updateJumpLabel(); updateRocketButton();
+  if (!crashed) { sound.play('fly'); showToast('🛬 Nice flying! Rocket parked.', 2200); }
+}
+// Crash physics shared by the rocket + the dragon: flying fast into an asteroid
+// (any solid block ahead) in Space World → a harmless boom + back to the pad.
+function flightCrashCheck() {
+  if (dimension !== 'space') return;
+  const flyingMount = (rocketState === 'flying') || dragonRiding;
+  if (!flyingMount || !player.flying) return;
+  const sp = Math.hypot(player.vel[0], player.vel[2]);
+  if (sp < 1.2) return;                          // only a real collision counts
+  const ax = player.pos[0] + (player.vel[0] / sp) * 0.55;
+  const az = player.pos[2] + (player.vel[2] / sp) * 0.55;
+  const id = world.get(Math.floor(ax), Math.floor(player.pos[1] + 0.9), Math.floor(az));
+  if (id !== B.AIR && !(BLOCKS[id] && BLOCKS[id].passable)) crashFlight();
+}
+function crashFlight() {
+  const p = player.pos.slice();
+  sound.play('boom');
+  spawnParticles([p[0], p[1] + 0.9, p[2]], '💥', 'puff', 12, 90);
+  spawnParticles([p[0], p[1] + 0.9, p[2]], '🔥', 'puff', 6, 70);
+  shake = Math.min(0.9, shake + 0.7);
+  const wasRocket = rocketState === 'flying';
+  if (rocketState !== 'off') stopRocket(true);
+  if (dragonRiding) dismountDragon();
+  player.goHome(); player.vel = [0, 0, 0]; player.flying = false;
+  camYaw = player.yaw; portalCooldown = 1.0; saveDirty = true;
+  syncFlyButton(); updateJumpLabel();
+  showToast(wasRocket ? '💥 Crash! Watch the asteroids! Back to the pad — tap 🚀 to try again! 🚀'
+    : '💥 Oof — the dragon bonked an asteroid! Back to the pad. 🐉', 3400);
 }
 
 // --- Fishing: a calm activity at any water. Cast near water, wait for a bite,
@@ -1786,6 +1883,7 @@ function buySnack(s) {
 function resetWorld() {
   if (roving) stopRover();
   if (dragonRiding) dismountDragon();
+  if (rocketState !== 'off') stopRocket(false);
   const key = dimension, W = worlds[key].world, kind = WORLD_KINDS[key];
   const hubDests = [...new Set(W.portals.filter((p) => HUB_DESTS.includes(p.dest)).map((p) => p.dest))];
   for (let i = saplings.length - 1; i >= 0; i--) if (saplings[i].world === W) saplings.splice(i, 1);
@@ -1817,6 +1915,7 @@ function hurt(n) {
 function knockout() {
   if (riding) dismount();
   if (dragonRiding) dismountDragon();
+  if (rocketState !== 'off') stopRocket(false);
   if (fishing) reelIn(false);
   heartBuff = 0; heartBuffT = 0;          // bonus hearts end on a knockout
   showToast('💤 Oof! You got sleepy — back home, safe and sound.', 3400);
@@ -2281,6 +2380,7 @@ function wireUI() {
   document.getElementById('btn-ride').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); toggleRide(); });
   document.getElementById('btn-rover').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); toggleRover(); });
   document.getElementById('btn-dragon').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); toggleDragon(); });
+  document.getElementById('btn-rocket').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); toggleRocket(); });
   document.getElementById('btn-fish').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); castLine(); });
   document.getElementById('btn-char').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); openChars(); });
   document.getElementById('chars-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeChars(); });
@@ -2445,6 +2545,9 @@ function frameBody(now) {
   controls.frame();
   applyLook();
   if (ride) updateRide(dt); else player.update(dt, controls, camYaw);
+  // Rocket blast-off: lift him skyward for ~1s so launch really feels like LIFTOFF
+  // (fly physics resets vel each frame, so we nudge the position directly).
+  if (rocketKick > 0) { rocketKick = Math.max(0, rocketKick - dt); player.pos[1] = Math.min(SY - 2, player.pos[1] + 12 * dt); player.onGround = false; }
   cameraFollow(dt);
   const dxm = player.pos[0] - prevX, dzm = player.pos[2] - prevZ;
   const dm = Math.hypot(dxm, dzm);
@@ -2476,6 +2579,17 @@ function frameBody(now) {
 
   // Space World: drop below the moon floor (a hidden black hole) → whoosh home.
   if (dimension === 'space' && portalCooldown === 0 && player.pos[1] < 3) blackHoleWhoosh();
+
+  // Rocket: tick the launch countdown (3-2-1-blast off), then watch for crashes.
+  if (rocketState === 'countdown') {
+    const was = Math.ceil(rocketCountT);
+    rocketCountT -= dt;
+    const now = Math.ceil(rocketCountT);
+    if (now !== was && now >= 1) { showToast('🚀 ' + now + '…', 900); sound.play('fuse'); }
+    if (rocketCountT <= 0) rocketLiftoff();
+  }
+  rocketBoost += (((rocketState === 'flying' && (controls.jump || player.moveAmt > 0.2)) ? 1 : (rocketState === 'flying' ? 0.4 : 0)) - rocketBoost) * Math.min(1, dt * 6);
+  if (rocketState === 'flying' || dragonRiding) flightCrashCheck();
 
   // Tick lit TNT fuses → detonate when they reach zero.
   for (let i = fuses.length - 1; i >= 0; i--) {
@@ -2605,11 +2719,16 @@ function frameBody(now) {
     const climb = (controls.jump ? 1 : 0.3) + player.moveAmt * 0.5;
     dragonMount.draw(worldProg, player.pos[0], player.pos[1], player.pos[2], player.yaw, dragonT, climb);
   }
+  // The Rocket — sits on the pad, then flames out when it flies.
+  if (rocketState !== 'off') {
+    rocketT += dt; ensureRocket();
+    rocketShip.draw(worldProg, player.pos[0], player.pos[1], player.pos[2], player.yaw, rocketBoost, rocketT);
+  }
   // Engine hum: idles when seated, revs up as you drive. Only touch it on change.
   const wantEngine = roving ? (player.moveAmt > 0.15 ? roverSpeedIdx + 1 : 1) : 0;
   if (wantEngine !== engineLevel) { engineLevel = wantEngine; sound.engine(engineLevel); }
   const seatRide = ride && ride.att.id !== 'balloon';     // sit in the gondola/carousel
-  const seated = !!riding || !!seatRide || roving || dragonRiding;
+  const seated = !!riding || !!seatRide || roving || dragonRiding || rocketState !== 'off';
   character.draw(worldProg, player.pos[0], player.pos[1] + (seated ? 0.62 : 0), player.pos[2], player.yaw, player.walkPhase, player.moveAmt, actionAnim, seated);
   drawMobs(m);
   // Steve mans his Lava Chicken stand in the overworld, turning to face you.
@@ -2769,6 +2888,7 @@ function init() {
   ensurePet();
   ensurePony();
   updateRoverButton();
+  updateRocketButton();
   updateDragonButton();
   setupSteve();
   if (!goals.adv) startChapter(0);     // begin the adventure (captures "from now" baselines)
@@ -2859,6 +2979,12 @@ function init() {
     blackHole: () => blackHoleWhoosh(),
     dragonRiding: () => dragonRiding,
     toggleDragon: () => toggleDragon(),
+    toggleRocket: () => toggleRocket(),
+    rocketState: () => rocketState,
+    rocketLaunch: () => { if (rocketState === 'off') toggleRocket(); if (rocketState === 'ready') toggleRocket(); },
+    crashFlight: () => crashFlight(),
+    flightCrash: () => flightCrashCheck(),
+    _liftoff: () => { ensureRocket(); rocketState = 'ready'; rocketLiftoff(); },
     forceNight: () => startAutoNight(),
     endNight: () => endAutoNight(),
     autoNightT: () => autoNightT,
