@@ -148,6 +148,7 @@ body {
 #shop,
 #confirm,
 #quest,
+#astro,
 #adventure,
 #chars,
 #math,
@@ -174,6 +175,7 @@ body {
 #shop.hidden,
 #confirm.hidden,
 #quest.hidden,
+#astro.hidden,
 #adventure.hidden,
 #chars.hidden,
 #math.hidden,
@@ -324,7 +326,8 @@ body {
 }
 
 /* Villager quest dialog */
-#quest-msg {
+#quest-msg,
+#astro-msg {
   font-size: 22px;
   font-weight: 700;
   color: #2a2a33;

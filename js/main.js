@@ -17,6 +17,7 @@ import { Skeletons } from './skeletons.js';
 import { Villagers } from './villagers.js';
 import { Dragon } from './dragon.js';
 import { AlienCops } from './aliencops.js';
+import { Astronauts } from './astronaut.js';
 import { Rover } from './rover.js';
 import { DragonMount } from './dragonmount.js';
 import { RocketShip } from './rocketship.js';
@@ -179,6 +180,8 @@ function makeMobs(kind, w) {
       };
     } else if (t === 'villagers') {
       m.villagers = new Villagers(gl, w);
+    } else if (t === 'astronaut') {
+      m.astronaut = new Astronauts(gl, w);
     } else if (t === 'funpark') {
       m.funpark = new SecretPark(gl, w);
       m.funpark.onFirework = (pos) => { spawnParticles(pos, ['🎆', '🎇', '✨'][Math.floor(Math.random() * 3)], 'puff', 5, 80); sound.note(Math.floor(Math.random() * 5)); };
@@ -215,6 +218,7 @@ function populateMobs(m) {
   if (m.animals) m.animals.spawn(10);
   if (m.ants) m.ants.spawn(14);
   if (m.villagers) m.villagers.spawn(2);
+  if (m.astronaut) m.astronaut.spawn();
   if (m.funpark) m.funpark.populate();
   if (m.nethermobs) m.nethermobs.populate(SX, SZ);
   if (m.aliencops) m.aliencops.populate(2);
@@ -230,6 +234,7 @@ function updateMobs(m, dt) {
   if (m.spiders) m.spiders.update(dt, player, night && dimension === 'over');
   if (m.skeletons) m.skeletons.update(dt, player, night && dimension === 'over');
   if (m.villagers) m.villagers.update(dt, player);
+  if (m.astronaut) m.astronaut.update(dt, player);
   if (m.funpark) { try { m.funpark.update(dt, player); } catch (e) { softError(e); } }
   if (m.aliencops) m.aliencops.update(dt, player, roving, roverSpeedIdx);
   if (m.dragon) m.dragon.update(dt, player);
@@ -243,6 +248,7 @@ function drawMobs(m) {
   if (m.spiders) m.spiders.draw(worldProg);
   if (m.skeletons) m.skeletons.draw(worldProg);
   if (m.villagers) m.villagers.draw(worldProg);
+  if (m.astronaut) m.astronaut.draw(worldProg);
   if (m.funpark) { try { m.funpark.draw(worldProg); } catch (e) { softError(e); } }
   if (m.aliencops) { try { m.aliencops.draw(worldProg); } catch (e) { softError(e); } }
   if (m.dragon) m.dragon.draw(worldProg);
@@ -277,6 +283,7 @@ function drawShadows(m) {
     [m.skeletons, () => 0.9],
     [m.ants, () => 0.55],
     [m.villagers, () => 0.85],
+    [m.astronaut, () => 0.85],
     [m.nethermobs, (a) => a.species === 'ghast' ? 1.7 : 1.0],
     [m.aliencops, () => 1.3],
   ];
@@ -367,7 +374,7 @@ function travelTo(dest) {
     if (dest === 'lego' && !isLego(selected)) selected = B.LEGO_RED; // arrive holding a Lego brick
     buildPicker(); refreshBlocksButton();     // Lego World shows a Lego-only palette
     if (dest === 'secret') tip('tickets', '🎟️ Walk up to the Ticket booth to pick a ride! There\'s a Popcorn stand and Gift Shop too. 🍿🛍️');
-    if (dest === 'space') { goals.bump('space'); startSpaceRace(); tip('space', '🚀 Welcome to Space! Jump to bounce sky-high. Fly to race the glowing rings! 🌟'); }
+    if (dest === 'space') { goals.bump('space'); startSpaceRace(); tip('space', '🚀 Welcome to Space! Say hi to Captain Nova 🧑‍🚀 for a mission. Jump to bounce sky-high! 🌟'); }
   } catch (e) {
     // A portal should never strand Ezra on the scary "Oops" screen. If anything
     // goes wrong mid-trip, log it for us and pop him safely back home instead.
@@ -1581,6 +1588,56 @@ function questOk() {
   closeQuest();
 }
 
+// --- Captain Nova's space missions: tap the astronaut in Space World for a
+// space-themed task, finish it for 💎. Same baseline-relative ("from now on")
+// tracking as the villager quests, just with a friendly astronaut face. ---
+const ASTRO_MISSIONS = [
+  { metric: 'spacegem', n: 3, reward: 4, icon: '🔷', label: 'mine {n} space crystals' },
+  { metric: 'dig', n: 12, reward: 3, icon: '⛏️', label: 'dig up {n} moon rocks' },
+  { metric: 'place', n: 8, reward: 3, icon: '🧱', label: 'build with {n} blocks on the moon' },
+  { metric: 'spacerace', n: 1, reward: 5, icon: '🏁', label: 'race through the glowing rings' },
+];
+let astroNpc = null;
+function makeMission() {
+  const q = ASTRO_MISSIONS[Math.floor(Math.random() * ASTRO_MISSIONS.length)];
+  return { metric: q.metric, target: q.n, base: goals.counts[q.metric] || 0, reward: q.reward, icon: q.icon, label: q.label.replace('{n}', q.n) };
+}
+function missionProgress(q) { return Math.max(0, Math.min(q.target, (goals.counts[q.metric] || 0) - q.base)); }
+function missionDone(q) { return missionProgress(q) >= q.target; }
+function talkToAstronaut(a) {
+  sound.play('pet');
+  if (!a.mission) { a.mission = makeMission(); showAstro(a, 'offer'); }
+  else if (missionDone(a.mission)) showAstro(a, 'done');
+  else showAstro(a, 'progress');
+}
+function showAstro(a, state) {
+  astroNpc = a;
+  const q = a.mission, msg = document.getElementById('astro-msg'), btn = document.getElementById('astro-ok');
+  if (state === 'offer') {
+    msg.innerHTML = '<div class="qface">🧑‍🚀</div>Hi, space friend! 👋<br>I\'m <b>Captain Nova</b>.<br>Can you <b>' + q.icon + ' ' + q.label + '</b>?<br>I\'ll give you <b>💎' + q.reward + '</b>!';
+    btn.textContent = 'Blast off! 🚀';
+  } else if (state === 'progress') {
+    msg.innerHTML = '<div class="qface">🧑‍🚀</div><b>' + q.icon + ' ' + q.label + '</b><br>You\'ve done <b>' + missionProgress(q) + ' / ' + q.target + '</b> — keep going!';
+    btn.textContent = 'Okay';
+  } else {
+    msg.innerHTML = '<div class="qface">🎉</div>Mission complete, astronaut! 🚀<br>Here\'s <b>💎' + q.reward + '</b>!<br>You\'re a space star! ⭐';
+    btn.textContent = 'Yay! 🎉';
+  }
+  document.getElementById('astro').classList.remove('hidden');
+}
+function closeAstro() { document.getElementById('astro').classList.add('hidden'); }
+function astroOk() {
+  const a = astroNpc;
+  if (a && a.mission && missionDone(a.mission)) {
+    goals.addGems(a.mission.reward); updateGems();
+    goals.bump('spacemission');
+    sound.play('treasure');
+    showToast('🚀 Mission done! +💎' + a.mission.reward);
+    a.mission = null;          // tapping again offers a fresh mission
+  }
+  closeAstro();
+}
+
 // --- 📖 Adventure: a story journey across the worlds, hosted by Ezra's friends.
 // Each chapter = a friend, a short readable blurb, one clear "do it together"
 // task (tracked from now via a goals counter), a 💎 reward, friendship hearts,
@@ -2427,6 +2484,8 @@ function wireUI() {
   document.getElementById('adventure').addEventListener('pointerdown', (e) => { if (e.target.id === 'adventure') closeAdventure(); });
   document.getElementById('quest-ok').addEventListener('pointerdown', (e) => { e.preventDefault(); questOk(); });
   document.getElementById('quest').addEventListener('pointerdown', (e) => { if (e.target.id === 'quest') closeQuest(); });
+  document.getElementById('astro-ok').addEventListener('pointerdown', (e) => { e.preventDefault(); astroOk(); });
+  document.getElementById('astro').addEventListener('pointerdown', (e) => { if (e.target.id === 'astro') closeAstro(); });
   document.getElementById('btn-reset').addEventListener('pointerdown', (e) => { e.preventDefault(); askReset(); });
   document.getElementById('confirm-no').addEventListener('pointerdown', (e) => { e.preventDefault(); document.getElementById('confirm').classList.add('hidden'); });
   document.getElementById('confirm-yes').addEventListener('pointerdown', (e) => { e.preventDefault(); document.getElementById('confirm').classList.add('hidden'); resetWorld(); });
@@ -2513,12 +2572,20 @@ function drawMinimap() {
       }
     }
   }
-  // Space World: a gold marker for the next race ring to fly through.
-  if (dimension === 'space' && spaceRace) {
-    const g = spaceRace.nextGate();
-    if (g) {
-      mmCtx.fillStyle = '#ffd11a'; mmCtx.strokeStyle = '#7a5a00'; mmCtx.lineWidth = 1.5;
-      mmCtx.beginPath(); mmCtx.arc(g[0] * s, g[2] * s, 4.5, 0, Math.PI * 2); mmCtx.fill(); mmCtx.stroke();
+  // Space World: a gold marker for the next race ring + a white marker for
+  // Captain Nova the astronaut, so both are easy to find on the big moon.
+  if (dimension === 'space') {
+    if (spaceRace) {
+      const g = spaceRace.nextGate();
+      if (g) {
+        mmCtx.fillStyle = '#ffd11a'; mmCtx.strokeStyle = '#7a5a00'; mmCtx.lineWidth = 1.5;
+        mmCtx.beginPath(); mmCtx.arc(g[0] * s, g[2] * s, 4.5, 0, Math.PI * 2); mmCtx.fill(); mmCtx.stroke();
+      }
+    }
+    const ast = mobs().astronaut;
+    if (ast) for (const a of ast.list) {
+      mmCtx.fillStyle = '#eaf2ff'; mmCtx.strokeStyle = '#3a5a9a'; mmCtx.lineWidth = 1.5;
+      mmCtx.beginPath(); mmCtx.arc(a.pos[0] * s, a.pos[2] * s, 3.4, 0, Math.PI * 2); mmCtx.fill(); mmCtx.stroke();
     }
   }
   // player arrow (points the way you face)
@@ -2663,7 +2730,8 @@ function frameBody(now) {
     const sp = (!dg && !cr && !zb && m.spiders) ? m.spiders.pickRay(camPos, dir) : null;
     const sk = (!dg && !cr && !zb && !sp && m.skeletons) ? m.skeletons.pickRay(camPos, dir) : null;
     const vl = (!dg && !cr && !zb && !sp && !sk && m.villagers) ? m.villagers.pickRay(camPos, dir) : null;
-    const bd = (!dg && !cr && !zb && !sp && !sk && !vl && buddy && dimension === 'over') &&
+    const as = (!dg && !cr && !zb && !sp && !sk && !vl && m.astronaut) ? m.astronaut.pickRay(camPos, dir) : null;
+    const bd = (!dg && !cr && !zb && !sp && !sk && !vl && !as && buddy && dimension === 'over') &&
       rayHitsSphere(camPos, dir, buddy.pos[0], buddy.pos[1] + 0.9, buddy.pos[2], 1.2);
     const stv = (!dg && !cr && !zb && !sp && !sk && !vl && !bd && stevePos && dimension === 'over') &&
       rayHitsSphere(camPos, dir, stevePos[0], stevePos[1] + 0.9, stevePos[2], 1.2);
@@ -2675,6 +2743,7 @@ function frameBody(now) {
     else if (sp) doBonkSpider(sp);
     else if (sk) doBonkSkeleton(sk);
     else if (vl) talkToVillager(vl);
+    else if (as) talkToAstronaut(as);
     else if (bd) openAdventure();
     else if (stv) openSteveMenu();
     else if (flintMode) flintTap(dir);     // flint & steel: light TNT / a portal frame
@@ -3035,6 +3104,9 @@ function init() {
     waterSize: (x, y, z) => waterBodySize(x, y, z),
     talkVillager: () => { const v = mobs().villagers; if (v && v.list.length) talkToVillager(v.list[0]); },
     questOk: () => questOk(),
+    astronaut: () => { const a = mobs().astronaut; return a ? a.list : []; },
+    talkAstronaut: () => { const a = mobs().astronaut; if (a && a.list.length) talkToAstronaut(a.list[0]); },
+    astroOk: () => astroOk(),
     setCharacter: (id) => { selectedChar = id; applyCharacter(); saveDirty = true; },
     character: () => selectedChar,
     openMath: () => openMath(),
