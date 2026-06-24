@@ -1134,6 +1134,14 @@ ids** (PILLOW 132, PUZZLE 133).
    (Simon-style). Right → +💎 (1→3, capped) + harder next round; wrong → forgiving
    replay, no penalty. `#puzzle` dialog (2×2 color pad), 'Puzzle solver' goal
    (`puzzle`). `__ezra.openPuzzle()/puzzleState()/puzzleSolve()/puzzleMiss()`.
+5. **🛏️ Lie down on the bed too (dad follow-up: "he can't lay on his bed like
+   Minecraft").** Tapping a bed used to instant-flash to morning; now it LAYS him
+   on the bed (reuses the pillow `resting` system: drawn lying centered along the
+   two halves, hearts refill, sets home). At night, lying down still sleeps to a
+   safe morning (clears monsters). Tap/move/travel to get up. `__ezra.sleepBed()/
+   restingBed()`. **sw v34→v35.** NOTE: the dad described the *old* fishing + no
+   pillow — his iPad PWA was still on the cached build; he needs to FULLY close &
+   reopen the app to pick up the new version.
    All verified headless (CDP) with screenshots: Nova spawn/mission/claim/persist;
    pillow lie-down + heart regen + save-reload; fishing bite→hook→exact reward +
    water-size scaling + forgiving miss; puzzle open→solve→💎→difficulty-up +
