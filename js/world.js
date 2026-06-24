@@ -42,6 +42,7 @@ export const B = {
   // plasma, gem ore, and a sticky alien goo that's hard to walk across.
   MOON_ROCK: 126, SPACE_METAL: 127, ALIEN_GOO: 128, METEOR: 129, PLASMA: 130, CRYSTAL_ORE: 131,
   PILLOW: 132,                 // a soft cushion you can tap to lie down on
+  PUZZLE: 133,                 // a colorful cube — tap for a color-memory mini-game
 };
 
 const W = [1, 1, 1]; // white tint for textured blocks
@@ -196,6 +197,7 @@ export const BLOCKS = {
   [B.PLASMA]: nat(TILE.PLASMA, '#7a2ad8'),
   [B.CRYSTAL_ORE]: nat(TILE.CRYSTAL_ORE, '#33e0d8'),
   [B.PILLOW]: nat3(TILE.PILLOW_TOP, TILE.PILLOW_SIDE, TILE.PILLOW_SIDE, '#c7cdf0'),
+  [B.PUZZLE]: nat(TILE.PUZZLE, '#e63946'),
 };
 
 // Build blocks grouped into categories for the pop-up picker.
@@ -211,7 +213,7 @@ export const CATEGORIES = [
   { name: 'Wood', blocks: [B.PLANKS, B.BIRCH_PLANKS, B.DARK_PLANKS, B.CHERRY_PLANKS, B.CRIMSON_PLANKS, B.WARPED_PLANKS, B.BOOKSHELF] },
   { name: 'Decor 🪑', blocks: [B.MELON, B.HAY, B.HONEY, B.NOTE_BLOCK, B.SPONGE, B.SCULK, B.PUMPKIN, B.GLOWSTONE, B.SEA_LANTERN] },
   // A special group of wild blocks for crazy builds!
-  { name: 'Creative ✨', blocks: [B.NEON_PINK, B.NEON_GREEN, B.NEON_BLUE, B.NEON_ORANGE, B.NEON_PURPLE, B.GLOW_CRYSTAL, B.STARRY, B.CLOUD, B.CHECKER, B.CANDY, B.CHROME] },
+  { name: 'Creative ✨', blocks: [B.PUZZLE, B.NEON_PINK, B.NEON_GREEN, B.NEON_BLUE, B.NEON_ORANGE, B.NEON_PURPLE, B.GLOW_CRYSTAL, B.STARRY, B.CLOUD, B.CHECKER, B.CANDY, B.CHROME] },
   // Out-of-this-world blocks for building moon bases (alien goo is sticky!).
   { name: 'Space 🚀', blocks: [B.MOON_ROCK, B.METEOR, B.SPACE_METAL, B.CRYSTAL_ORE, B.PLASMA, B.ALIEN_GOO, B.STARRY, B.GLOW_CRYSTAL] },
   { name: 'Fun', blocks: [B.PUMPKIN, B.SLIME, B.BARRIER] },

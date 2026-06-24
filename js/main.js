@@ -306,6 +306,7 @@ function registerDim(key, w) {
   worlds[key] = { world: w, mobs: m, kind };
   populateMobs(m);
   ensurePortalsFor(key);
+  placePuzzleFixture(w);                  // a discoverable 🧩 puzzle cube near spawn (every world)
   w.rebuildAll();
   w.updateRedstone();                    // light any saved lamps wired to on-levers
   scanSaplings(w);                        // resume growing any saved saplings
@@ -1696,6 +1697,84 @@ function astroOk() {
   closeAstro();
 }
 
+// --- 🧩 Color Puzzle: a "watch then repeat" colour-memory mini-game inside a
+// puzzle cube. Found in every world (and placeable from the Creative tab), so
+// there are puzzles to solve for 💎 everywhere. Watch the colours flash, tap
+// them back in order. Longer sequences pay more; a wrong tap just replays it
+// (forgiving). Difficulty climbs as you keep getting them right. ---
+let puzzle = null;                 // { level, seq:[], pos, showing }
+function puzzleButtons() { return Array.from(document.querySelectorAll('#puzzle-pad .pz')); }
+function setPuzzleMsg(t) { const e = document.getElementById('puzzle-msg'); if (e) e.innerHTML = t; }
+function openPuzzle() {
+  if (puzzle) return;
+  puzzle = { level: 2, seq: [], pos: 0, showing: false };
+  document.getElementById('puzzle').classList.remove('hidden');
+  sound.play('pet');
+  startPuzzleRound();
+}
+function startPuzzleRound() {
+  if (!puzzle) return;
+  puzzle.seq = []; for (let i = 0; i < puzzle.level; i++) puzzle.seq.push(Math.floor(Math.random() * 4));
+  puzzle.pos = 0;
+  showPuzzleSequence();
+}
+function flashPuzzle(ci) {
+  const b = puzzleButtons()[ci]; if (!b) return;
+  b.classList.add('flash'); sound.note(ci);
+  setTimeout(() => b.classList.remove('flash'), 360);
+}
+function showPuzzleSequence() {
+  if (!puzzle) return;
+  puzzle.showing = true;
+  setPuzzleMsg('👀 Watch the colors…');
+  let i = 0;
+  const step = () => {
+    if (!puzzle) return;                        // dialog closed mid-show
+    if (i >= puzzle.seq.length) { puzzle.showing = false; setPuzzleMsg('🎵 Your turn! Tap them in order.'); return; }
+    flashPuzzle(puzzle.seq[i]); i++;
+    setTimeout(step, 680);
+  };
+  setTimeout(step, 480);
+}
+function puzzleTap(ci) {
+  if (!puzzle || puzzle.showing) return;        // ignore taps while it's showing
+  flashPuzzle(ci);
+  if (ci === puzzle.seq[puzzle.pos]) {
+    puzzle.pos++;
+    if (puzzle.pos >= puzzle.seq.length) puzzleWin();
+  } else { puzzleFail(); }
+}
+function puzzleWin() {
+  const reward = Math.max(1, Math.min(3, Math.floor(puzzle.level / 2)));  // 1 → 3 as it gets longer
+  goals.addGems(reward); updateGems(); goals.bump('puzzle');
+  sound.play('treasure');
+  setPuzzleMsg('🎉 You did it! +💎' + reward + '<br>Here comes a trickier one…');
+  puzzle.level = Math.min(7, puzzle.level + 1);
+  puzzle.showing = true;                          // lock input during the gap
+  setTimeout(() => { if (puzzle) startPuzzleRound(); }, 1500);
+}
+function puzzleFail() {
+  sound.play('deny');
+  setPuzzleMsg('😅 Oops — watch again!');
+  puzzle.pos = 0; puzzle.showing = true;
+  setTimeout(() => { if (puzzle) showPuzzleSequence(); }, 1100);
+}
+function closePuzzle() { puzzle = null; document.getElementById('puzzle').classList.add('hidden'); }
+// Drop a puzzle cube on solid ground a few steps from spawn, in every world.
+// Idempotent: if one's already there (loaded from save) it does nothing, so it
+// never piles up; if it was dug away it comes back next load (a respawning
+// puzzle station). Only fills AIR, so it never overwrites terrain or a build.
+function placePuzzleFixture(w) {
+  const sp = w.spawn;
+  const x = Math.floor(sp[0]) + 3, z = Math.floor(sp[2]);
+  if (x < 1 || x >= SX - 1 || z < 1 || z >= SZ - 1) return;
+  const gy = w.heightAt(x, z);
+  if (gy < 1) return;                                   // no ground here (void/water edge)
+  const top = w.get(x, gy, z);                           // the topmost solid block
+  if (top === B.PUZZLE) return;                          // already placed (it IS the top block now)
+  if (top !== B.AIR && top !== B.WATER) w.set(x, gy + 1, z, B.PUZZLE);   // sit it on the ground
+}
+
 // --- 📖 Adventure: a story journey across the worlds, hosted by Ezra's friends.
 // Each chapter = a friend, a short readable blurb, one clear "do it together"
 // task (tracked from now via a goals counter), a 💎 reward, friendship hearts,
@@ -2546,6 +2625,9 @@ function wireUI() {
   document.getElementById('quest').addEventListener('pointerdown', (e) => { if (e.target.id === 'quest') closeQuest(); });
   document.getElementById('astro-ok').addEventListener('pointerdown', (e) => { e.preventDefault(); astroOk(); });
   document.getElementById('astro').addEventListener('pointerdown', (e) => { if (e.target.id === 'astro') closeAstro(); });
+  for (const b of document.querySelectorAll('#puzzle-pad .pz')) b.addEventListener('pointerdown', (e) => { e.preventDefault(); puzzleTap(+b.dataset.c); });
+  document.getElementById('puzzle-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closePuzzle(); });
+  document.getElementById('puzzle').addEventListener('pointerdown', (e) => { if (e.target.id === 'puzzle') closePuzzle(); });
   document.getElementById('btn-reset').addEventListener('pointerdown', (e) => { e.preventDefault(); askReset(); });
   document.getElementById('confirm-no').addEventListener('pointerdown', (e) => { e.preventDefault(); document.getElementById('confirm').classList.add('hidden'); });
   document.getElementById('confirm-yes').addEventListener('pointerdown', (e) => { e.preventDefault(); document.getElementById('confirm').classList.add('hidden'); resetWorld(); });
@@ -2823,6 +2905,7 @@ function frameBody(now) {
       if (hit && isDoor(bid)) toggleDoor(hit.block[0], hit.block[1], hit.block[2]);
       else if (hit && isBed(bid)) sleepInBed(hit.block[0], hit.block[1], hit.block[2]);
       else if (hit && bid === B.PILLOW) lieDown(hit.block[0], hit.block[1], hit.block[2]);
+      else if (hit && bid === B.PUZZLE) openPuzzle();
       else if (hit && (bid === B.LEVER || bid === B.LEVER_ON)) toggleLever(hit.block[0], hit.block[1], hit.block[2]);
       else if (hit && bid === B.NOTE_BLOCK) playNoteBlock(hit.block[0], hit.block[1], hit.block[2]);
       else if (hit && isTNT(bid)) lightTNT(hit.block[0], hit.block[1], hit.block[2]);
@@ -3183,6 +3266,11 @@ function init() {
     lieDown: (x, y, z) => lieDown(x != null ? x : Math.floor(player.pos[0]), y != null ? y : Math.floor(player.pos[1]) - 1, z != null ? z : Math.floor(player.pos[2])),
     getUp: () => getUp(),
     resting: () => !!resting,
+    openPuzzle: () => openPuzzle(),
+    puzzleState: () => (puzzle ? { level: puzzle.level, seq: puzzle.seq.slice(), pos: puzzle.pos, showing: puzzle.showing } : null),
+    puzzleSolve: () => { if (!puzzle) return; puzzle.showing = false; const s = puzzle.seq.slice(); for (const c of s) puzzleTap(c); },
+    puzzleMiss: () => { if (!puzzle) return; puzzle.showing = false; puzzleTap((puzzle.seq[0] + 1) % 4); },
+    closePuzzle: () => closePuzzle(),
     setCharacter: (id) => { selectedChar = id; applyCharacter(); saveDirty = true; },
     character: () => selectedChar,
     openMath: () => openMath(),

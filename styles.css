@@ -149,6 +149,7 @@ body {
 #confirm,
 #quest,
 #astro,
+#puzzle,
 #adventure,
 #chars,
 #math,
@@ -176,12 +177,22 @@ body {
 #confirm.hidden,
 #quest.hidden,
 #astro.hidden,
+#puzzle.hidden,
 #adventure.hidden,
 #chars.hidden,
 #math.hidden,
 #steve.hidden {
   display: none;
 }
+/* Color-memory puzzle: a 2×2 pad of big colored buttons that flash a sequence. */
+#puzzle-msg { font-size: 22px; font-weight: 800; color: #2a2a33; text-align: center; margin-bottom: 12px; line-height: 1.4; }
+#puzzle-pad { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: min(260px, 66vw); margin: 4px auto 16px; }
+.pz { height: 88px; border: none; border-radius: 16px; opacity: .72; transition: transform .07s, opacity .12s, box-shadow .12s; }
+.pz[data-c="0"] { background: #e63946; }
+.pz[data-c="1"] { background: #43aa3a; }
+.pz[data-c="2"] { background: #2a6fdb; }
+.pz[data-c="3"] { background: #f2c21e; }
+.pz.flash { opacity: 1; transform: scale(1.06); box-shadow: 0 0 0 5px #fff, 0 0 22px 7px rgba(255, 255, 255, .85); }
 /* The "Build here" bar is a bottom strip, not a full-screen modal. */
 #placebar.hidden { display: none; }
 

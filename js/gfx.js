@@ -37,6 +37,8 @@ export const TILE = {
   MOON_ROCK: 112, SPACE_METAL: 113, ALIEN_GOO: 114, METEOR: 115, PLASMA: 116, CRYSTAL_ORE: 117,
   // session: a cozy cushion to lie down on
   PILLOW_TOP: 118, PILLOW_SIDE: 119,
+  // session: a colorful puzzle cube — tap it for a color-memory mini-game
+  PUZZLE: 120,
 };
 
 export function initGL(canvas) {
@@ -546,6 +548,15 @@ function buildAtlasCanvas() {
     ctx.fillStyle = 'rgba(255,255,255,0.30)'; ctx.fillRect(q[0] + 1, q[1] + 2, T - 2, 3);
     ctx.fillStyle = 'rgba(90,96,150,0.40)'; ctx.fillRect(q[0], q[1] + 7, T, 1);
     for (let x = 2; x < T; x += 4) { ctx.fillStyle = 'rgba(120,126,180,0.5)'; ctx.fillRect(q[0] + x, q[1] + 6, 1, 1); } }
+
+  // Puzzle cube: a 2×2 of the four puzzle colours with a bright white "?" so it
+  // reads as "tap me to play!". The colours match the mini-game buttons.
+  { const q = at(TILE.PUZZLE), h = T / 2; const cols = [0xe63946, 0x43aa3a, 0x2a6fdb, 0xf2c21e];
+    const quad = [[0, 0], [h, 0], [0, h], [h, h]];
+    for (let i = 0; i < 4; i++) { ctx.fillStyle = shade(cols[i], 1); ctx.fillRect(q[0] + quad[i][0], q[1] + quad[i][1], h, h); }
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(q[0] + h - 0.5, q[1], 1, T); ctx.fillRect(q[0], q[1] + h - 0.5, T, 1);
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('?', q[0] + h, q[1] + h + 1); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; }
 
   return c;
 }
