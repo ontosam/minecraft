@@ -1043,6 +1043,24 @@ A rideable **flying mount** — the dad's pick. Shipped on
   (no fold on glide); dragon is a fixed size (frames fine in 3rd-person); flight
   uses the gentle Fly speeds — could add a faster "dive."
 
+## Status (session 36) — challenge pass (dad: "he's missing some challenge")
+Dad's wishlist: a rocket that launches + explodes on asteroids, racing action,
+the same flight physics for the dragon, manual "feel in charge" startup steps,
+and **auto-night every ~15 min** (not frequent; shelter in builds). Shipping in
+increments on **`claude/dreamy-mccarthy-g6wgjr`** → `main`.
+1. **🌙 Auto-night every ~15 min.** `AUTO_NIGHT_EVERY=900s` of play, then the next
+   time he's home in the overworld it **falls to night** (`startAutoNight`: warns
+   "get inside!", spawns the existing zombies/spiders/skeletons), lasting
+   `AUTO_NIGHT_DURATION=85s` before **dawn** (`endAutoNight`). Only fires in the
+   overworld (held while he's in space/etc.), never mid-big-build. The manual 🌙
+   button still works and **cancels the auto cadence** (`nightAuto=false`; turning
+   day back on / sleeping / knockout all reset the ~15 min timer). **sw v27→v28.**
+   Debug: `__ezra.forceNight()/endNight()/setNightTimer(s)/nightInfo()`. Verified
+   headless: timer counts down, does NOT fire in space, fires on return to the
+   overworld (night+nightAuto), dawn + manual toggle + knockout all reset cleanly,
+   zero errors. (Still to come this pass: launchable/crashable rocket + dragon
+   flight challenge + manual ignition.)
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept

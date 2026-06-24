@@ -36,6 +36,11 @@ let heartBuffT = 0;                        // seconds left on the bonus
 const effMax = () => maxHearts + heartBuff; // total hearts right now (base + bonus)
 let night = false;                        // night-time toggle (zombies come out)
 let nightAmt = 0;                         // eased 0..1 for the day↔night look
+let nightAuto = false;                    // is the current night an automatic one?
+const AUTO_NIGHT_EVERY = 900;            // ~15 min of play between automatic nights
+const AUTO_NIGHT_DURATION = 85;          // how long an auto-night lasts before dawn
+let autoNightT = AUTO_NIGHT_EVERY;       // seconds until the next automatic night
+let autoNightLeft = 0;                   // seconds left in the current auto-night
 let invuln = 0;                           // brief mercy window after taking damage
 let hurtFlash = 0;                        // red screen flash timer
 let regenT = 0, sinceHurt = 99;           // gentle heart regen when safe
@@ -706,7 +711,7 @@ function placeBed(hit) {
   tip('bed', '🛏️ Tap to sleep! Night → morning, full hearts, home set.');
 }
 function sleepInBed(x, y, z) {
-  night = false; updateNightButton();
+  night = false; nightAuto = false; autoNightT = AUTO_NIGHT_EVERY; updateNightButton();   // sleeping skips the night
   hearts = effMax(); updateHearts();
   world.spawn = [x + 0.5, y, z + 0.5];     // beds set your home, just like Minecraft
   sound.play('coo');
@@ -1815,7 +1820,7 @@ function knockout() {
   if (fishing) reelIn(false);
   heartBuff = 0; heartBuffT = 0;          // bonus hearts end on a knockout
   showToast('💤 Oof! You got sleepy — back home, safe and sound.', 3400);
-  night = false; updateNightButton();
+  night = false; nightAuto = false; autoNightT = AUTO_NIGHT_EVERY; updateNightButton();
   const om = worlds.over && worlds.over.mobs;
   if (om && om.zombies) om.zombies.list.length = 0;
   if (om && om.spiders) om.spiders.list.length = 0;
@@ -1827,6 +1832,21 @@ function knockout() {
 function updateNightButton() {
   const b = document.getElementById('btn-night');
   if (b) { b.textContent = night ? '☀️' : '🌙'; b.classList.toggle('on', night); }
+}
+// Auto-night: every ~15 min of play the world darkens and monsters come out — a
+// gentle recurring challenge. He can shelter in his builds; it lifts at dawn.
+function startAutoNight() {
+  night = true; nightAuto = true; autoNightLeft = AUTO_NIGHT_DURATION;
+  updateNightButton();
+  goals.bump('night');
+  sound.play('uhoh');
+  showToast('🌙 Night is falling! Quick — get inside your house or build a shelter! 🏠', 4800);
+  tip('autonight', '🌙 Night comes now and then! Hide in a house, or tap the monsters. You always wake up safe!');
+}
+function endAutoNight() {
+  night = false; nightAuto = false; autoNightT = AUTO_NIGHT_EVERY;
+  updateNightButton();
+  showToast('☀️ Morning! You made it through the night — well done! 🎉', 3600);
 }
 
 // --- UI wiring ---
@@ -2253,8 +2273,9 @@ function wireUI() {
 
   document.getElementById('btn-night').addEventListener('pointerdown', (e) => {
     e.preventDefault(); sound.resume();
-    night = !night; updateNightButton();
+    night = !night; nightAuto = false; updateNightButton();
     if (night) { goals.bump('night'); tip('night', '🌙 Monsters come out! Tap them, or fly up. You always wake up safe!'); }
+    else autoNightT = AUTO_NIGHT_EVERY;   // turning day back on resets the ~15 min timer
   });
 
   document.getElementById('btn-ride').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); toggleRide(); });
@@ -2413,6 +2434,10 @@ function frameBody(now) {
   if (heartBuffT > 0) { heartBuffT -= dt; if (heartBuffT <= 0) { heartBuff = 0; hearts = Math.min(hearts, maxHearts); updateHearts(); } }
   // Steve's math 💎 pouch refills slowly (caps how fast math earns diamonds).
   if (mathPouch < MATH_POUCH_MAX) { mathRefillT += dt; if (mathRefillT >= 30) { mathRefillT = 0; mathPouch++; } }
+  // Auto-night timer: count down play-time while it's day, then fall to night the
+  // next time he's home in the overworld; lift back to day after a while.
+  if (!night) { autoNightT -= dt; if (autoNightT <= 0 && dimension === 'over' && !pendingBuild) startAutoNight(); }
+  else if (nightAuto) { autoNightLeft -= dt; if (autoNightLeft <= 0) endAutoNight(); }
   const nightTarget = (night && dimension === 'over') ? 1 : 0;
   nightAmt += (nightTarget - nightAmt) * Math.min(1, dt * 1.5);
   if (hurtEl) hurtEl.style.opacity = (hurtFlash * 0.9).toFixed(3);
@@ -2834,6 +2859,11 @@ function init() {
     blackHole: () => blackHoleWhoosh(),
     dragonRiding: () => dragonRiding,
     toggleDragon: () => toggleDragon(),
+    forceNight: () => startAutoNight(),
+    endNight: () => endAutoNight(),
+    autoNightT: () => autoNightT,
+    setNightTimer: (s) => { autoNightT = s; },
+    nightInfo: () => ({ night, nightAuto, autoNightT, autoNightLeft }),
     aliencops: () => { const a = mobs().aliencops; return a ? a.list : []; },
     fishing: () => !!fishing,
     castLine: () => castLine(),
