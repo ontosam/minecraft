@@ -307,6 +307,8 @@ function registerDim(key, w) {
   populateMobs(m);
   ensurePortalsFor(key);
   placePuzzleFixture(w);                  // a discoverable 🧩 puzzle cube near spawn (every world)
+  placeCraftFixture(w);                   // a 🛠️ crafting table near spawn (every stone world)
+  w.sprinkleOre();                        // seed coal/iron to mine (new worlds + older saves)
   w.rebuildAll();
   w.updateRedstone();                    // light any saved lamps wired to on-levers
   scanSaplings(w);                        // resume growing any saved saplings
@@ -665,6 +667,39 @@ function doDig(hit) {
     goals.addGems(1); updateGems();
     tip('spacegem', '🔷 Space crystals are treasure! Dig them for 💎. Drive around to find more!');
   }
+  collectFromDig(id, wasPlaced, [x + 0.5, y + 0.6, z + 0.5]);
+}
+
+// --- ⛏️ The earn-your-tools loop: mining NATURAL blocks gives crafting
+// materials, and a better pickaxe unlocks collecting better ones, so effort
+// compounds (wood → stone+coal → iron → diamond). Purely additive: nothing gets
+// harder, and YOUR placed blocks are never "mined" — creative building stays free.
+let pickNudgeT = -1e9;
+function pickNudge(msg) {
+  if (performance.now() - pickNudgeT < 12000) return;   // a gentle reminder, never spammy
+  pickNudgeT = performance.now();
+  sound.play('deny'); showToast(msg, 3200);
+}
+function collectFromDig(id, wasPlaced, pos) {
+  if (wasPlaced) return;                                  // only untouched, natural blocks are "mined"
+  const tier = goals.pickTier();
+  if (id === B.LOG || id === B.BIRCH_LOG) {               // wood: bare hands are fine
+    goals.addItem('wood'); gotMaterial('wood', pos);
+    tip('craft', '🪵 You got Wood! Tap the 🛠️ crafting table to make a Pickaxe — then you can mine stone, coal & iron!');
+  } else if (id === B.COAL_ORE) {
+    if (tier >= 1) { goals.addItem('coal'); gotMaterial('coal', pos); }
+    else pickNudge('⛏️ Coal! Make a Wooden Pickaxe at the 🛠️ table to dig it up.');
+  } else if (id === B.STONE || id === B.COBBLE) {
+    if (tier >= 1) { goals.addItem('stone'); gotMaterial('stone', pos); }
+    else pickNudge('⛏️ Make a Wooden Pickaxe at the 🛠️ table to collect stone! (Chop a tree for 🪵 wood first.)');
+  } else if (id === B.IRON_ORE) {
+    if (tier >= 2) { goals.addItem('iron'); gotMaterial('iron', pos); }
+    else pickNudge('⚙️ Iron! Make a Stone Pickaxe at the 🛠️ table to mine it.');
+  }
+}
+function gotMaterial(k, pos) {
+  if (pos) spawnParticles(pos, ITEM_ICON[k], 'puff', 1, 30);
+  updateInventory(k);
 }
 
 // --- Redstone: a lever powers wire, which lights up lamps ---
@@ -1074,6 +1109,7 @@ function setTool(t) {
   const bb = document.getElementById('btn-build'), bd = document.getElementById('btn-dig');
   if (bb) bb.classList.toggle('active', t === 'build');
   if (bd) bd.classList.toggle('active', t === 'dig');
+  syncHeldTool();                 // hold the pickaxe while digging, the sword otherwise
 }
 
 // --- Floating particles (hearts when petting, puffs when bonking a creeper) ---
@@ -1186,9 +1222,18 @@ function applyUnlocks() {
   }
   if (character) {
     character.wearCrown = goals.hasUnlock('crown');
-    character.holdSword = goals.hasUnlock('sword');
+    syncHeldTool();              // sets holdSword / holdPick based on the current tool
   }
   updateHearts();
+}
+// Show the pickaxe in hand while the Dig tool is active (and you own one); the
+// diamond sword shows the rest of the time. Tier picks which pickaxe mesh.
+const PICK_TIER_NAME = ['', 'wood', 'stone', 'iron', 'diamond'];
+function syncHeldTool() {
+  if (!character || !goals) return;
+  const tier = goals.pickTier();
+  character.holdPick = (tier > 0 && lastTool === 'dig') ? PICK_TIER_NAME[tier] : false;
+  character.holdSword = goals.hasUnlock('sword') && !character.holdPick;
 }
 // Regular TNT vs. the Mega TNT block (bought in the 💎 shop) — a much bigger boom.
 const TNT_RADIUS = 3.2, MEGA_TNT_RADIUS = 5.2;
@@ -1612,6 +1657,84 @@ function buyItem(it) {
   sound.play('treasure');
   updateGems(); buildShop();
   showToast('✨ Unlocked: ' + it.name + '!');
+}
+
+// --- ⛏️ Crafting: turn mined materials into better pickaxes (the ladder) ---
+// You can only craft the NEXT pickaxe up, so it's a clear step-by-step climb.
+// The Diamond Pickaxe costs 💎 — so the diamonds you earn everywhere finally buy
+// real digging power, not just cosmetics.
+const ITEM_ICON = { wood: '🪵', stone: '🪨', coal: '⚫', iron: '⚙️' };
+const PICK_LABEL = ['', '🪵⛏️', '🪨⛏️', '⚙️⛏️', '💠⛏️'];
+const RECIPES = [
+  { tier: 1, icon: '🪵⛏️', name: 'Wooden Pickaxe', cost: { wood: 4 }, desc: 'Mine stone & coal!' },
+  { tier: 2, icon: '🪨⛏️', name: 'Stone Pickaxe', cost: { stone: 5, wood: 2 }, desc: 'Mine iron!' },
+  { tier: 3, icon: '⚙️⛏️', name: 'Iron Pickaxe', cost: { iron: 4, wood: 2 }, desc: 'Strong & speedy!' },
+  { tier: 4, icon: '💠⛏️', name: 'Diamond Pickaxe', cost: { iron: 3, gems: 10 }, desc: 'The very best — uses 💎!' },
+];
+function costStr(cost) { return Object.keys(cost).map((k) => (k === 'gems' ? '💎' : ITEM_ICON[k]) + cost[k]).join(' '); }
+function openCrafting() {
+  buildCraft();
+  document.getElementById('craft').classList.remove('hidden');
+  sound.play('pet');
+  tip('craft2', '🛠️ Mine 🪵 wood, 🪨 stone and ⚙️ iron, then make a better pickaxe here. Each one digs up more!');
+}
+function buildCraft() {
+  const inv = document.getElementById('craft-inv');
+  if (inv) inv.innerHTML = ['wood', 'stone', 'coal', 'iron'].map((k) => '<span>' + ITEM_ICON[k] + ' ' + goals.itemCount(k) + '</span>').join('') + '<span>💎 ' + goals.gems + '</span>';
+  const body = document.getElementById('craft-body');
+  body.innerHTML = '';
+  const tier = goals.pickTier();
+  for (const r of RECIPES) {
+    const owned = tier >= r.tier;
+    const locked = r.tier > tier + 1;                       // only the next pickaxe up is craftable
+    const can = !owned && !locked && goals.canAfford(r.cost);
+    const btn = document.createElement('button');
+    btn.className = 'shop-item' + (owned ? ' owned' : '') + (locked ? ' locked' : '');
+    const sub = owned ? '✓ You made this!' : locked ? '🔒 Make the one above first' : r.desc + '  ·  ' + costStr(r.cost);
+    btn.innerHTML = '<span class="si">' + r.icon + '</span><div class="st"><b>' + r.name + '</b><small>' + sub + '</small></div>' +
+      '<div class="sc">' + (owned ? '✓' : locked ? '🔒' : (can ? 'Make!' : costStr(r.cost))) + '</div>';
+    if (can) btn.addEventListener('pointerdown', (e) => { e.preventDefault(); craftItem(r); });
+    body.appendChild(btn);
+  }
+}
+function craftItem(r) {
+  const tier = goals.pickTier();
+  if (tier >= r.tier || r.tier > tier + 1) return;
+  if (!goals.spendItems(r.cost)) { sound.play('deny'); showToast('Mine a little more first! Need ' + costStr(r.cost)); return; }
+  goals.setPickTier(r.tier);
+  syncHeldTool();
+  sound.play('treasure'); spawnSparkles([player.pos[0], player.pos[1] + 1.2, player.pos[2]]);
+  updateGems(); updateInventory(); buildCraft();
+  const next = { 1: 'Now you can mine 🪨 stone and ⚫ coal!', 2: 'Now you can mine ⚙️ iron!', 3: 'You dig nice and strong now!', 4: '💠 The best pickaxe ever!' };
+  showToast('✨ You made the ' + r.name + '! ' + (next[r.tier] || ''), 4200);
+}
+function closeCraft() { document.getElementById('craft').classList.add('hidden'); }
+// The little materials HUD (top-left). Hidden until you start mining, so it's
+// never clutter; `pulse` is the item key that just changed (for a pop animation).
+function updateInventory(pulse) {
+  const el = document.getElementById('inv-bar');
+  if (!el || !goals) return;
+  const keys = ['wood', 'stone', 'coal', 'iron'];
+  const any = goals.pickTier() > 0 || keys.some((k) => goals.itemCount(k) > 0);
+  el.style.display = any ? 'flex' : 'none';
+  if (!any) return;
+  let html = '';
+  for (const k of keys) html += '<span class="invi' + (k === pulse ? ' pop' : '') + '">' + ITEM_ICON[k] + goals.itemCount(k) + '</span>';
+  const tier = goals.pickTier();
+  if (tier > 0) html += '<span class="invi pick">' + PICK_LABEL[tier] + '</span>';
+  el.innerHTML = html;
+}
+// A 🛠️ crafting table on the ground near spawn (every world). Idempotent like the
+// puzzle cube: only fills AIR, never overwrites a build, and respawns if dug.
+function placeCraftFixture(w) {
+  const sp = w.spawn;
+  const x = Math.floor(sp[0]) - 3, z = Math.floor(sp[2]);
+  if (x < 1 || x >= SX - 1 || z < 1 || z >= SZ - 1) return;
+  const gy = w.heightAt(x, z);
+  if (gy < 1) return;
+  const top = w.get(x, gy, z);
+  if (top === B.CRAFTING) return;
+  if (top !== B.AIR && top !== B.WATER) w.set(x, gy + 1, z, B.CRAFTING);
 }
 
 // --- Villager quests: tap a villager for a little task, finish it for 💎 ---
@@ -2634,6 +2757,8 @@ function wireUI() {
   document.getElementById('gem-bar').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); openShop(); });
   document.getElementById('shop-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeShop(); });
   document.getElementById('shop').addEventListener('pointerdown', (e) => { if (e.target.id === 'shop') closeShop(); });
+  document.getElementById('craft-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeCraft(); });
+  document.getElementById('craft').addEventListener('pointerdown', (e) => { if (e.target.id === 'craft') closeCraft(); });
   document.getElementById('btn-adventure').addEventListener('pointerdown', (e) => {
     e.preventDefault(); sound.resume();
     tip('adventure', '📖 Friends give you fun jobs! Do it, then tap 📖.');
@@ -2928,6 +3053,7 @@ function frameBody(now) {
       else if (hit && bid === B.PUZZLE) openPuzzle();
       else if (hit && (bid === B.LEVER || bid === B.LEVER_ON)) toggleLever(hit.block[0], hit.block[1], hit.block[2]);
       else if (hit && bid === B.NOTE_BLOCK) playNoteBlock(hit.block[0], hit.block[1], hit.block[2]);
+      else if (hit && bid === B.CRAFTING) openCrafting();
       else if (hit && isTNT(bid)) lightTNT(hit.block[0], hit.block[1], hit.block[2]);
       else doAction(hit);
     }
@@ -3176,6 +3302,8 @@ function init() {
   updateHearts();
   updateNightButton();
   updateGems();
+  updateInventory();
+  syncHeldTool();
 
   // Resume audio on first interaction.
   const firstTouch = () => {
@@ -3223,6 +3351,13 @@ function init() {
     crown: () => character.wearCrown,
     sword: () => character.holdSword,
     gems: () => goals.gems,
+    openCraft: () => openCrafting(),
+    craft: (tier) => { const r = RECIPES.find((x) => x.tier === tier); if (r) craftItem(r); },
+    pickTier: () => goals.pickTier(),
+    holdPick: () => character.holdPick,
+    inventory: () => ({ ...goals.items, pick: goals.pickTier() }),
+    giveMaterials: (n = 9) => { for (const k of ['wood', 'stone', 'coal', 'iron']) goals.addItem(k, n); updateInventory(); },
+    mine: (x, y, z) => doDig({ block: [x, y, z] }),    // dig a specific cell (exercises the collect/gating path)
     buy: (idd) => { const it = SHOP.find((s) => s.id === idd); if (it) buyItem(it); },
     resetWorld: () => resetWorld(),
     travelTo: (k) => travelTo(k),

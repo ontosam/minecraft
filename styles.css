@@ -146,6 +146,7 @@ body {
 #ridemenu,
 #popcorn,
 #shop,
+#craft,
 #confirm,
 #quest,
 #astro,
@@ -174,6 +175,7 @@ body {
 #ridemenu.hidden,
 #popcorn.hidden,
 #shop.hidden,
+#craft.hidden,
 #confirm.hidden,
 #quest.hidden,
 #astro.hidden,
@@ -519,6 +521,43 @@ body {
   transform: translateY(2px);
 }
 
+/* Materials HUD (🪵🪨⚫⚙️ + your pickaxe) — top-left under 💎, only while mining. */
+#inv-bar {
+  position: absolute;
+  top: calc(max(10px, env(safe-area-inset-top)) + 96px);
+  left: max(12px, env(safe-area-inset-left));
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  max-width: 60vw;
+  pointer-events: none;
+}
+
+.invi {
+  font-size: 15px;
+  font-weight: 800;
+  color: #5a4a32;
+  background: rgba(255, 255, 255, .85);
+  border-radius: 10px;
+  padding: 3px 8px;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, .15);
+}
+
+.invi.pick {
+  color: #1c6;
+  background: rgba(228, 255, 240, .92);
+}
+
+.invi.pop {
+  animation: invpop .35s ease;
+}
+
+@keyframes invpop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+
 /* Treasure shop */
 #shop-gems {
   text-align: center;
@@ -528,12 +567,32 @@ body {
   font-size: 17px;
 }
 
-#shop-body {
+#shop-body,
+#craft-body {
   padding: 4px 16px 18px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+/* Crafting: the materials-you-have row + a greyed look for locked recipes. */
+#craft-inv {
+  text-align: center;
+  font-weight: 800;
+  color: #5a4a32;
+  padding: 10px;
+  font-size: 17px;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.shop-item.locked {
+  opacity: .5;
+  border-color: #e0e0e6;
+  background: #f3f3f6;
 }
 
 .shop-item {

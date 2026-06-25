@@ -43,6 +43,7 @@ export const B = {
   MOON_ROCK: 126, SPACE_METAL: 127, ALIEN_GOO: 128, METEOR: 129, PLASMA: 130, CRYSTAL_ORE: 131,
   PILLOW: 132,                 // a soft cushion you can tap to lie down on
   PUZZLE: 133,                 // a colorful cube — tap for a color-memory mini-game
+  COAL_ORE: 134, IRON_ORE: 135, // session 38: mine these for crafting materials
 };
 
 const W = [1, 1, 1]; // white tint for textured blocks
@@ -87,6 +88,8 @@ export const BLOCKS = {
   [B.DARK_PLANKS]: nat(TILE.DARK_PLANKS, '#4f3a22'),
   [B.GOLD]: nat(TILE.GOLD, '#f2c63a'),
   [B.DIAMOND]: nat(TILE.DIAMOND, '#59d6c8'),
+  [B.COAL_ORE]: nat(TILE.COAL_ORE, '#3a3a42'),
+  [B.IRON_ORE]: nat(TILE.IRON_ORE, '#c9a06a'),
   [B.BOOKSHELF]: nat3(TILE.PLANKS, TILE.BOOKSHELF, TILE.PLANKS, '#9a6b3a'),
   [B.GLOWSTONE]: nat(TILE.GLOWSTONE, '#e8c24a'),
   [B.PUMPKIN]: nat3(TILE.PUMPKIN_TOP, TILE.PUMPKIN_SIDE, TILE.PUMPKIN_TOP, '#e07b1e'),
@@ -209,7 +212,7 @@ export const CATEGORIES = [
   // Tap a lever → it powers redstone wire → wired-up lamps light up.
   { name: 'Redstone ⚙️', blocks: [B.LEVER, B.REDSTONE, B.REDLAMP, B.TARGET] },
   { name: 'Stone 🪨', blocks: [B.STONE, B.SMOOTH_STONE, B.COBBLE, B.STONE_BRICK, B.MOSSY_BRICK, B.DEEPSLATE, B.BLACKSTONE, B.GRANITE, B.ANDESITE, B.DIORITE, B.QUARTZ, B.PRISMARINE, B.SANDSTONE, B.TERRACOTTA, B.END_STONE, B.BRICK, B.OBSIDIAN] },
-  { name: 'Shiny 💎', blocks: [B.IRON_BLOCK, B.GOLD_BLOCK, B.DIAMOND_BLOCK, B.EMERALD_BLOCK, B.LAPIS_BLOCK, B.REDSTONE_BLOCK, B.COAL_BLOCK, B.COPPER, B.COPPER_OX, B.AMETHYST, B.GOLD, B.DIAMOND, B.ICE, B.PACKED_ICE] },
+  { name: 'Shiny 💎', blocks: [B.COAL_ORE, B.IRON_ORE, B.IRON_BLOCK, B.GOLD_BLOCK, B.DIAMOND_BLOCK, B.EMERALD_BLOCK, B.LAPIS_BLOCK, B.REDSTONE_BLOCK, B.COAL_BLOCK, B.COPPER, B.COPPER_OX, B.AMETHYST, B.GOLD, B.DIAMOND, B.ICE, B.PACKED_ICE] },
   { name: 'Wood', blocks: [B.PLANKS, B.BIRCH_PLANKS, B.DARK_PLANKS, B.CHERRY_PLANKS, B.CRIMSON_PLANKS, B.WARPED_PLANKS, B.BOOKSHELF] },
   { name: 'Decor 🪑', blocks: [B.MELON, B.HAY, B.HONEY, B.NOTE_BLOCK, B.SPONGE, B.SCULK, B.PUMPKIN, B.GLOWSTONE, B.SEA_LANTERN] },
   // A special group of wild blocks for crazy builds!
@@ -377,6 +380,40 @@ export class World {
     // Spawn on solid ground in the middle.
     const sh = this.heightAt(Math.floor(this.spawn[0]), Math.floor(this.spawn[2]));
     this.spawn[1] = sh + 2;
+  }
+
+  // Scatter coal + iron ore through the natural stone so there's something to
+  // mine for crafting materials. Idempotent: only runs if this world has stone
+  // but no ore yet, so freshly-generated worlds, reset worlds, AND older saves
+  // (loaded before this feature existed) all get some — and once it's seeded and
+  // saved it never runs again. Never replaces a block the player placed.
+  sprinkleOre() {
+    let hasOre = false, hasStone = false;
+    for (let i = 0; i < this.data.length; i++) {
+      const v = this.data[i];
+      if (v === B.COAL_ORE || v === B.IRON_ORE) { hasOre = true; break; }
+      if (v === B.STONE) hasStone = true;
+    }
+    if (hasOre || !hasStone) return;
+    let s = (0x9e3779b1 ^ this.data.length) >>> 0;   // small local RNG (no global state)
+    const rand = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+    const seed = (id, count, hiFrac) => {
+      for (let i = 0; i < count; i++) {
+        const x = 2 + Math.floor(rand() * (SX - 4)), z = 2 + Math.floor(rand() * (SZ - 4));
+        const surf = this.heightAt(x, z);
+        if (surf < 4) continue;
+        const cy = 1 + Math.floor(rand() * Math.max(1, Math.floor(surf * hiFrac) - 1));
+        const n = 2 + Math.floor(rand() * 4);
+        for (let k = 0; k < n; k++) {
+          const bx = x + (Math.floor(rand() * 3) - 1), by = cy + Math.floor(rand() * 2), bz = z + (Math.floor(rand() * 3) - 1);
+          if (bx < 1 || bx >= SX - 1 || bz < 1 || bz >= SZ - 1 || by < 1 || by >= SY) continue;
+          const key = this.idx(bx, by, bz);
+          if (this.get(bx, by, bz) === B.STONE && !this.placed.has(key)) this.data[key] = id;
+        }
+      }
+    };
+    seed(B.COAL_ORE, 54, 1.0);   // coal: common, any depth in the stone
+    seed(B.IRON_ORE, 34, 0.7);   // iron: a bit rarer, lower down
   }
 
   // Carve a gentle sandy lagoon: a bowl of water rimmed by a sand beach. Used

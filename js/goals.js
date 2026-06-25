@@ -60,17 +60,22 @@ export const GOAL_DEFS = [
   { id: 'spacerace', icon: '🏁', title: 'Space racer', desc: 'Finish the space ring race', metric: 'spacerace', target: 1 },
   { id: 'spacebuddy', icon: '🧑‍🚀', title: "Nova's helper", desc: 'Finish 3 missions for Captain Nova', metric: 'spacemission', target: 3 },
   { id: 'puzzler', icon: '🧩', title: 'Puzzle solver', desc: 'Solve 3 color puzzles', metric: 'puzzle', target: 3 },
+  { id: 'gather', icon: '🪵', title: 'Gather materials', desc: 'Collect 10 materials by mining', metric: 'gather', target: 10 },
+  { id: 'toolsmith', icon: '⛏️', title: 'Toolsmith', desc: 'Craft your first pickaxe', metric: 'craft', target: 1 },
+  { id: 'pickmaster', icon: '💠', title: 'Master miner', desc: 'Craft the shiny Diamond Pickaxe', metric: 'craftdia', target: 1 },
 ];
 
 const KEY = 'ezrablocks.goals.v1';
 
 export class Goals {
   constructor() {
-    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0, bought: 0, spider: 0, lamp: 0, monster: 0, lever: 0, bounce: 0, ride: 0, fish: 0, quest: 0, plant: 0, math: 0, snack: 0, skeleton: 0, crystal: 0, dragon: 0, story: 0, sleep: 0, funride: 0, treat: 0, space: 0, rover: 0, blackhole: 0, spacegem: 0, dragonfly: 0, rocketfly: 0, spacerace: 0, spacemission: 0, puzzle: 0 };
+    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0, bought: 0, spider: 0, lamp: 0, monster: 0, lever: 0, bounce: 0, ride: 0, fish: 0, quest: 0, plant: 0, math: 0, snack: 0, skeleton: 0, crystal: 0, dragon: 0, story: 0, sleep: 0, funride: 0, treat: 0, space: 0, rover: 0, blackhole: 0, spacegem: 0, dragonfly: 0, rocketfly: 0, spacerace: 0, spacemission: 0, puzzle: 0, gather: 0, craft: 0, craftdia: 0 };
     this.usedTypes = new Set();
     this.done = {};
     this.stars = 0;
     this.gems = 0;            // 💎 spendable currency (mined + earned from goals)
+    this.items = { wood: 0, stone: 0, coal: 0, iron: 0 };  // crafting materials, collected by mining
+    this.tools = { pick: 0 }; // tool tiers: pick 0=bare hands, 1=wood, 2=stone, 3=iron, 4=diamond
     this.unlocks = {};        // shop unlocks: { pet, heart, megatnt }
     this.tips = {};           // which one-time friendly hint blurbs have been shown
     this.adv = null;          // adventure story state: { i: chapter, base: counter baseline }
@@ -106,6 +111,18 @@ export class Goals {
   onDefend() { this.counts.defend++; this.check(); this.save(); }
   bump(metric) { if (metric in this.counts) { this.counts[metric]++; this.check(); this.save(); } }
 
+  // Crafting materials (collected by mining) + the tool ladder.
+  addItem(k, n = 1) { if (k in this.items) { this.items[k] += n; this.counts.gather += n; this.check(); this.save(); } }
+  itemCount(k) { return this.items[k] || 0; }
+  canAfford(cost) { for (const k in cost) { if (k === 'gems') { if (this.gems < cost[k]) return false; } else if ((this.items[k] || 0) < cost[k]) return false; } return true; }
+  spendItems(cost) {
+    if (!this.canAfford(cost)) return false;
+    for (const k in cost) { if (k === 'gems') this.gems -= cost[k]; else this.items[k] -= cost[k]; }
+    this.save(); return true;
+  }
+  pickTier() { return this.tools.pick || 0; }
+  setPickTier(t) { if (t > (this.tools.pick || 0)) { this.tools.pick = t; this.counts.craft++; if (t >= 4) this.counts.craftdia++; this.check(); this.save(); } }
+
   // 💎 currency + shop unlocks.
   addGems(n) { this.gems += n; this.save(); }
   spend(n) { if (this.gems >= n) { this.gems -= n; this.save(); return true; } return false; }
@@ -119,7 +136,7 @@ export class Goals {
     this._lastSave = Date.now();
     try {
       localStorage.setItem(KEY, JSON.stringify({
-        c: this.counts, t: [...this.usedTypes], d: this.done, s: this.stars, g: this.gems, u: this.unlocks, p: this.tips, adv: this.adv, fr: this.friends,
+        c: this.counts, t: [...this.usedTypes], d: this.done, s: this.stars, g: this.gems, it: this.items, tl: this.tools, u: this.unlocks, p: this.tips, adv: this.adv, fr: this.friends,
       }));
     } catch (e) { /* ignore */ }
   }
@@ -132,6 +149,8 @@ export class Goals {
         this.done = o.d || {};
         this.stars = o.s || 0;
         this.gems = o.g || 0;
+        this.items = Object.assign(this.items, o.it || {});
+        this.tools = Object.assign(this.tools, o.tl || {});
         this.unlocks = o.u || {};
         this.tips = o.p || {};
         this.adv = o.adv || null;

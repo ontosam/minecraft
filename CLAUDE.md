@@ -1151,6 +1151,53 @@ ids** (PILLOW 132, PUZZLE 133).
    spawn+3 (fills only air — could rarely perch on a portal/build, cosmetic);
    pillow body overhangs a single cushion (lay a row — intentional).
 
+## Status (session 38) — ⛏️ the earn-your-tools ladder (the progression spine)
+Dad asked "where's the game lacking vs Minecraft?" I diagnosed it as **wide but
+shallow** — many parallel toys, but nothing *compounds* the way Minecraft's one
+loop (mine → craft a better pickaxe → mine deeper → better stuff) does; the 💎
+economy pays out from everything and buys mostly cosmetics, so earning never made
+him more *capable*. He picked the **earn-your-tools ladder** via AskUserQuestion.
+Shipped on **`claude/dazzling-rubin-tabkcg`** → `main`. **sw v35→v36.** Now **136
+block ids** (COAL_ORE 134, IRON_ORE 135), **55 goals**. Hybrid by design: free
+creative building is 100% untouched — the ladder is a purely *additive* layer.
+- **Collect materials by mining** (`collectFromDig` in `doDig`): digging a
+  *natural* block drops crafting materials into a tiny inventory (`goals.items`:
+  🪵wood/🪨stone/⚫coal/⚙️iron). YOUR placed blocks are never "mined" (creative stays
+  free + snappy). A top-left **materials HUD** (`#inv-bar`, hidden until you start,
+  no hearts overlap) shows counts + your pickaxe.
+- **A crafting table that works** (`B.CRAFTING` was decorative): tap it → the
+  `#craft` dialog with big picture recipes; a **fixture** drops near spawn in every
+  world (`placeCraftFixture`, idempotent like the puzzle cube).
+- **The pickaxe ladder** (`goals.tools.pick` 0→4, `RECIPES`): 🪵 Wooden (unlocks
+  mining stone+coal) → 🪨 Stone (unlocks iron) → ⚙️ Iron (strong) → 💠 **Diamond
+  (costs 10💎 + iron)** — so the diamonds earned everywhere finally buy *capability*.
+  You can only craft the *next* tier up (a clear climb). **Gentle gating**
+  (additive, never punitive): bare hands get wood; a better pick unlocks the next
+  material, with a throttled "make a pickaxe!" nudge (`pickNudge`, ≤1/12s, never
+  spammy — nothing existing got harder). The pickaxe is **held in hand while
+  digging** (tier-colored mesh, `character.holdPick`/`syncHeldTool`; sword shows
+  otherwise).
+- **Ore to mine** (`World.sprinkleOre`): coal+iron seeded into natural stone —
+  idempotent (runs only if the world has stone but no ore), so new/reset worlds AND
+  **older saves all get ore** without losing a single build (only replaces
+  un-placed stone; once seeded+saved it never re-runs). Ores added to the Shiny
+  picker tab.
+- 3 new goals: **Gather materials** / **Toolsmith** / **Master miner** (→ 55).
+  Debug: `__ezra.openCraft()/craft(tier)/pickTier()/inventory()/giveMaterials(n)/
+  mine(x,y,z)`. Verified: Node logic (materials, canAfford-with-💎, tier-only-
+  climbs, save round-trip, old-save safe defaults) + headless CDP (ore seeded
+  ~78 coal/86 iron; full ladder wood→stone→coal→iron→diamond with gating at each
+  rung; 💎 really spent on the diamond pick; held pickaxe on Dig / hidden on Build;
+  dialog opens with 4 recipes; HUD visible + no hearts overlap; **save/reload keeps
+  materials+tier+ore ids**; 11-world hop clean; creative dig-your-own-block gives
+  no material) — all green, **zero errors**. Screenshots of the crafting dialog +
+  mining. Tuning candidates: crafting-table fixture sits at spawn−3 (only fills
+  air — could rarely be blocked on a cramped old save; a minimap marker / topbar
+  button is the easy follow-up); ore is surface-shallow (no caves yet); dig is
+  still instant (a "break time" sped up by better picks is a natural follow-up).
+  **Next rungs of this arc (offered to dad):** caves (deeper = better ore), real
+  break-time so faster picks *feel* faster, and more recipes (axe/shovel/armor).
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept

@@ -127,6 +127,16 @@ function buildSword(A) {
   addBox(A, -0.03, -0.06, -0.60, 0.03, 0.06, -0.02, STEEL);
   addBox(A, -0.014, -0.03, -0.68, 0.014, 0.03, -0.60, STEEL);
 }
+// A little pickaxe (crafted at the table). The head colour shows its tier:
+// wood → stone → iron → diamond. Held in the action hand while digging.
+function buildPick(head) {
+  return (A) => {
+    addBox(A, -0.022, -0.022, -0.46, 0.022, 0.022, 0.14, [0.45, 0.30, 0.16]);   // wooden handle
+    addBox(A, -0.20, -0.028, -0.55, 0.20, 0.045, -0.45, head);                    // pick head bar
+    addBox(A, -0.235, -0.018, -0.535, -0.18, 0.035, -0.47, head);                 // left tip
+    addBox(A, 0.18, -0.018, -0.535, 0.235, 0.035, -0.47, head);                   // right tip
+  };
+}
 // A little golden crown (shop reward) that sits on top of the head.
 function buildCrown(A) {
   addBox(A, -0.24, 0, -0.24, 0.24, 0.12, -0.18, GOLD);
@@ -149,6 +159,13 @@ export class Character {
     this._buildParts();
     this.crown = mesh(gl, buildCrown); this.wearCrown = false;
     this.sword = mesh(gl, buildSword); this.holdSword = false;
+    this.picks = {
+      wood: mesh(gl, buildPick([0.55, 0.38, 0.20])),
+      stone: mesh(gl, buildPick([0.56, 0.57, 0.62])),
+      iron: mesh(gl, buildPick([0.86, 0.87, 0.92])),
+      diamond: mesh(gl, buildPick([0.36, 0.86, 0.82])),
+    };
+    this.holdPick = false;          // false, or a tier name ('wood'|'stone'|'iron'|'diamond')
     this.ball = mesh(gl, buildBall);
     this.parts = [
       { mount: [-0.1, 0.7, 0], dir: 1, swing: true, leg: true },
@@ -204,11 +221,11 @@ export class Character {
       mat4.multiply(this._M, this._P, this._L);
       gl.uniformMatrix4fv(prog.u.uModel, false, this._M);
       p.m.draw(prog);
-      if (p.action && this.holdSword) {
+      if (p.action && (this.holdPick || this.holdSword)) {
         mat4.translate(this._T2, 0, -0.46, -0.02);
         mat4.multiply(this._M2, this._M, this._T2);
         gl.uniformMatrix4fv(prog.u.uModel, false, this._M2);
-        this.sword.draw(prog);
+        (this.holdPick && this.picks[this.holdPick] ? this.picks[this.holdPick] : this.sword).draw(prog);
       }
     }
     if (this.def.ball && !seated) {        // a soccer ball resting beside you

@@ -39,6 +39,8 @@ export const TILE = {
   PILLOW_TOP: 118, PILLOW_SIDE: 119,
   // session: a colorful puzzle cube — tap it for a color-memory mini-game
   PUZZLE: 120,
+  // session 38: ores you mine for crafting materials (the earn-your-tools ladder)
+  COAL_ORE: 121, IRON_ORE: 122,
 };
 
 export function initGL(canvas) {
@@ -537,6 +539,9 @@ function buildAtlasCanvas() {
   { const q = at(TILE.METEOR); noise(ctx, q[0], q[1], 0x3a322e, 0.20, 404); ctx.strokeStyle = shade(0xff6a1a, 1); ctx.lineWidth = 1; for (const [a, b, cc, d] of [[2, 3, 8, 9], [10, 2, 13, 11], [3, 12, 9, 14]]) { ctx.beginPath(); ctx.moveTo(q[0] + a, q[1] + b); ctx.lineTo(q[0] + cc, q[1] + d); ctx.stroke(); } ctx.fillStyle = shade(0xffb030, 1); ctx.fillRect(q[0] + 7, q[1] + 7, 1, 1); }
   glow(TILE.PLASMA, 0x7a2ad8, 0x33e0ff, 405);
   { const q = at(TILE.CRYSTAL_ORE); noise(ctx, q[0], q[1], 0x6c6c76, 0.16, 406); for (const [gx, gy] of [[4, 4], [10, 6], [6, 11], [12, 12]]) { ctx.fillStyle = shade(0x33e0d8, 1); ctx.fillRect(q[0] + gx, q[1] + gy, 2, 2); ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(q[0] + gx, q[1] + gy, 1, 1); } }
+  // Ores: a stone-grey block with embedded nuggets you can spot while digging.
+  { const q = at(TILE.COAL_ORE); noise(ctx, q[0], q[1], 0x8f8f97, 0.12, 407); for (const [gx, gy] of [[3, 4], [9, 3], [5, 10], [11, 11], [12, 6]]) { ctx.fillStyle = shade(0x1c1b22, 1); ctx.fillRect(q[0] + gx, q[1] + gy, 3, 3); ctx.fillStyle = 'rgba(90,90,100,0.6)'; ctx.fillRect(q[0] + gx, q[1] + gy, 1, 1); } }
+  { const q = at(TILE.IRON_ORE); noise(ctx, q[0], q[1], 0x8f8f97, 0.12, 408); for (const [gx, gy] of [[4, 3], [10, 5], [3, 11], [12, 12], [7, 8]]) { ctx.fillStyle = shade(0xcea06a, 1); ctx.fillRect(q[0] + gx, q[1] + gy, 3, 2); ctx.fillStyle = 'rgba(255,236,200,0.8)'; ctx.fillRect(q[0] + gx, q[1] + gy, 1, 1); } }
 
   // A soft pastel cushion. Top: a rounded highlight + four corner tufts (stitch
   // buttons). Side: the same colour with a stuffed seam line across the middle.
