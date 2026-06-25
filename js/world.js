@@ -350,6 +350,9 @@ export class World {
     // A big sandy beach lagoon to fly over and splash into.
     this.carveBeach();
 
+    // Caves to explore underground (a separate RNG so trees/treasure stay put).
+    this.carveCaves(mulberry32(0xca7e5));
+
     // Scatter friendly little trees on grass, away from the beach.
     let trees = 0;
     for (let attempt = 0; attempt < 400 && trees < 16; attempt++) {
@@ -413,7 +416,89 @@ export class World {
       }
     };
     seed(B.COAL_ORE, 54, 1.0);   // coal: common, any depth in the stone
-    seed(B.IRON_ORE, 34, 0.7);   // iron: a bit rarer, lower down
+    seed(B.IRON_ORE, 32, 0.7);   // iron: a bit rarer, lower down
+    seed(B.GOLD, 6, 0.4);        // gold: deeper
+    seed(B.DIAMOND, 6, 0.3);     // diamond: the deepest reward — sparse, brave the caves!
+  }
+
+  // Carve gentle caves into the stone: wandering tunnels + a few caverns + a
+  // handful of surface entrances you can find and climb down. Only ever removes
+  // *natural* stone/dirt/ore (never a block the player placed, never bedrock),
+  // and skips any column near a placed block (`protect`) so builds are safe and
+  // never undermined. New worlds carve freely; existing saves pass `protect`.
+  carveCaves(rand, protect) {
+    protect = protect || new Set();
+    const colKey = (x, z) => x + z * SX;
+    const carveSphere = (cx, cy, cz, r) => {
+      const ri = Math.round(cx), rj = Math.round(cy), rk = Math.round(cz);
+      for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) for (let dz = -r; dz <= r; dz++) {
+        if (dx * dx + dy * dy + dz * dz > r * r + 0.4) continue;
+        const x = ri + dx, y = rj + dy, z = rk + dz;
+        if (x < 1 || x >= SX - 1 || z < 1 || z >= SZ - 1 || y < 1 || y >= SY - 1) continue;  // keep bedrock + edges
+        if (protect.has(colKey(x, z))) continue;
+        const k = this.idx(x, y, z);
+        const id = this.data[k];
+        if ((id === B.STONE || id === B.DIRT || id === B.COAL_ORE || id === B.IRON_ORE) && !this.placed.has(k)) this.data[k] = B.AIR;
+      }
+    };
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    // Wandering tunnels.
+    for (let w = 0; w < 8; w++) {
+      let x = 4 + rand() * (SX - 8), z = 4 + rand() * (SZ - 8);
+      let y = 2 + rand() * 4;
+      let ax = rand() - 0.5, az = rand() - 0.5, ay = (rand() - 0.5) * 0.3;
+      const steps = 45 + (rand() * 45 | 0);
+      for (let s = 0; s < steps; s++) {
+        x = clamp(x + ax, 1, SX - 2); z = clamp(z + az, 1, SZ - 2); y += ay;
+        ax = clamp(ax + (rand() - 0.5) * 0.3, -1, 1); az = clamp(az + (rand() - 0.5) * 0.3, -1, 1);
+        ay = clamp(ay + (rand() - 0.5) * 0.2, -0.4, 0.4);
+        const surf = this.heightAt(Math.round(x), Math.round(z));
+        y = clamp(y, 2, Math.max(2, surf - 1));            // always stay underground
+        carveSphere(x, y, z, 1 + (rand() < 0.3 ? 1 : 0));
+      }
+    }
+    // A few bigger caverns.
+    for (let c = 0; c < 4; c++) {
+      const cx = 6 + (rand() * (SX - 12) | 0), cz = 6 + (rand() * (SZ - 12) | 0);
+      const cy = clamp(3 + (rand() * 3 | 0), 2, Math.max(2, this.heightAt(cx, cz) - 2));
+      carveSphere(cx, cy, cz, 2 + (rand() * 2 | 0));
+    }
+    // Surface entrances: a wandering sloped shaft down through open grass, so a
+    // kid can spot the hole and walk/drift down into a cave.
+    for (let e = 0; e < 6; e++) {
+      const x0 = 4 + (rand() * (SX - 8) | 0), z0 = 4 + (rand() * (SZ - 8) | 0);
+      if (protect.has(colKey(x0, z0))) continue;
+      const surf = this.heightAt(x0, z0);
+      if (surf < 5 || this.get(x0, surf, z0) !== B.GRASS) continue;   // only open grassy ground
+      let ex = x0, ez = z0;
+      for (let y = surf; y >= 2; y--) {
+        carveSphere(ex, y, ez, 1);
+        ex = clamp(ex + (rand() - 0.5) * 0.9, 1, SX - 2);
+        ez = clamp(ez + (rand() - 0.5) * 0.9, 1, SZ - 2);
+      }
+    }
+  }
+
+  // Retroactively add caves to an already-generated world (e.g. an old save that
+  // predates caves) WITHOUT touching builds. Idempotent: samples for existing
+  // underground air and bails if the world already has caves.
+  carveCavesIfNone() {
+    let air = 0, checked = 0;
+    for (let x = 2; x < SX - 2; x += 3) for (let z = 2; z < SZ - 2; z += 3) {
+      const surf = this.heightAt(x, z);
+      for (let y = 2; y < surf - 2; y++) { checked++; if (this.get(x, y, z) === B.AIR) air++; }
+    }
+    if (checked === 0 || air / checked > 0.05) return;     // already has caves (or no underground)
+    const protect = new Set();
+    for (const key of this.placed) {
+      const rem = key % (SX * SZ);
+      const x = rem % SX, z = Math.floor(rem / SX);
+      for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
+        const nx = x + dx, nz = z + dz;
+        if (nx >= 0 && nx < SX && nz >= 0 && nz < SZ) protect.add(nx + nz * SX);
+      }
+    }
+    this.carveCaves(mulberry32(0x5caf3d), protect);
   }
 
   // Carve a gentle sandy lagoon: a bowl of water rimmed by a sand beach. Used

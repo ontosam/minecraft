@@ -308,7 +308,8 @@ function registerDim(key, w) {
   ensurePortalsFor(key);
   placePuzzleFixture(w);                  // a discoverable 🧩 puzzle cube near spawn (every world)
   placeCraftFixture(w);                   // a 🛠️ crafting table near spawn (every stone world)
-  w.sprinkleOre();                        // seed coal/iron to mine (new worlds + older saves)
+  if (key === 'over') w.carveCavesIfNone();  // give older overworld saves caves too (build-safe)
+  w.sprinkleOre();                        // seed coal/iron/deep treasure to mine (new worlds + older saves)
   w.rebuildAll();
   w.updateRedstone();                    // light any saved lamps wired to on-levers
   scanSaplings(w);                        // resume growing any saved saplings
@@ -649,6 +650,20 @@ function doDig(hit) {
   if (isBed(id)) { removeBed(x, y, z); return; }
   const key = world.idx(x, y, z);
   const wasPlaced = world.placed.has(key);
+  // Break-time: natural rock/ore takes a few "chips" to break, and a better
+  // pickaxe chips harder — so tools FEEL more powerful. Soft blocks (dirt/sand/
+  // wood) and anything YOU placed break in one tap, so creative stays snappy.
+  const need = wasPlaced ? 0 : blockHardness(id);
+  if (need > 0) {
+    if (!breaking || breaking.key !== key) breaking = { key, progress: 0 };
+    breaking.progress += pickPower();
+    if (breaking.progress < need) {                 // chipped, not broken yet — tap again
+      sound.play('dig'); actionAnim = 1;
+      spawnParticles([x + 0.5, y + 0.5, z + 0.5], '⛏️', 'puff', 1, 22);
+      return;
+    }
+    breaking = null;                                // this tap broke through
+  }
   world.set(x, y, z, B.AIR);
   world.placed.delete(key);
   sound.play('dig'); saveDirty = true; actionAnim = 1; minimapDirty = true;
@@ -674,6 +689,18 @@ function doDig(hit) {
 // materials, and a better pickaxe unlocks collecting better ones, so effort
 // compounds (wood → stone+coal → iron → diamond). Purely additive: nothing gets
 // harder, and YOUR placed blocks are never "mined" — creative building stays free.
+// Break-time: how many "chips" a natural rock/ore needs, and how hard each
+// pickaxe tier chips. Tuned so the pickaxe that UNLOCKS a block breaks it in ~1
+// tap (snappy), while a weaker tool takes a few more (a nudge to upgrade), and
+// the diamond pickaxe shatters everything instantly (the power-fantasy reward).
+let breaking = null;                          // { key, progress } for the block being chipped
+const PICK_POWER = [1, 2, 3, 5, 8];           // bare, wood, stone, iron, diamond
+function pickPower() { return PICK_POWER[goals.pickTier()] || 1; }
+let HARDNESS = null;
+function blockHardness(id) {
+  if (!HARDNESS) HARDNESS = { [B.STONE]: 2, [B.COBBLE]: 2, [B.COAL_ORE]: 2, [B.IRON_ORE]: 3, [B.GOLD]: 4, [B.DIAMOND]: 4, [B.DEEPSLATE]: 3 };
+  return HARDNESS[id] || 0;                    // 0 = instant (soft natural blocks)
+}
 let pickNudgeT = -1e9;
 function pickNudge(msg) {
   if (performance.now() - pickNudgeT < 12000) return;   // a gentle reminder, never spammy
@@ -3358,6 +3385,8 @@ function init() {
     inventory: () => ({ ...goals.items, pick: goals.pickTier() }),
     giveMaterials: (n = 9) => { for (const k of ['wood', 'stone', 'coal', 'iron']) goals.addItem(k, n); updateInventory(); },
     mine: (x, y, z) => doDig({ block: [x, y, z] }),    // dig a specific cell (exercises the collect/gating path)
+    breaking: () => breaking,                          // current break-time chip progress
+    caveAir: () => { let a = 0; const w = world; for (let i = 0; i < w.data.length; i++) if (w.data[i] === B.AIR) a++; return a; },
     buy: (idd) => { const it = SHOP.find((s) => s.id === idd); if (it) buyItem(it); },
     resetWorld: () => resetWorld(),
     travelTo: (k) => travelTo(k),

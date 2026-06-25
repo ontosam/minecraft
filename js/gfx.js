@@ -114,7 +114,8 @@ uniform float uFogNear, uFogFar, uAlpha, uDayLight;
 void main() {
   vec4 tex = texture2D(uTex, vUV);
   if (tex.a < 0.5) discard;            // cutout transparency (glass, leaves)
-  vec3 c = tex.rgb * vColor * vLight * uDayLight;
+  float lit = max(vLight, 0.3);        // ambient floor so caves are dim, not pitch-black
+  vec3 c = tex.rgb * vColor * lit * uDayLight;
   float fog = clamp((vDist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
   c = mix(c, uFogColor, fog);
   gl_FragColor = vec4(c, uAlpha);
