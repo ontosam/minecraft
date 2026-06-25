@@ -1246,6 +1246,47 @@ the pickaxes somewhere exciting to earn their keep AND makes a better pickaxe
    (the 0.3 floor covers visibility) — a real block-light system + torches is the
    natural next step, along with axe/shovel and a "break time" crack overlay.
 
+## Status (session 40) — 🔥 The Forge (smelting + armor: mining ↔ combat)
+Dad asked "what makes it deeper, not shallow?" I diagnosed depth = systems that
+FEED each other, and the mining spine (s38–39) was walled off from combat. He
+picked **The Forge** via AskUserQuestion — the bridge tying mining → smelting →
+crafting → surviving. Shipped on **`claude/dazzling-rubin-tabkcg`** (commit
+**pending the same 403 deploy relay**; stacks on s38–39). **sw v37→v38.** Now
+**57 goals**.
+1. **🔥 Functional furnace.** The decorative `B.FURNACE` now opens a `#furnace`
+   dialog (tap it, or its near-spawn fixture beside the crafting table — they sit
+   side by side as one workshop, via `placeFixtureBlock`). **Smelt raw iron (⛓️) +
+   a coal (⚫ fuel) → an iron bar (🔩)** (`goals.smeltIron`, with a "Smelt all"
+   button). This finally gives **coal a purpose** (it was collected but unused).
+2. **Smelting is on the ladder.** The **Iron + Diamond pickaxes now need 🔩 bars**
+   (`RECIPES`: iron = 3 bars + wood, diamond = 2 bars + 10💎). So the path is
+   mine ⛓️ → smelt → craft — a real processing step, not just collecting. (Note:
+   the mined material is still `goals.items.iron`; smelting turns it into `ingot`.)
+3. **🛡️ Armor — the mining↔combat bridge.** Forge **Iron Armor** (6 bars) or
+   **Diamond Armor** (3 bars + 12💎) in a new "Armor" section of the crafting
+   dialog (`ARMOR_RECIPES`, `craftArmor`, tier-gated like pickaxes). Armor **soaks
+   damage** in `hurt()` (iron ×0.5, diamond ×0.25, min 0.5/hit) — so mining iron
+   deep in the caves lets you **survive the night & deep caves**, fusing mining +
+   smelting + crafting + combat into ONE "gear up to go deeper" loop. Drawn on the
+   kid as a tier-coloured **chestplate + helmet** (`character.armor`,
+   `buildChest`/`buildHelmet`; iron grey, diamond cyan; set in `applyUnlocks` +
+   `craftArmor`).
+4. HUD shows 🔩 bars + a 🛡️ armor badge. 2 new goals: **Smelter** (smelt 3) +
+   **Suit up!** (forge armor → 57). Save round-trips `items.ingot` +
+   `tools.armor` for free (existing `it`/`tl` keys). Debug: `__ezra.openFurnace()/
+   smelt(n)/craftArmor(t)/armorTier()`.
+   Verified: Node logic (smelt fuel cost, ingot-gated recipes, armor only-climbs +
+   goals, save round-trip, old-save defaults) + headless CDP (furnace fixture +
+   dialog; smelt 4 burns 4 iron + 4 coal → 4 bars; iron pickaxe via bars; iron +
+   diamond armor; **armor halves a hit: no-armor 1❤ vs diamond-armor 0.5❤**;
+   save/reload keeps bars + armor; armor drawn on the kid) + the updated ladder &
+   11-world-hop regressions — all green, **zero errors**. Screenshots of the
+   furnace dialog + the kid in diamond armor. **DEPLOY: s38–40 all committed
+   locally, pending the 403 relay** (push + mirror to `main` when infra recovers).
+   Next rungs offered to dad: axe/shovel (chop/dig faster), torches + a real
+   block-light system (deep caves get dark + torches matter), underground
+   dungeons with loot.
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept

@@ -63,19 +63,21 @@ export const GOAL_DEFS = [
   { id: 'gather', icon: '🪵', title: 'Gather materials', desc: 'Collect 10 materials by mining', metric: 'gather', target: 10 },
   { id: 'toolsmith', icon: '⛏️', title: 'Toolsmith', desc: 'Craft your first pickaxe', metric: 'craft', target: 1 },
   { id: 'pickmaster', icon: '💠', title: 'Master miner', desc: 'Craft the shiny Diamond Pickaxe', metric: 'craftdia', target: 1 },
+  { id: 'smelter', icon: '🔥', title: 'Smelter', desc: 'Smelt 3 iron bars in the furnace', metric: 'smelt', target: 3 },
+  { id: 'armored', icon: '🛡️', title: 'Suit up!', desc: 'Forge a suit of armor', metric: 'suit', target: 1 },
 ];
 
 const KEY = 'ezrablocks.goals.v1';
 
 export class Goals {
   constructor() {
-    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0, bought: 0, spider: 0, lamp: 0, monster: 0, lever: 0, bounce: 0, ride: 0, fish: 0, quest: 0, plant: 0, math: 0, snack: 0, skeleton: 0, crystal: 0, dragon: 0, story: 0, sleep: 0, funride: 0, treat: 0, space: 0, rover: 0, blackhole: 0, spacegem: 0, dragonfly: 0, rocketfly: 0, spacerace: 0, spacemission: 0, puzzle: 0, gather: 0, craft: 0, craftdia: 0 };
+    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0, bought: 0, spider: 0, lamp: 0, monster: 0, lever: 0, bounce: 0, ride: 0, fish: 0, quest: 0, plant: 0, math: 0, snack: 0, skeleton: 0, crystal: 0, dragon: 0, story: 0, sleep: 0, funride: 0, treat: 0, space: 0, rover: 0, blackhole: 0, spacegem: 0, dragonfly: 0, rocketfly: 0, spacerace: 0, spacemission: 0, puzzle: 0, gather: 0, craft: 0, craftdia: 0, smelt: 0, suit: 0 };
     this.usedTypes = new Set();
     this.done = {};
     this.stars = 0;
     this.gems = 0;            // 💎 spendable currency (mined + earned from goals)
-    this.items = { wood: 0, stone: 0, coal: 0, iron: 0 };  // crafting materials, collected by mining
-    this.tools = { pick: 0 }; // tool tiers: pick 0=bare hands, 1=wood, 2=stone, 3=iron, 4=diamond
+    this.items = { wood: 0, stone: 0, coal: 0, iron: 0, ingot: 0 };  // materials (mined) + smelted iron bars
+    this.tools = { pick: 0, armor: 0 }; // pick 0=bare→4=diamond; armor 0=none/1=iron/2=diamond
     this.unlocks = {};        // shop unlocks: { pet, heart, megatnt }
     this.tips = {};           // which one-time friendly hint blurbs have been shown
     this.adv = null;          // adventure story state: { i: chapter, base: counter baseline }
@@ -122,6 +124,10 @@ export class Goals {
   }
   pickTier() { return this.tools.pick || 0; }
   setPickTier(t) { if (t > (this.tools.pick || 0)) { this.tools.pick = t; this.counts.craft++; if (t >= 4) this.counts.craftdia++; this.check(); this.save(); } }
+  armorTier() { return this.tools.armor || 0; }
+  setArmor(t) { if (t > (this.tools.armor || 0)) { this.tools.armor = t; this.counts.suit++; this.check(); this.save(); } }
+  // Smelt one raw iron into a bar, burning a coal as fuel. Returns false if short.
+  smeltIron() { if ((this.items.iron || 0) < 1 || (this.items.coal || 0) < 1) return false; this.items.iron--; this.items.coal--; this.items.ingot = (this.items.ingot || 0) + 1; this.counts.smelt++; this.check(); this.save(); return true; }
 
   // 💎 currency + shop unlocks.
   addGems(n) { this.gems += n; this.save(); }

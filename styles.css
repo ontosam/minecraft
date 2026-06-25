@@ -147,6 +147,7 @@ body {
 #popcorn,
 #shop,
 #craft,
+#furnace,
 #confirm,
 #quest,
 #astro,
@@ -176,6 +177,7 @@ body {
 #popcorn.hidden,
 #shop.hidden,
 #craft.hidden,
+#furnace.hidden,
 #confirm.hidden,
 #quest.hidden,
 #astro.hidden,
@@ -568,7 +570,8 @@ body {
 }
 
 #shop-body,
-#craft-body {
+#craft-body,
+#furnace-body {
   padding: 4px 16px 18px;
   overflow-y: auto;
   display: flex;
@@ -577,7 +580,8 @@ body {
 }
 
 /* Crafting: the materials-you-have row + a greyed look for locked recipes. */
-#craft-inv {
+#craft-inv,
+#furnace-inv {
   text-align: center;
   font-weight: 800;
   color: #5a4a32;
@@ -587,6 +591,14 @@ body {
   gap: 10px;
   justify-content: center;
   flex-wrap: wrap;
+}
+
+.craft-sep {
+  text-align: center;
+  font-weight: 800;
+  color: #6a5a8a;
+  font-size: 16px;
+  margin: 4px 0 -4px;
 }
 
 .shop-item.locked {

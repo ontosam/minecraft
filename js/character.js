@@ -137,6 +137,22 @@ function buildPick(head) {
     addBox(A, 0.18, -0.018, -0.535, 0.235, 0.035, -0.47, head);                   // right tip
   };
 }
+// Forged armor (crafted at the table): a chestplate over the torso + a helmet
+// cap over the head. Colour = tier (iron grey, diamond cyan). Drawn over the
+// body/head parts so it moves with the kid.
+function buildChest(col) {
+  return (A) => {
+    addBox(A, -0.205, 0.02, -0.135, 0.205, 0.5, 0.135, col);          // chestplate shell
+    addBox(A, -0.225, 0.36, -0.13, -0.15, 0.52, 0.13, col);           // left shoulder
+    addBox(A, 0.15, 0.36, -0.13, 0.225, 0.52, 0.13, col);             // right shoulder
+  };
+}
+function buildHelmet(col) {
+  return (A) => {
+    addBox(A, -0.225, 0.27, -0.225, 0.225, 0.46, 0.225, col);         // cap above the eyes
+    addBox(A, -0.225, 0.12, 0.16, 0.225, 0.30, 0.225, col);           // back of the head
+  };
+}
 // A little golden crown (shop reward) that sits on top of the head.
 function buildCrown(A) {
   addBox(A, -0.24, 0, -0.24, 0.24, 0.12, -0.18, GOLD);
@@ -166,6 +182,10 @@ export class Character {
       diamond: mesh(gl, buildPick([0.36, 0.86, 0.82])),
     };
     this.holdPick = false;          // false, or a tier name ('wood'|'stone'|'iron'|'diamond')
+    const IRON_A = [0.78, 0.79, 0.84], DIAMOND_A = [0.40, 0.85, 0.82];
+    this.armorChest = [null, mesh(gl, buildChest(IRON_A)), mesh(gl, buildChest(DIAMOND_A))];
+    this.armorHelm = [null, mesh(gl, buildHelmet(IRON_A)), mesh(gl, buildHelmet(DIAMOND_A))];
+    this.armor = 0;                 // 0 = none, 1 = iron, 2 = diamond
     this.ball = mesh(gl, buildBall);
     this.parts = [
       { mount: [-0.1, 0.7, 0], dir: 1, swing: true, leg: true },
@@ -221,6 +241,8 @@ export class Character {
       mat4.multiply(this._M, this._P, this._L);
       gl.uniformMatrix4fv(prog.u.uModel, false, this._M);
       p.m.draw(prog);
+      if (this.armor > 0 && p.body && this.armorChest[this.armor]) this.armorChest[this.armor].draw(prog);
+      if (this.armor > 0 && p.head && this.armorHelm[this.armor]) this.armorHelm[this.armor].draw(prog);
       if (p.action && (this.holdPick || this.holdSword)) {
         mat4.translate(this._T2, 0, -0.46, -0.02);
         mat4.multiply(this._M2, this._M, this._T2);

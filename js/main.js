@@ -1249,6 +1249,7 @@ function applyUnlocks() {
   }
   if (character) {
     character.wearCrown = goals.hasUnlock('crown');
+    character.armor = goals.armorTier();   // forged armor shows on the kid
     syncHeldTool();              // sets holdSword / holdPick based on the current tool
   }
   updateHearts();
@@ -1690,13 +1691,22 @@ function buyItem(it) {
 // You can only craft the NEXT pickaxe up, so it's a clear step-by-step climb.
 // The Diamond Pickaxe costs 💎 — so the diamonds you earn everywhere finally buy
 // real digging power, not just cosmetics.
-const ITEM_ICON = { wood: '🪵', stone: '🪨', coal: '⚫', iron: '⚙️' };
+const ITEM_ICON = { wood: '🪵', stone: '🪨', coal: '⚫', iron: '⛓️', ingot: '🔩' };
 const PICK_LABEL = ['', '🪵⛏️', '🪨⛏️', '⚙️⛏️', '💠⛏️'];
+const ARMOR_LABEL = ['', '🛡️', '💠🛡️'];
+// The pickaxe ladder. Iron+ now need smelted 🔩 iron bars (mine ⛓️ raw iron →
+// smelt it at the 🔥 furnace), so the furnace is a real step on the climb.
 const RECIPES = [
   { tier: 1, icon: '🪵⛏️', name: 'Wooden Pickaxe', cost: { wood: 4 }, desc: 'Mine stone & coal!' },
   { tier: 2, icon: '🪨⛏️', name: 'Stone Pickaxe', cost: { stone: 5, wood: 2 }, desc: 'Mine iron!' },
-  { tier: 3, icon: '⚙️⛏️', name: 'Iron Pickaxe', cost: { iron: 4, wood: 2 }, desc: 'Strong & speedy!' },
-  { tier: 4, icon: '💠⛏️', name: 'Diamond Pickaxe', cost: { iron: 3, gems: 10 }, desc: 'The very best — uses 💎!' },
+  { tier: 3, icon: '⚙️⛏️', name: 'Iron Pickaxe', cost: { ingot: 3, wood: 2 }, desc: 'Strong & speedy!' },
+  { tier: 4, icon: '💠⛏️', name: 'Diamond Pickaxe', cost: { ingot: 2, gems: 10 }, desc: 'The very best — uses 💎!' },
+];
+// Armor: forge a suit to take less damage at night & in deep caves (the bridge
+// that ties mining → smelting → crafting into surviving tougher adventures).
+const ARMOR_RECIPES = [
+  { tier: 1, icon: '🛡️', name: 'Iron Armor', cost: { ingot: 6 }, desc: 'Take less damage — be brave at night!' },
+  { tier: 2, icon: '💠🛡️', name: 'Diamond Armor', cost: { ingot: 3, gems: 12 }, desc: 'The toughest armor of all!' },
 ];
 function costStr(cost) { return Object.keys(cost).map((k) => (k === 'gems' ? '💎' : ITEM_ICON[k]) + cost[k]).join(' '); }
 function openCrafting() {
@@ -1705,24 +1715,27 @@ function openCrafting() {
   sound.play('pet');
   tip('craft2', '🛠️ Mine 🪵 wood, 🪨 stone and ⚙️ iron, then make a better pickaxe here. Each one digs up more!');
 }
+function craftRow(body, r, owned, locked, onMake) {
+  const can = !owned && !locked && goals.canAfford(r.cost);
+  const btn = document.createElement('button');
+  btn.className = 'shop-item' + (owned ? ' owned' : '') + (locked ? ' locked' : '');
+  const sub = owned ? '✓ You made this!' : locked ? '🔒 Make the one above first' : r.desc + '  ·  ' + costStr(r.cost);
+  btn.innerHTML = '<span class="si">' + r.icon + '</span><div class="st"><b>' + r.name + '</b><small>' + sub + '</small></div>' +
+    '<div class="sc">' + (owned ? '✓' : locked ? '🔒' : (can ? 'Make!' : costStr(r.cost))) + '</div>';
+  if (can) btn.addEventListener('pointerdown', (e) => { e.preventDefault(); onMake(r); });
+  body.appendChild(btn);
+}
 function buildCraft() {
   const inv = document.getElementById('craft-inv');
-  if (inv) inv.innerHTML = ['wood', 'stone', 'coal', 'iron'].map((k) => '<span>' + ITEM_ICON[k] + ' ' + goals.itemCount(k) + '</span>').join('') + '<span>💎 ' + goals.gems + '</span>';
+  if (inv) inv.innerHTML = ['wood', 'stone', 'coal', 'iron', 'ingot'].map((k) => '<span>' + ITEM_ICON[k] + ' ' + goals.itemCount(k) + '</span>').join('') + '<span>💎 ' + goals.gems + '</span>';
   const body = document.getElementById('craft-body');
   body.innerHTML = '';
-  const tier = goals.pickTier();
-  for (const r of RECIPES) {
-    const owned = tier >= r.tier;
-    const locked = r.tier > tier + 1;                       // only the next pickaxe up is craftable
-    const can = !owned && !locked && goals.canAfford(r.cost);
-    const btn = document.createElement('button');
-    btn.className = 'shop-item' + (owned ? ' owned' : '') + (locked ? ' locked' : '');
-    const sub = owned ? '✓ You made this!' : locked ? '🔒 Make the one above first' : r.desc + '  ·  ' + costStr(r.cost);
-    btn.innerHTML = '<span class="si">' + r.icon + '</span><div class="st"><b>' + r.name + '</b><small>' + sub + '</small></div>' +
-      '<div class="sc">' + (owned ? '✓' : locked ? '🔒' : (can ? 'Make!' : costStr(r.cost))) + '</div>';
-    if (can) btn.addEventListener('pointerdown', (e) => { e.preventDefault(); craftItem(r); });
-    body.appendChild(btn);
-  }
+  const pt = goals.pickTier();
+  for (const r of RECIPES) craftRow(body, r, pt >= r.tier, r.tier > pt + 1, craftItem);
+  const at = goals.armorTier();
+  const head = document.createElement('div'); head.className = 'craft-sep'; head.textContent = '🛡️ Armor';
+  body.appendChild(head);
+  for (const r of ARMOR_RECIPES) craftRow(body, r, at >= r.tier, r.tier > at + 1, craftArmor);
 }
 function craftItem(r) {
   const tier = goals.pickTier();
@@ -1735,34 +1748,85 @@ function craftItem(r) {
   const next = { 1: 'Now you can mine 🪨 stone and ⚫ coal!', 2: 'Now you can mine ⚙️ iron!', 3: 'You dig nice and strong now!', 4: '💠 The best pickaxe ever!' };
   showToast('✨ You made the ' + r.name + '! ' + (next[r.tier] || ''), 4200);
 }
+function craftArmor(r) {
+  const at = goals.armorTier();
+  if (at >= r.tier || r.tier > at + 1) return;
+  if (!goals.spendItems(r.cost)) { sound.play('deny'); showToast('Forge more 🔩 iron bars first! Need ' + costStr(r.cost)); return; }
+  goals.setArmor(r.tier);
+  if (character) character.armor = r.tier;
+  sound.play('treasure'); spawnSparkles([player.pos[0], player.pos[1] + 1.2, player.pos[2]]);
+  updateGems(); updateInventory(); buildCraft();
+  showToast('✨ You forged ' + r.name + '! Now monsters can\'t hurt you as much — be brave! 🛡️', 4400);
+}
 function closeCraft() { document.getElementById('craft').classList.add('hidden'); }
+// --- 🔥 Furnace: smelt raw iron (⛓️) into iron bars (🔩), burning coal as fuel.
+// Iron+ tools/armor need bars, so the furnace is a real step on the ladder. ---
+function openFurnace() {
+  buildFurnace();
+  document.getElementById('furnace').classList.remove('hidden');
+  sound.play('pet');
+  tip('furnace', '🔥 Smelt your ⛓️ raw iron into 🔩 iron bars here (burns a ⚫ coal). Bars make iron tools + armor!');
+}
+function buildFurnace() {
+  const inv = document.getElementById('furnace-inv');
+  if (inv) inv.innerHTML = ['iron', 'coal', 'ingot'].map((k) => '<span>' + ITEM_ICON[k] + ' ' + goals.itemCount(k) + '</span>').join('');
+  const body = document.getElementById('furnace-body');
+  if (!body) return;
+  body.innerHTML = '';
+  const can = goals.itemCount('iron') >= 1 && goals.itemCount('coal') >= 1;
+  const one = document.createElement('button');
+  one.className = 'shop-item' + (can ? '' : ' locked');
+  one.innerHTML = '<span class="si">🔥</span><div class="st"><b>Smelt iron bar</b><small>⛓️1 + ⚫1 → 🔩1</small></div><div class="sc">' + (can ? 'Smelt!' : '🔒') + '</div>';
+  if (can) one.addEventListener('pointerdown', (e) => { e.preventDefault(); doSmelt(1); });
+  body.appendChild(one);
+  const n = Math.min(goals.itemCount('iron'), goals.itemCount('coal'));
+  if (n > 1) {
+    const all = document.createElement('button');
+    all.className = 'shop-item';
+    all.innerHTML = '<span class="si">🔥</span><div class="st"><b>Smelt all (' + n + ')</b><small>turn all your raw iron into bars</small></div><div class="sc">Smelt!</div>';
+    all.addEventListener('pointerdown', (e) => { e.preventDefault(); doSmelt(n); });
+    body.appendChild(all);
+  }
+}
+function doSmelt(n) {
+  let made = 0;
+  for (let i = 0; i < n; i++) { if (goals.smeltIron()) made++; else break; }
+  if (made > 0) { sound.play('treasure'); spawnSparkles([player.pos[0], player.pos[1] + 1.2, player.pos[2]]); showToast('🔥 Smelted ' + made + ' iron bar' + (made > 1 ? 's' : '') + '! 🔩', 3000); }
+  else sound.play('deny');
+  updateInventory(); buildFurnace();
+}
+function closeFurnace() { document.getElementById('furnace').classList.add('hidden'); }
 // The little materials HUD (top-left). Hidden until you start mining, so it's
 // never clutter; `pulse` is the item key that just changed (for a pop animation).
 function updateInventory(pulse) {
   const el = document.getElementById('inv-bar');
   if (!el || !goals) return;
-  const keys = ['wood', 'stone', 'coal', 'iron'];
-  const any = goals.pickTier() > 0 || keys.some((k) => goals.itemCount(k) > 0);
+  const keys = ['wood', 'stone', 'coal', 'iron', 'ingot'];
+  const any = goals.pickTier() > 0 || goals.armorTier() > 0 || keys.some((k) => goals.itemCount(k) > 0);
   el.style.display = any ? 'flex' : 'none';
   if (!any) return;
   let html = '';
-  for (const k of keys) html += '<span class="invi' + (k === pulse ? ' pop' : '') + '">' + ITEM_ICON[k] + goals.itemCount(k) + '</span>';
+  for (const k of keys) if (goals.itemCount(k) > 0 || k !== 'ingot') html += '<span class="invi' + (k === pulse ? ' pop' : '') + '">' + ITEM_ICON[k] + goals.itemCount(k) + '</span>';
   const tier = goals.pickTier();
   if (tier > 0) html += '<span class="invi pick">' + PICK_LABEL[tier] + '</span>';
+  const at = goals.armorTier();
+  if (at > 0) html += '<span class="invi pick">' + ARMOR_LABEL[at] + '</span>';
   el.innerHTML = html;
 }
-// A 🛠️ crafting table on the ground near spawn (every world). Idempotent like the
-// puzzle cube: only fills AIR, never overwrites a build, and respawns if dug.
-function placeCraftFixture(w) {
+// A 🛠️ crafting table + 🔥 furnace on the ground near spawn (every world).
+// Idempotent like the puzzle cube: only fills AIR, never overwrites a build, and
+// respawns if dug. The two sit side by side so the forge reads as one workshop.
+function placeFixtureBlock(w, dx, dz, id) {
   const sp = w.spawn;
-  const x = Math.floor(sp[0]) - 3, z = Math.floor(sp[2]);
+  const x = Math.floor(sp[0]) + dx, z = Math.floor(sp[2]) + dz;
   if (x < 1 || x >= SX - 1 || z < 1 || z >= SZ - 1) return;
   const gy = w.heightAt(x, z);
   if (gy < 1) return;
   const top = w.get(x, gy, z);
-  if (top === B.CRAFTING) return;
-  if (top !== B.AIR && top !== B.WATER) w.set(x, gy + 1, z, B.CRAFTING);
+  if (top === id) return;
+  if (top !== B.AIR && top !== B.WATER) w.set(x, gy + 1, z, id);
 }
+function placeCraftFixture(w) { placeFixtureBlock(w, -3, 0, B.CRAFTING); placeFixtureBlock(w, -3, 1, B.FURNACE); }
 
 // --- Villager quests: tap a villager for a little task, finish it for 💎 ---
 // Each quest tracks a goals counter from a baseline, so it's "from now on".
@@ -2296,6 +2360,8 @@ function askReset() {
 }
 function hurt(n) {
   if (invuln > 0 || hearts <= 0) return;
+  const armor = goals.armorTier();                 // forged armor soaks up damage (the mining→combat bridge)
+  if (armor > 0) n = Math.max(0.5, Math.round(n * (armor >= 2 ? 0.25 : 0.5) * 2) / 2);
   hearts = Math.max(0, hearts - n);
   invuln = 0.7; hurtFlash = 0.55; sinceHurt = 0; regenT = 0;
   sound.play('hurt');
@@ -2786,6 +2852,8 @@ function wireUI() {
   document.getElementById('shop').addEventListener('pointerdown', (e) => { if (e.target.id === 'shop') closeShop(); });
   document.getElementById('craft-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeCraft(); });
   document.getElementById('craft').addEventListener('pointerdown', (e) => { if (e.target.id === 'craft') closeCraft(); });
+  document.getElementById('furnace-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeFurnace(); });
+  document.getElementById('furnace').addEventListener('pointerdown', (e) => { if (e.target.id === 'furnace') closeFurnace(); });
   document.getElementById('btn-adventure').addEventListener('pointerdown', (e) => {
     e.preventDefault(); sound.resume();
     tip('adventure', '📖 Friends give you fun jobs! Do it, then tap 📖.');
@@ -3081,6 +3149,7 @@ function frameBody(now) {
       else if (hit && (bid === B.LEVER || bid === B.LEVER_ON)) toggleLever(hit.block[0], hit.block[1], hit.block[2]);
       else if (hit && bid === B.NOTE_BLOCK) playNoteBlock(hit.block[0], hit.block[1], hit.block[2]);
       else if (hit && bid === B.CRAFTING) openCrafting();
+      else if (hit && bid === B.FURNACE) openFurnace();
       else if (hit && isTNT(bid)) lightTNT(hit.block[0], hit.block[1], hit.block[2]);
       else doAction(hit);
     }
@@ -3380,6 +3449,10 @@ function init() {
     gems: () => goals.gems,
     openCraft: () => openCrafting(),
     craft: (tier) => { const r = RECIPES.find((x) => x.tier === tier); if (r) craftItem(r); },
+    openFurnace: () => openFurnace(),
+    smelt: (n) => doSmelt(n || 1),
+    craftArmor: (tier) => { const r = ARMOR_RECIPES.find((x) => x.tier === tier); if (r) craftArmor(r); },
+    armorTier: () => goals.armorTier(),
     pickTier: () => goals.pickTier(),
     holdPick: () => character.holdPick,
     inventory: () => ({ ...goals.items, pick: goals.pickTier() }),
