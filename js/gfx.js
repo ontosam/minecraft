@@ -41,6 +41,8 @@ export const TILE = {
   PUZZLE: 120,
   // session 38: ores you mine for crafting materials (the earn-your-tools ladder)
   COAL_ORE: 121, IRON_ORE: 122,
+  // session 40: the legendary treasure at the bottom of the Deep Vault
+  RELIC: 123,
 };
 
 export function initGL(canvas) {
@@ -543,6 +545,12 @@ function buildAtlasCanvas() {
   // Ores: a stone-grey block with embedded nuggets you can spot while digging.
   { const q = at(TILE.COAL_ORE); noise(ctx, q[0], q[1], 0x8f8f97, 0.12, 407); for (const [gx, gy] of [[3, 4], [9, 3], [5, 10], [11, 11], [12, 6]]) { ctx.fillStyle = shade(0x1c1b22, 1); ctx.fillRect(q[0] + gx, q[1] + gy, 3, 3); ctx.fillStyle = 'rgba(90,90,100,0.6)'; ctx.fillRect(q[0] + gx, q[1] + gy, 1, 1); } }
   { const q = at(TILE.IRON_ORE); noise(ctx, q[0], q[1], 0x8f8f97, 0.12, 408); for (const [gx, gy] of [[4, 3], [10, 5], [3, 11], [12, 12], [7, 8]]) { ctx.fillStyle = shade(0xcea06a, 1); ctx.fillRect(q[0] + gx, q[1] + gy, 3, 2); ctx.fillStyle = 'rgba(255,236,200,0.8)'; ctx.fillRect(q[0] + gx, q[1] + gy, 1, 1); } }
+  // The legendary Relic — a radiant gem that glows gold/violet (the grand prize).
+  { const q = at(TILE.RELIC); ctx.fillStyle = shade(0x2a1840, 1); ctx.fillRect(q[0], q[1], T, T);
+    for (let r = 7; r >= 1; r--) { ctx.fillStyle = `rgba(${180 + r * 8},${120 + r * 12},${255 - r * 6},0.16)`; ctx.beginPath(); ctx.arc(q[0] + 8, q[1] + 8, r, 0, 7); ctx.fill(); }
+    ctx.fillStyle = shade(0xffd24a, 1); ctx.beginPath(); ctx.moveTo(q[0] + 8, q[1] + 2); ctx.lineTo(q[0] + 13, q[1] + 8); ctx.lineTo(q[0] + 8, q[1] + 14); ctx.lineTo(q[0] + 3, q[1] + 8); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = shade(0xfff3b0, 1); ctx.beginPath(); ctx.moveTo(q[0] + 8, q[1] + 4); ctx.lineTo(q[0] + 11, q[1] + 8); ctx.lineTo(q[0] + 8, q[1] + 8); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.fillRect(q[0] + 7, q[1] + 6, 2, 2); }
 
   // A soft pastel cushion. Top: a rounded highlight + four corner tufts (stitch
   // buttons). Side: the same colour with a stuffed seam line across the middle.

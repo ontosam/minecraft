@@ -1287,6 +1287,45 @@ crafting → surviving. Shipped on **`claude/dazzling-rubin-tabkcg`** (commit
    block-light system (deep caves get dark + torches matter), underground
    dungeons with loot.
 
+## Status (session 41) — 🏆 Journey to the Deep (the grand goal)
+Dad asked "what makes it deeper, not shallow?" and picked **"a grand goal to gear
+up for"** via AskUserQuestion. Built a legendary quest that gives the whole
+mining → smelting → crafting → armor spine ONE epic destination. On
+**`claude/dazzling-rubin-tabkcg`** (**pending the 403 deploy relay**; stacks on
+s38–40). **sw v38→v39.** Now **59 goals**, **137 block ids** (RELIC 136).
+- **🏆 The Deep Vault + the Relic.** `World.carveVault` digs an **obsidian chamber
+  near bedrock** holding a glowing **legendary RELIC** (new block 136 +
+  `TILE.RELIC`), with a **shaft up to the surface** so you can find it and drop
+  down. Carved in `generate()` + a build-safe `carveVaultIfNone()` migration for
+  older saves (skips placed blocks/columns; idempotent; `findVault` locates the
+  one relic on load, in `registerDim`). A **gold ✦ minimap marker** shows where to
+  dig (until claimed).
+- **📜 The Great Quest journal** (new 📜 topbar button, overworld-only, hidden once
+  won). A staged checklist (`questStages`): ⛏️ forge an Iron Pickaxe → 🛡️ forge
+  Armor → 🕳️ dig deep (a frame check `pos[1]≤4` ticks `wentdeep`) → 🏆 claim the
+  Relic. Big readable text; the button **glows** (`questReadyToClaim`) once you're
+  geared up.
+- **The grand prize, gated by the gear.** Tapping the Relic ungeared = "sealed by
+  magic — gear up first!" (opens the journal). With an **Iron Pickaxe + Armor**,
+  `claimVault` pays **+💎25 + the Hero's Crown trophy + the Champion of the Deep
+  ⭐** + a celebration — *once* (no farming; `goals.done.champion` guards). So the
+  whole spine finally has a destination + payoff. The Relic is tap-to-claim only
+  (`doDig`/tap routing guard — can't be dug away).
+- 2 new goals: **Into the deep** + **Champion of the Deep** (→ 59). Save persists
+  Champion (the goal) + the relic block (world bytes) for free. Debug:
+  `__ezra.vault()/openQuest()/claimVault()/goDeep()/champion()`.
+  Verified: Node logic (one deep relic, obsidian walls, bedrock intact, reachable
+  shaft; migration keeps all 48 build blocks + idempotent) + headless CDP (vault +
+  relic present; journal 4 stages; ungeared claim = sealed; gear up → 📜 glows →
+  deep stage ticks → claim pays 💎+crown+Champion; button hides; relic undiggable;
+  no double reward; **save/reload keeps Champion**) + forge & 11-world-hop
+  regressions — all green, **zero errors**. Screenshots of the journal + the
+  crowned Champion beside the Relic in the vault. **DEPLOY: s38–41 all committed
+  locally, pending the 403 relay** (push + mirror to `main` when infra recovers).
+  Tuning candidates: crown sits a touch tall (known since s7); vault is
+  overworld-only; the surface shaft can clip a hillside (cosmetic). Next rungs:
+  axe/shovel, torches + real cave darkness, more vault tiers / a deeper boss.
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept

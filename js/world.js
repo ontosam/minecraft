@@ -44,6 +44,7 @@ export const B = {
   PILLOW: 132,                 // a soft cushion you can tap to lie down on
   PUZZLE: 133,                 // a colorful cube — tap for a color-memory mini-game
   COAL_ORE: 134, IRON_ORE: 135, // session 38: mine these for crafting materials
+  RELIC: 136,                   // session 40: the legendary treasure in the Deep Vault
 };
 
 const W = [1, 1, 1]; // white tint for textured blocks
@@ -90,6 +91,7 @@ export const BLOCKS = {
   [B.DIAMOND]: nat(TILE.DIAMOND, '#59d6c8'),
   [B.COAL_ORE]: nat(TILE.COAL_ORE, '#3a3a42'),
   [B.IRON_ORE]: nat(TILE.IRON_ORE, '#c9a06a'),
+  [B.RELIC]: nat(TILE.RELIC, '#c98cff'),
   [B.BOOKSHELF]: nat3(TILE.PLANKS, TILE.BOOKSHELF, TILE.PLANKS, '#9a6b3a'),
   [B.GLOWSTONE]: nat(TILE.GLOWSTONE, '#e8c24a'),
   [B.PUMPKIN]: nat3(TILE.PUMPKIN_TOP, TILE.PUMPKIN_SIDE, TILE.PUMPKIN_TOP, '#e07b1e'),
@@ -352,6 +354,7 @@ export class World {
 
     // Caves to explore underground (a separate RNG so trees/treasure stay put).
     this.carveCaves(mulberry32(0xca7e5));
+    this.carveVault(mulberry32(0x7eaf5));   // the legendary Deep Vault (grand goal)
 
     // Scatter friendly little trees on grass, away from the beach.
     let trees = 0;
@@ -499,6 +502,57 @@ export class World {
       }
     }
     this.carveCaves(mulberry32(0x5caf3d), protect);
+  }
+
+  // The Deep Vault: an obsidian chamber near bedrock holding the legendary RELIC
+  // (the grand prize you gear up for), with a shaft up to the surface so you can
+  // find it and dig down. Carved once; build-safe (skips placed blocks/columns).
+  carveVault(rand, protect) {
+    protect = protect || new Set();
+    const colKey = (x, z) => x + z * SX;
+    let cx = SX >> 1, cz = SZ >> 1, tries = 0;
+    do {
+      cx = 10 + (rand() * (SX - 20) | 0); cz = 10 + (rand() * (SZ - 20) | 0); tries++;
+    } while (tries < 80 && (protect.has(colKey(cx, cz)) || this.heightAt(cx, cz) < 7 || Math.hypot(cx - this.spawn[0], cz - this.spawn[2]) < 14));
+    const fy = 2;                                  // floor sits just above bedrock
+    for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) for (let dy = 0; dy <= 4; dy++) {
+      const x = cx + dx, y = fy + dy, z = cz + dz;
+      if (x < 1 || x >= SX - 1 || z < 1 || z >= SZ - 1 || y < 1 || y >= SY) continue;
+      const k = this.idx(x, y, z);
+      if (protect.has(colKey(x, z)) || this.placed.has(k)) continue;
+      const wall = dx === -2 || dx === 2 || dz === -2 || dz === 2 || dy === 0 || dy === 4;
+      this.data[k] = wall ? B.OBSIDIAN : B.AIR;
+    }
+    this.data[this.idx(cx, fy + 1, cz)] = B.RELIC;   // the prize, on a little pedestal
+    const surf = this.heightAt(cx, cz);
+    for (let y = fy + 2; y <= surf + 1; y++) for (const [ox, oz] of [[0, 0], [1, 0]]) {
+      const x = cx + ox, z = cz + oz;
+      if (x < 1 || x >= SX - 1 || z < 1 || z >= SZ - 1 || protect.has(colKey(x, z))) continue;
+      const k = this.idx(x, y, z);
+      if (!this.placed.has(k) && this.data[k] !== B.BEDROCK) this.data[k] = B.AIR;
+    }
+    this.vault = [cx, fy + 1, cz];
+  }
+
+  // Find the single RELIC block (set from a fresh carve or after loading a save).
+  findVault() {
+    for (let i = 0; i < this.data.length; i++) if (this.data[i] === B.RELIC) {
+      const rem = i % (SX * SZ);
+      this.vault = [rem % SX, Math.floor(i / (SX * SZ)), Math.floor(rem / SX)];
+      return this.vault;
+    }
+    this.vault = null; return null;
+  }
+
+  // Add a vault to an older save that predates it, without disturbing builds.
+  carveVaultIfNone() {
+    if (this.findVault()) return;
+    const protect = new Set();
+    for (const key of this.placed) {
+      const rem = key % (SX * SZ); const x = rem % SX, z = Math.floor(rem / SX);
+      for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) { const nx = x + dx, nz = z + dz; if (nx >= 0 && nx < SX && nz >= 0 && nz < SZ) protect.add(nx + nz * SX); }
+    }
+    this.carveVault(mulberry32(0x7eaf5), protect);
   }
 
   // Carve a gentle sandy lagoon: a bowl of water rimmed by a sand beach. Used

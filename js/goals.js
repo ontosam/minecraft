@@ -65,13 +65,15 @@ export const GOAL_DEFS = [
   { id: 'pickmaster', icon: '💠', title: 'Master miner', desc: 'Craft the shiny Diamond Pickaxe', metric: 'craftdia', target: 1 },
   { id: 'smelter', icon: '🔥', title: 'Smelter', desc: 'Smelt 3 iron bars in the furnace', metric: 'smelt', target: 3 },
   { id: 'armored', icon: '🛡️', title: 'Suit up!', desc: 'Forge a suit of armor', metric: 'suit', target: 1 },
+  { id: 'deepdig', icon: '🕳️', title: 'Into the deep', desc: 'Dig down to the bottom of a cave', metric: 'wentdeep', target: 1 },
+  { id: 'champion', icon: '🏆', title: 'Champion of the Deep', desc: 'Claim the legendary Relic in the Deep Vault', metric: 'champion', target: 1 },
 ];
 
 const KEY = 'ezrablocks.goals.v1';
 
 export class Goals {
   constructor() {
-    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0, bought: 0, spider: 0, lamp: 0, monster: 0, lever: 0, bounce: 0, ride: 0, fish: 0, quest: 0, plant: 0, math: 0, snack: 0, skeleton: 0, crystal: 0, dragon: 0, story: 0, sleep: 0, funride: 0, treat: 0, space: 0, rover: 0, blackhole: 0, spacegem: 0, dragonfly: 0, rocketfly: 0, spacerace: 0, spacemission: 0, puzzle: 0, gather: 0, craft: 0, craftdia: 0, smelt: 0, suit: 0 };
+    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0, bought: 0, spider: 0, lamp: 0, monster: 0, lever: 0, bounce: 0, ride: 0, fish: 0, quest: 0, plant: 0, math: 0, snack: 0, skeleton: 0, crystal: 0, dragon: 0, story: 0, sleep: 0, funride: 0, treat: 0, space: 0, rover: 0, blackhole: 0, spacegem: 0, dragonfly: 0, rocketfly: 0, spacerace: 0, spacemission: 0, puzzle: 0, gather: 0, craft: 0, craftdia: 0, smelt: 0, suit: 0, wentdeep: 0, champion: 0 };
     this.usedTypes = new Set();
     this.done = {};
     this.stars = 0;

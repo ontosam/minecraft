@@ -308,7 +308,8 @@ function registerDim(key, w) {
   ensurePortalsFor(key);
   placePuzzleFixture(w);                  // a discoverable 🧩 puzzle cube near spawn (every world)
   placeCraftFixture(w);                   // a 🛠️ crafting table near spawn (every stone world)
-  if (key === 'over') w.carveCavesIfNone();  // give older overworld saves caves too (build-safe)
+  if (key === 'over') { w.carveCavesIfNone(); w.carveVaultIfNone(); }  // caves + the Deep Vault for older saves (build-safe)
+  else if (w.findVault) w.findVault();    // locate the relic in any world that has one
   w.sprinkleOre();                        // seed coal/iron/deep treasure to mine (new worlds + older saves)
   w.rebuildAll();
   w.updateRedstone();                    // light any saved lamps wired to on-levers
@@ -348,6 +349,7 @@ function setDimension(key) {
   if (key !== 'space' && rocketState !== 'off') stopRocket(false); // the rocket flies in Space World
   updateRoverButton();
   updateRocketButton();
+  updateQuestButton();           // the 📜 Great Quest is an overworld journey
   minimapDirty = true;
 }
 
@@ -645,6 +647,7 @@ function doDig(hit) {
   const [x, y, z] = hit.block;
   const id = world.get(x, y, z);
   if (id === B.AIR || (BLOCKS[id] && BLOCKS[id].indestructible)) { sound.play('deny'); return; }
+  if (id === B.RELIC) { claimVault(); return; }                       // the prize: tap to claim, never dig away
   if (world.isPortalBlock(x, y, z)) { sound.play('deny'); return; }   // portals can't be broken
   if (isDoor(id)) { removeDoor(x, y, z); return; }
   if (isBed(id)) { removeBed(x, y, z); return; }
@@ -1744,9 +1747,10 @@ function craftItem(r) {
   goals.setPickTier(r.tier);
   syncHeldTool();
   sound.play('treasure'); spawnSparkles([player.pos[0], player.pos[1] + 1.2, player.pos[2]]);
-  updateGems(); updateInventory(); buildCraft();
+  updateGems(); updateInventory(); buildCraft(); updateQuestButton();
   const next = { 1: 'Now you can mine 🪨 stone and ⚫ coal!', 2: 'Now you can mine ⚙️ iron!', 3: 'You dig nice and strong now!', 4: '💠 The best pickaxe ever!' };
   showToast('✨ You made the ' + r.name + '! ' + (next[r.tier] || ''), 4200);
+  if (r.tier === 1) tip('quest2', '📜 You\'re on an adventure! Tap 📜 up top to see the Great Quest — a legendary treasure waits deep below!');
 }
 function craftArmor(r) {
   const at = goals.armorTier();
@@ -1755,7 +1759,7 @@ function craftArmor(r) {
   goals.setArmor(r.tier);
   if (character) character.armor = r.tier;
   sound.play('treasure'); spawnSparkles([player.pos[0], player.pos[1] + 1.2, player.pos[2]]);
-  updateGems(); updateInventory(); buildCraft();
+  updateGems(); updateInventory(); buildCraft(); updateQuestButton();
   showToast('✨ You forged ' + r.name + '! Now monsters can\'t hurt you as much — be brave! 🛡️', 4400);
 }
 function closeCraft() { document.getElementById('craft').classList.add('hidden'); }
@@ -1796,6 +1800,49 @@ function doSmelt(n) {
   updateInventory(); buildFurnace();
 }
 function closeFurnace() { document.getElementById('furnace').classList.add('hidden'); }
+
+// --- 📜 Journey to the Deep: the grand quest. Gather → craft an iron pickaxe →
+// forge armor → dig deep through the caves → claim the legendary Relic in the
+// Deep Vault. It gives the whole mining/crafting/armor spine one epic destination.
+function questStages() {
+  return [
+    { icon: '⛏️', label: 'Forge an Iron Pickaxe', done: goals.pickTier() >= 3, hint: 'Mine iron, smelt 🔩 bars at the 🔥 furnace, craft it at the 🛠️ table.' },
+    { icon: '🛡️', label: 'Forge a suit of Armor', done: goals.armorTier() >= 1, hint: 'Make 🔩 bars, then craft Armor at the 🛠️ table.' },
+    { icon: '🕳️', label: 'Dig deep underground', done: (goals.counts.wentdeep || 0) >= 1, hint: 'Find a cave and dig down — follow the gold ✦ on your map!' },
+    { icon: '🏆', label: 'Claim the Legendary Relic', done: !!goals.done.champion, hint: 'Tap the glowing Relic deep in the Vault!' },
+  ];
+}
+function questReadyToClaim() { const s = questStages(); return !goals.done.champion && s[0].done && s[1].done; }
+function openQuestJournal() {
+  const st = questStages();
+  document.getElementById('quest2-msg').innerHTML = goals.done.champion ? '🏆 You are the Champion of the Deep! 🏆' : '📜 A legendary treasure waits deep below.<br>Gear up, then dig down to claim it!';
+  document.getElementById('quest2-body').innerHTML = st.map((s) => '<div class="qstage' + (s.done ? ' qdone' : '') + '"><span class="qi">' + (s.done ? '✅' : s.icon) + '</span><div class="qt"><b>' + s.label + '</b><small>' + (s.done ? 'Done!' : s.hint) + '</small></div></div>').join('');
+  document.getElementById('quest2').classList.remove('hidden');
+  sound.play('pet');
+}
+function closeQuest2() { document.getElementById('quest2').classList.add('hidden'); }
+function updateQuestButton() {
+  const b = document.getElementById('btn-quest'); if (!b) return;
+  b.style.display = (dimension === 'over' && !goals.done.champion) ? '' : 'none';   // an overworld journey
+  b.classList.toggle('ready', questReadyToClaim());
+}
+function claimVault() {
+  if (goals.done.champion) { sound.play('pet'); showToast('🏆 You are the Champion of the Deep! The Relic glows just for you.', 3500); return; }
+  if (goals.pickTier() < 3 || goals.armorTier() < 1) {
+    sound.play('deny');
+    showToast('✨ The Relic is sealed by magic… Gear up first — forge an Iron Pickaxe AND Armor, then return! 📜', 5400);
+    openQuestJournal();
+    return;
+  }
+  goals.bump('champion');                       // completes the Champion of the Deep goal (a ⭐)
+  goals.addGems(25); updateGems();
+  if (!goals.hasUnlock('crown')) { goals.setUnlock('crown'); applyUnlocks(); }   // the Hero's Crown trophy
+  const v = (world.vault || [player.pos[0], player.pos[1], player.pos[2]]);
+  for (let i = 0; i < 6; i++) spawnSparkles([v[0] + 0.5, v[1] + 0.7 + i * 0.25, v[2] + 0.5]);
+  sound.play('treasure');
+  showToast('🏆🎉 YOU CLAIMED THE LEGENDARY RELIC! +💎25 and a Hero\'s Crown! You are the Champion of the Deep! 👑', 6500);
+  updateQuestButton(); minimapDirty = true;
+}
 // The little materials HUD (top-left). Hidden until you start mining, so it's
 // never clutter; `pulse` is the item key that just changed (for a pop animation).
 function updateInventory(pulse) {
@@ -2854,6 +2901,9 @@ function wireUI() {
   document.getElementById('craft').addEventListener('pointerdown', (e) => { if (e.target.id === 'craft') closeCraft(); });
   document.getElementById('furnace-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeFurnace(); });
   document.getElementById('furnace').addEventListener('pointerdown', (e) => { if (e.target.id === 'furnace') closeFurnace(); });
+  document.getElementById('btn-quest').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); openQuestJournal(); });
+  document.getElementById('quest2-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeQuest2(); });
+  document.getElementById('quest2').addEventListener('pointerdown', (e) => { if (e.target.id === 'quest2') closeQuest2(); });
   document.getElementById('btn-adventure').addEventListener('pointerdown', (e) => {
     e.preventDefault(); sound.resume();
     tip('adventure', '📖 Friends give you fun jobs! Do it, then tap 📖.');
@@ -2938,6 +2988,13 @@ function drawMinimap() {
     if (stevePos) {
       mmCtx.fillStyle = '#ff8c1a'; mmCtx.strokeStyle = '#5a2e00'; mmCtx.lineWidth = 1.5;
       mmCtx.beginPath(); mmCtx.arc(stevePos[0] * s, stevePos[2] * s, 4, 0, Math.PI * 2); mmCtx.fill(); mmCtx.stroke();
+    }
+    // The Deep Vault — a gold ✦ showing where to dig down for the Relic (until claimed).
+    if (world.vault && !goals.done.champion) {
+      const vx = world.vault[0] * s, vz = world.vault[2] * s;
+      mmCtx.fillStyle = '#ffe24a'; mmCtx.strokeStyle = '#8a6a00'; mmCtx.lineWidth = 1.5; mmCtx.font = 'bold 11px sans-serif'; mmCtx.textAlign = 'center'; mmCtx.textBaseline = 'middle';
+      mmCtx.beginPath(); mmCtx.arc(vx, vz, 5, 0, Math.PI * 2); mmCtx.fill(); mmCtx.stroke();
+      mmCtx.fillStyle = '#7a5a00'; mmCtx.fillText('✦', vx, vz + 0.5);
     }
   }
   // Secret World markers: rides (pink) + stands incl. the ticket booth (gold).
@@ -3070,6 +3127,12 @@ function frameBody(now) {
   // Space World: drop below the moon floor (a hidden black hole) → whoosh home.
   if (dimension === 'space' && portalCooldown === 0 && player.pos[1] < 3) blackHoleWhoosh();
 
+  // The grand quest: reaching the deep ticks the "dig deep" stage (once).
+  if (dimension === 'over' && player.pos[1] <= 4 && (goals.counts.wentdeep || 0) < 1) {
+    goals.bump('wentdeep'); updateQuestButton();
+    tip('deep', "🕳️ You're deep underground! The Legendary Relic is near — find the gold ✦ on your map (top-right).");
+  }
+
   // Rocket: tick the launch countdown (3-2-1-blast off), then watch for crashes.
   if (rocketState === 'countdown') {
     const was = Math.ceil(rocketCountT);
@@ -3150,6 +3213,7 @@ function frameBody(now) {
       else if (hit && bid === B.NOTE_BLOCK) playNoteBlock(hit.block[0], hit.block[1], hit.block[2]);
       else if (hit && bid === B.CRAFTING) openCrafting();
       else if (hit && bid === B.FURNACE) openFurnace();
+      else if (hit && bid === B.RELIC) claimVault();
       else if (hit && isTNT(bid)) lightTNT(hit.block[0], hit.block[1], hit.block[2]);
       else doAction(hit);
     }
@@ -3400,6 +3464,7 @@ function init() {
   updateGems();
   updateInventory();
   syncHeldTool();
+  updateQuestButton();
 
   // Resume audio on first interaction.
   const firstTouch = () => {
@@ -3453,6 +3518,11 @@ function init() {
     smelt: (n) => doSmelt(n || 1),
     craftArmor: (tier) => { const r = ARMOR_RECIPES.find((x) => x.tier === tier); if (r) craftArmor(r); },
     armorTier: () => goals.armorTier(),
+    vault: () => (world.vault ? world.vault.slice() : null),
+    openQuest: () => openQuestJournal(),
+    claimVault: () => claimVault(),
+    goDeep: () => { const v = world.vault; if (v) { player.pos = [v[0] + 0.5, v[1], v[2] + 0.5]; player.vel = [0, 0, 0]; } },
+    champion: () => !!goals.done.champion,
     pickTier: () => goals.pickTier(),
     holdPick: () => character.holdPick,
     inventory: () => ({ ...goals.items, pick: goals.pickTier() }),
