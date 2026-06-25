@@ -1197,6 +1197,54 @@ creative building is 100% untouched — the ladder is a purely *additive* layer.
   still instant (a "break time" sped up by better picks is a natural follow-up).
   **Next rungs of this arc (offered to dad):** caves (deeper = better ore), real
   break-time so faster picks *feel* faster, and more recipes (axe/shovel/armor).
+  **DEPLOY NOTE:** session 38 + 39 are committed locally (`3725d13`, `54b5b94`)
+  but the git **push relay was returning 403** (infra; reads + GitHub MCP work,
+  only `git push` fails). They'll go live the moment the relay recovers — retry
+  `git push -u origin <branch>` then mirror to `main`. Nothing is lost.
+
+## Status (session 39) — 🕳️ caves + ⛏️ break-time (the underground update)
+Dad loved the phased plan and said "build the next set." Shipped the next two
+rungs of the earn-your-tools arc on **`claude/dazzling-rubin-tabkcg`** (commit
+`54b5b94`; **pending deploy** — see the 403 note above). **sw v36→v37.** Gives
+the pickaxes somewhere exciting to earn their keep AND makes a better pickaxe
+*feel* more powerful (the two things missing after the ladder).
+1. **🕳️ Caves.** `World.carveCaves(rand, protect)` digs wandering tunnels + a few
+   caverns + a handful of **surface entrances** (sloped shafts through open grass)
+   into the overworld stone — carved in `generate()` with its own RNG (trees/
+   treasure unchanged). It **only ever removes natural stone/dirt/ore, never
+   bedrock, never a placed block**, and skips any column in `protect`.
+   `carveCavesIfNone()` retroactively adds caves to **older overworld saves**
+   without touching builds (builds `protect` = a 5×5 around every placed block;
+   idempotent via an underground-air sample). Wired: `generate()` carves; main's
+   `registerDim` calls `carveCavesIfNone()` for `key==='over'` before `sprinkleOre`.
+2. **Deeper = better ore.** `sprinkleOre` now also seeds **sparse gold + diamond
+   down near bedrock** (`seed(B.GOLD,6,0.4)`, `seed(B.DIAMOND,6,0.3)` — deep), so
+   braving the caves with an iron+ pickaxe is the payoff (diamond sits below coal).
+   Existing natural gold/diamond still pays 💎 on dig (ungated, unchanged).
+3. **⛏️ Break-time mining (the "feel").** Natural rock/ore now takes a few *chips*
+   to break, and a better pickaxe chips harder: `PICK_POWER=[1,2,3,5,8]` (bare→
+   diamond) vs `HARDNESS` (stone 2, coal 2, iron 3, gold/diamond ore 4, deepslate
+   3). Tuned so the pickaxe that **unlocks** a block breaks it in ~1 tap and the
+   **diamond pick shatters everything instantly** (power fantasy); a weaker tool
+   takes 2–3 (a gentle nudge to upgrade). **Soft blocks and anything YOU placed
+   still break in one tap** (`need = wasPlaced ? 0 : blockHardness(id)`), so
+   creative building stays snappy. State in a `breaking={key,progress}`; a chip
+   plays the dig sound + a ⛏️ particle and returns before removal.
+4. **Cave visibility.** A `max(vLight, 0.3)` **ambient floor** in the world
+   fragment shader so caves are dim-but-explorable (you can spot ore), not
+   pitch-black — without washing out the surface AO. Non-scary: daytime, no fall
+   damage, Fly always available to climb back out.
+   Debug: `__ezra.breaking()/caveAir()` (+ `mine(x,y,z)` from s38).
+   Verified: Node logic (caves carved ~2.7k underground-air cells + bedrock
+   intact + diamond-below-coal; migration kept all 48 build blocks + idempotent) +
+   headless CDP (overworld has caves; break-time: bare 2 chips on stone / wood 1,
+   wood 2 chips on diamond ore / diamond pick 1; placed blocks still 1 tap;
+   ambient floor) + the s38 ladder & 11-world-hop regressions — all green, zero
+   errors. Screenshot of a cave entrance. Tuning candidates: third-person camera
+   makes tight cave interiors pull the camera in close (fine, like any wall);
+   caves are overworld-only for now (could extend to gold/ant); no torches yet
+   (the 0.3 floor covers visibility) — a real block-light system + torches is the
+   natural next step, along with axe/shovel and a "break time" crack overlay.
 
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
