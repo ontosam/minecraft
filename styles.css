@@ -85,7 +85,13 @@ body {
   top: 10px;
   left: 12px;
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 16px;            /* bigger gap BETWEEN groups */
+}
+/* A cluster of related buttons — a small gap WITHIN the group. */
+.tg {
+  display: flex;
+  gap: 7px;
 }
 
 .mini {
@@ -101,10 +107,6 @@ body {
   transform: translateY(2px);
   box-shadow: 0 1px 0 rgba(0, 0, 0, .18);
 }
-
-/* Buttons moved into the ✨ Fun menu — kept in the DOM (so their wiring/state
-   still works) but never shown in the top bar. */
-#topbar .tucked { display: none !important; }
 
 /* A "mini" toggle that's currently on (e.g. Fly) gets a gold ring. */
 .mini.on {
@@ -146,7 +148,6 @@ body {
 #portalmenu,
 #buildmenu,
 #worldmenu,
-#funmenu,
 #ride,
 #ridemenu,
 #popcorn,
@@ -178,7 +179,6 @@ body {
 #portalmenu.hidden,
 #buildmenu.hidden,
 #worldmenu.hidden,
-#funmenu.hidden,
 #ride.hidden,
 #ridemenu.hidden,
 #popcorn.hidden,
@@ -954,10 +954,6 @@ body {
   border-style: dashed;
 }
 
-/* A Fun-menu entry with something ready to claim gets a gold glow. */
-.portal-choice.ready-choice { box-shadow: 0 0 0 4px #ffd23f, 0 3px 0 rgba(0, 0, 0, .18); }
-.portal-choice.ready-choice small { color: #b07a00; font-weight: 800; }
-
 /* The Big-Build cards carry a little hint line under the name. */
 .portal-choice small {
   font-size: 11px;
@@ -1221,4 +1217,20 @@ body {
   white-space: pre-wrap;
   word-break: break-word;
   color: #b00;
+}
+
+/* Responsive top bar: on a narrower screen (e.g. iPad portrait) shrink the
+   grouped buttons so the whole row keeps fitting on one line. (Placed last so
+   it wins on source order over the base .mini/.btn-blocks sizes.) */
+@media (max-width: 900px) {
+  #topbar { gap: 11px; }
+  .tg { gap: 5px; }
+  .mini { width: 43px; height: 43px; font-size: 21px; border-radius: 12px; }
+  #btn-blocks { width: 48px; height: 48px; }
+}
+@media (max-width: 800px) {
+  #topbar { gap: 8px; left: 8px; }
+  .tg { gap: 4px; }
+  .mini { width: 36px; height: 36px; font-size: 18px; border-radius: 10px; }
+  #btn-blocks { width: 42px; height: 42px; border-width: 2px; }
 }

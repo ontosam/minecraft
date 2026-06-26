@@ -2661,49 +2661,6 @@ function buildWorldMenu() {
 function openWorldMenu() { buildWorldMenu(); document.getElementById('worldmenu').classList.remove('hidden'); }
 function closeWorldMenu() { document.getElementById('worldmenu').classList.add('hidden'); }
 
-// --- ✨ Fun menu: the occasional toys live here (instead of a dozen top-bar
-// buttons), so the bar stays calm. Each entry just triggers its (hidden) button,
-// reusing all the existing wiring; only the ones available right now are listed.
-function triggerBtn(id) {
-  const b = document.getElementById(id);
-  if (b) b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
-}
-const FUN_ITEMS = [
-  { icon: '🙂', label: 'Be someone new', btn: 'btn-char', when: () => true },
-  { icon: '🏗️', label: 'Build something big', btn: 'btn-buildkit', when: () => true },
-  { icon: '🎣', label: 'Go fishing', btn: 'btn-fish', when: () => true },
-  { icon: '🌙', label: 'Day or night', btn: 'btn-night', when: () => true },
-  { icon: '🔍', label: 'Switch view', btn: 'btn-view', when: () => true },
-  { icon: '🔥', label: 'Make a portal', btn: 'btn-flint', when: () => true },
-  { icon: '📖', label: 'Adventure with friends', btn: 'btn-adventure', when: () => true, ready: () => advReady() },
-  { icon: '📜', label: 'The Great Quest', btn: 'btn-quest', when: () => dimension === 'over' && !goals.done.champion, ready: () => questReadyToClaim() },
-  { icon: '🐴', label: 'Ride your pony', btn: 'btn-ride', when: () => goals.hasUnlock('pony') && dimension === 'over' },
-  { icon: '🛸', label: 'Drive the Rover', btn: 'btn-rover', when: () => goals.hasUnlock('rover') && dimension === 'space' },
-  { icon: '🚀', label: 'Fly the Rocket', btn: 'btn-rocket', when: () => dimension === 'space' },
-  { icon: '🐉', label: 'Fly your Dragon', btn: 'btn-dragon', when: () => goals.hasUnlock('dragonride') },
-];
-function buildFunMenu() {
-  const body = document.getElementById('funmenu-body');
-  body.innerHTML = '';
-  for (const it of FUN_ITEMS) {
-    if (!it.when()) continue;
-    const ready = it.ready && it.ready();
-    const btn = document.createElement('button');
-    btn.className = 'portal-choice' + (ready ? ' ready-choice' : '');
-    btn.innerHTML = '<span class="pe">' + it.icon + '</span><b>' + it.label + '</b>' + (ready ? '<small>⭐ Ready!</small>' : '');
-    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); closeFunMenu(); triggerBtn(it.btn); });
-    body.appendChild(btn);
-  }
-}
-function openFunMenu() { buildFunMenu(); document.getElementById('funmenu').classList.remove('hidden'); }
-function closeFunMenu() { document.getElementById('funmenu').classList.add('hidden'); }
-// Glow the ✨ Fun button when something inside is ready to claim (adventure/quest).
-function updateFunButton() {
-  const b = document.getElementById('btn-fun');
-  if (!b || !goals) return;
-  b.classList.toggle('ready', advReady() || questReadyToClaim());
-}
-
 // --- Secret World fun-park rides: tap a ride → pay 💎 → enjoy. The reward is
 // pure fun + a ⭐; rides NEVER pay diamonds (you earn those working elsewhere). ---
 function openRidePrompt(att) {
@@ -2984,10 +2941,6 @@ function wireUI() {
   });
   document.getElementById('worldmenu-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeWorldMenu(); });
   document.getElementById('worldmenu').addEventListener('pointerdown', (e) => { if (e.target.id === 'worldmenu') closeWorldMenu(); });
-
-  document.getElementById('btn-fun').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); openFunMenu(); });
-  document.getElementById('funmenu-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeFunMenu(); });
-  document.getElementById('funmenu').addEventListener('pointerdown', (e) => { if (e.target.id === 'funmenu') closeFunMenu(); });
 
   document.getElementById('ride-yes').addEventListener('pointerdown', (e) => { e.preventDefault(); confirmRide(); });
   document.getElementById('ride-no').addEventListener('pointerdown', (e) => { e.preventDefault(); closeRidePrompt(); });
@@ -3297,7 +3250,6 @@ function frameBody(now) {
   }
 
   updateAdventureButton();          // gold ring on 📖 when a chapter is ready to claim
-  updateFunButton();                // glow the ✨ Fun button when something inside is ready
   updateBuddy(dt);                   // the friend strolls up now and then
 
   const m = mobs();
