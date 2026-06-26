@@ -1515,6 +1515,38 @@ menu."** Shipped on **`claude/ezra-minecraft-next-2y6301`** → `main`. **sw v42
    portal") is a power-user tool buried mid-list (fine); if any toy feels too
    buried, easy to promote back to the bar.
 
+## Status (session 45 revision) — ↩️ Fun menu reverted → grouped visible buttons
+Dad playtested the s45 Fun menu: "the new menu is touchy + doesn't scroll well;
+honestly I liked the original buttons but better organized." So I **reverted the
+Fun-menu approach** and kept everything VISIBLE — just tidier. Shipped on
+**`claude/ezra-minecraft-next-2y6301`** → `main`. **sw v43→v44.**
+- **Removed** the ✨ Fun button + `#funmenu` dialog + all its JS (`FUN_ITEMS`,
+  build/open/close/triggerBtn/updateFunButton) and the `.tucked` CSS. Brought
+  every top-bar button back, restored their original inline `display:none` for
+  the contextual ones (vehicles + quest) so the existing update functions control
+  them exactly as before.
+- **Organized into clusters.** The top bar is now `display:flex; gap:16px` of
+  `.tg` groups (`gap:7px` within): **🏠🌍 navigate** · **⭐📖📜 progress/friends** ·
+  **🔍🕊️🌙 view&move** · **🙂🏗️🎣🔥 make&play** · **🐴🛸🚀🐉 vehicles** · 🧱 block.
+  Small gap within a group, bigger gap between groups → reads as tidy clusters,
+  not a jumble.
+- **Responsive shrink** (appended at the END of styles.css so it wins on source
+  order — a same-specificity media-query `.mini` rule placed *before* the base
+  rule silently loses; that bit me first): `@media ≤900px` → 43px buttons,
+  `@media ≤800px` → 36px, so the whole row keeps fitting on one line on a
+  narrower iPad. Verified the full 15-button row (pony+dragon owned) fits at
+  **1024 (911), 834 (762), 768 (630)** — all on one line.
+- **Kept the good bits** of the experiment: **tap an animal to pet it** (no Pet
+  button; `tapPetHit` in the tap routing) + the cleaner **Jump/Dig/Build** action
+  row. Verified headless (**0 errors**): 13 visible buttons grouped in 5 clusters
+  (overworld), each opens its feature (char/buildkit/worlds checked), vehicles
+  show in space (rover/rocket/dragon) and overworld (pony/dragon when owned),
+  **a real canvas tap on an animal pets it (0→1)**, save/reload keeps the layout,
+  world-hop clean. Screenshots: the grouped bar (landscape) + the shrunk-but-tidy
+  portrait bar. Tuning candidates: 15+ buttons is still a full row (responsive
+  shrink keeps it on one line; a 2-row grid would need moving gem-bar/hearts/inv
+  down — deferred); flint stays on the bar (he wanted buttons visible).
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept
