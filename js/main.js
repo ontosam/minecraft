@@ -655,16 +655,17 @@ function doDig(hit) {
   if (isBed(id)) { removeBed(x, y, z); return; }
   const key = world.idx(x, y, z);
   const wasPlaced = world.placed.has(key);
-  // Break-time: natural rock/ore takes a few "chips" to break, and a better
-  // pickaxe chips harder — so tools FEEL more powerful. Soft blocks (dirt/sand/
-  // wood) and anything YOU placed break in one tap, so creative stays snappy.
+  showHeldFor(id);                                  // show the right tool in hand (pick/axe/shovel)
+  // Break-time: natural rock/wood/dirt takes a few "chips", and the MATCHING tool
+  // chips harder — so the right crafted tool FEELS powerful. Anything YOU placed
+  // breaks in one tap, so creative building stays snappy.
   const need = wasPlaced ? 0 : blockHardness(id);
   if (need > 0) {
     if (!breaking || breaking.key !== key) breaking = { key, progress: 0 };
-    breaking.progress += pickPower();
+    breaking.progress += toolPowerFor(id);
     if (breaking.progress < need) {                 // chipped, not broken yet — tap again
       sound.play('dig'); actionAnim = 1;
-      spawnParticles([x + 0.5, y + 0.5, z + 0.5], '⛏️', 'puff', 1, 22);
+      spawnParticles([x + 0.5, y + 0.5, z + 0.5], toolCategory(id) === 'axe' ? '🪵' : '⛏️', 'puff', 1, 22);
       return;
     }
     breaking = null;                                // this tap broke through
@@ -699,12 +700,34 @@ function doDig(hit) {
 // tap (snappy), while a weaker tool takes a few more (a nudge to upgrade), and
 // the diamond pickaxe shatters everything instantly (the power-fantasy reward).
 let breaking = null;                          // { key, progress } for the block being chipped
-const PICK_POWER = [1, 2, 3, 5, 8];           // bare, wood, stone, iron, diamond
-function pickPower() { return PICK_POWER[goals.pickTier()] || 1; }
+const PICK_POWER = [1, 2, 3, 5, 8];           // bare, wood, stone, iron, diamond (any tool tier)
+// Which tool a block wants: a pickaxe for stone/ore, an axe for wood, a shovel
+// for dirt/sand — so the RIGHT crafted tool makes each job satisfyingly fast.
+let TOOL_CAT = null;
+function toolCategory(id) {
+  if (!TOOL_CAT) TOOL_CAT = {
+    [B.STONE]: 'pick', [B.COBBLE]: 'pick', [B.DEEPSLATE]: 'pick', [B.COAL_ORE]: 'pick',
+    [B.IRON_ORE]: 'pick', [B.GOLD]: 'pick', [B.DIAMOND]: 'pick',
+    [B.LOG]: 'axe', [B.BIRCH_LOG]: 'axe',
+    [B.DIRT]: 'shovel', [B.GRASS]: 'shovel', [B.SAND]: 'shovel', [B.GRAVEL]: 'shovel',
+  };
+  return TOOL_CAT[id] || null;
+}
+// How hard a NATURAL block is to break (number of "chips"). Tuned so the matching
+// tool breaks it in ~1 tap (snappy power-fantasy) and bare hands take 2–3 (a gentle
+// nudge to craft the tool). Placed blocks are always instant (handled in doDig).
 let HARDNESS = null;
 function blockHardness(id) {
-  if (!HARDNESS) HARDNESS = { [B.STONE]: 2, [B.COBBLE]: 2, [B.COAL_ORE]: 2, [B.IRON_ORE]: 3, [B.GOLD]: 4, [B.DIAMOND]: 4, [B.DEEPSLATE]: 3 };
-  return HARDNESS[id] || 0;                    // 0 = instant (soft natural blocks)
+  if (!HARDNESS) HARDNESS = {
+    [B.STONE]: 2, [B.COBBLE]: 2, [B.COAL_ORE]: 2, [B.IRON_ORE]: 3, [B.GOLD]: 4, [B.DIAMOND]: 4, [B.DEEPSLATE]: 3,
+    [B.LOG]: 2, [B.BIRCH_LOG]: 2, [B.DIRT]: 2, [B.GRASS]: 2, [B.SAND]: 2, [B.GRAVEL]: 2,
+  };
+  return HARDNESS[id] || 0;                    // 0 = instant (other soft natural blocks)
+}
+// The breaking power for a block = the owned tier of its matching tool (bare = 1).
+function toolPowerFor(id) {
+  const cat = toolCategory(id);
+  return PICK_POWER[cat ? goals.toolTier(cat) : 0] || 1;
 }
 let pickNudgeT = -1e9;
 function pickNudge(msg) {
@@ -1259,14 +1282,34 @@ function applyUnlocks() {
   }
   updateHearts();
 }
-// Show the pickaxe in hand while the Dig tool is active (and you own one); the
-// diamond sword shows the rest of the time. Tier picks which pickaxe mesh.
+// Show the right tool in hand while the Dig tool is active (and you own one): a
+// pickaxe by default, but the axe/shovel appear when chopping wood / digging dirt.
+// The diamond sword shows the rest of the time. Tier picks which mesh.
 const PICK_TIER_NAME = ['', 'wood', 'stone', 'iron', 'diamond'];
+function clearHeldTools() { if (character) character.holdPick = character.holdAxe = character.holdShovel = false; }
 function syncHeldTool() {
   if (!character || !goals) return;
+  clearHeldTools();
   const tier = goals.pickTier();
   character.holdPick = (tier > 0 && lastTool === 'dig') ? PICK_TIER_NAME[tier] : false;
   character.holdSword = goals.hasUnlock('sword') && !character.holdPick;
+}
+// Pick the held mesh for the block you're breaking: the matching tool if you own
+// it, else the pickaxe (so the kid always sees a tool while digging).
+function showHeldFor(id) {
+  if (!character || !goals) return;
+  clearHeldTools();
+  const cat = toolCategory(id);
+  const tier = cat ? goals.toolTier(cat) : 0;
+  if (cat && tier > 0) {
+    const name = PICK_TIER_NAME[tier];
+    if (cat === 'axe') character.holdAxe = name;
+    else if (cat === 'shovel') character.holdShovel = name;
+    else character.holdPick = name;
+  } else if (goals.pickTier() > 0) {
+    character.holdPick = PICK_TIER_NAME[goals.pickTier()];
+  }
+  character.holdSword = goals.hasUnlock('sword') && !character.holdPick && !character.holdAxe && !character.holdShovel;
 }
 // Regular TNT vs. the Mega TNT block (bought in the 💎 shop) — a much bigger boom.
 const TNT_RADIUS = 3.2, MEGA_TNT_RADIUS = 5.2;
@@ -1698,14 +1741,30 @@ function buyItem(it) {
 // real digging power, not just cosmetics.
 const ITEM_ICON = { wood: '🪵', stone: '🪨', coal: '⚫', iron: '⛓️', ingot: '🔩' };
 const PICK_LABEL = ['', '🪵⛏️', '🪨⛏️', '⚙️⛏️', '💠⛏️'];
+const AXE_LABEL = ['', '🪵🪓', '🪨🪓', '⚙️🪓', '💠🪓'];
+const SHOVEL_LABEL = ['', '🪵🥄', '🪨🥄', '⚙️🥄', '💠🥄'];
 const ARMOR_LABEL = ['', '🛡️', '💠🛡️'];
 // The pickaxe ladder. Iron+ now need smelted 🔩 iron bars (mine ⛓️ raw iron →
 // smelt it at the 🔥 furnace), so the furnace is a real step on the climb.
 const RECIPES = [
-  { tier: 1, icon: '🪵⛏️', name: 'Wooden Pickaxe', cost: { wood: 4 }, desc: 'Mine stone & coal!' },
-  { tier: 2, icon: '🪨⛏️', name: 'Stone Pickaxe', cost: { stone: 5, wood: 2 }, desc: 'Mine iron!' },
-  { tier: 3, icon: '⚙️⛏️', name: 'Iron Pickaxe', cost: { ingot: 3, wood: 2 }, desc: 'Strong & speedy!' },
-  { tier: 4, icon: '💠⛏️', name: 'Diamond Pickaxe', cost: { ingot: 2, gems: 10 }, desc: 'The very best — uses 💎!' },
+  { kind: 'pick', tier: 1, icon: '🪵⛏️', name: 'Wooden Pickaxe', cost: { wood: 4 }, desc: 'Mine stone & coal!' },
+  { kind: 'pick', tier: 2, icon: '🪨⛏️', name: 'Stone Pickaxe', cost: { stone: 5, wood: 2 }, desc: 'Mine iron!' },
+  { kind: 'pick', tier: 3, icon: '⚙️⛏️', name: 'Iron Pickaxe', cost: { ingot: 3, wood: 2 }, desc: 'Strong & speedy!' },
+  { kind: 'pick', tier: 4, icon: '💠⛏️', name: 'Diamond Pickaxe', cost: { ingot: 2, gems: 10 }, desc: 'The very best — uses 💎!' },
+];
+// The axe chops wood fast, the shovel digs dirt/sand fast — each with the same
+// wood→stone→iron→diamond ladder. A better tool makes its job satisfyingly quick.
+const AXE_RECIPES = [
+  { kind: 'axe', tier: 1, icon: '🪵🪓', name: 'Wooden Axe', cost: { wood: 3 }, desc: 'Chop trees fast!' },
+  { kind: 'axe', tier: 2, icon: '🪨🪓', name: 'Stone Axe', cost: { stone: 4, wood: 2 }, desc: 'Chop even faster!' },
+  { kind: 'axe', tier: 3, icon: '⚙️🪓', name: 'Iron Axe', cost: { ingot: 3, wood: 2 }, desc: 'Trees fall in one hit!' },
+  { kind: 'axe', tier: 4, icon: '💠🪓', name: 'Diamond Axe', cost: { ingot: 2, gems: 8 }, desc: 'The mightiest axe!' },
+];
+const SHOVEL_RECIPES = [
+  { kind: 'shovel', tier: 1, icon: '🪵🥄', name: 'Wooden Shovel', cost: { wood: 2 }, desc: 'Dig dirt & sand fast!' },
+  { kind: 'shovel', tier: 2, icon: '🪨🥄', name: 'Stone Shovel', cost: { stone: 3, wood: 1 }, desc: 'Dig even faster!' },
+  { kind: 'shovel', tier: 3, icon: '⚙️🥄', name: 'Iron Shovel', cost: { ingot: 2, wood: 1 }, desc: 'Scoop in one tap!' },
+  { kind: 'shovel', tier: 4, icon: '💠🥄', name: 'Diamond Shovel', cost: { ingot: 1, gems: 6 }, desc: 'The best digger!' },
 ];
 // Armor: forge a suit to take less damage at night & in deep caves (the bridge
 // that ties mining → smelting → crafting into surviving tougher adventures).
@@ -1718,7 +1777,7 @@ function openCrafting() {
   buildCraft();
   document.getElementById('craft').classList.remove('hidden');
   sound.play('pet');
-  tip('craft2', '🛠️ Mine 🪵 wood, 🪨 stone and ⚙️ iron, then make a better pickaxe here. Each one digs up more!');
+  tip('craft2', '🛠️ Make tools here! ⛏️ Pickaxe digs stone, 🪓 Axe chops wood, 🥄 Shovel digs dirt — each one faster than your hands!');
 }
 function craftRow(body, r, owned, locked, onMake) {
   const can = !owned && !locked && goals.canAfford(r.cost);
@@ -1730,29 +1789,39 @@ function craftRow(body, r, owned, locked, onMake) {
   if (can) btn.addEventListener('pointerdown', (e) => { e.preventDefault(); onMake(r); });
   body.appendChild(btn);
 }
+function craftSection(body, title, recipes) {
+  const head = document.createElement('div'); head.className = 'craft-sep'; head.textContent = title;
+  body.appendChild(head);
+  for (const r of recipes) { const t = goals.toolTier(r.kind); craftRow(body, r, t >= r.tier, r.tier > t + 1, craftTool); }
+}
 function buildCraft() {
   const inv = document.getElementById('craft-inv');
   if (inv) inv.innerHTML = ['wood', 'stone', 'coal', 'iron', 'ingot'].map((k) => '<span>' + ITEM_ICON[k] + ' ' + goals.itemCount(k) + '</span>').join('') + '<span>💎 ' + goals.gems + '</span>';
   const body = document.getElementById('craft-body');
   body.innerHTML = '';
-  const pt = goals.pickTier();
-  for (const r of RECIPES) craftRow(body, r, pt >= r.tier, r.tier > pt + 1, craftItem);
+  craftSection(body, '⛏️ Pickaxes — mine stone, ore & gems', RECIPES);
+  craftSection(body, '🪓 Axes — chop wood fast', AXE_RECIPES);
+  craftSection(body, '🥄 Shovels — dig dirt & sand fast', SHOVEL_RECIPES);
   const at = goals.armorTier();
   const head = document.createElement('div'); head.className = 'craft-sep'; head.textContent = '🛡️ Armor';
   body.appendChild(head);
   for (const r of ARMOR_RECIPES) craftRow(body, r, at >= r.tier, r.tier > at + 1, craftArmor);
 }
-function craftItem(r) {
-  const tier = goals.pickTier();
-  if (tier >= r.tier || r.tier > tier + 1) return;
+const TOOL_MADE_MSG = {
+  pick: { 1: 'Now you can mine 🪨 stone and ⚫ coal!', 2: 'Now you can mine ⚙️ iron!', 3: 'You dig nice and strong now!', 4: '💠 The best pickaxe ever!' },
+  axe: { 1: 'Trees chop way faster now!', 2: 'Chop chop chop!', 3: 'Timber in a tap!', 4: '💠 The mightiest axe!' },
+  shovel: { 1: 'Dirt and sand dig fast now!', 2: 'Dig dig dig!', 3: 'Scoop it in one tap!', 4: '💠 The best digger ever!' },
+};
+function craftTool(r) {
+  const t = goals.toolTier(r.kind);
+  if (t >= r.tier || r.tier > t + 1) return;
   if (!goals.spendItems(r.cost)) { sound.play('deny'); showToast('Mine a little more first! Need ' + costStr(r.cost)); return; }
-  goals.setPickTier(r.tier);
+  goals.setToolTier(r.kind, r.tier);
   syncHeldTool();
   sound.play('treasure'); spawnSparkles([player.pos[0], player.pos[1] + 1.2, player.pos[2]]);
   updateGems(); updateInventory(); buildCraft(); updateQuestButton();
-  const next = { 1: 'Now you can mine 🪨 stone and ⚫ coal!', 2: 'Now you can mine ⚙️ iron!', 3: 'You dig nice and strong now!', 4: '💠 The best pickaxe ever!' };
-  showToast('✨ You made the ' + r.name + '! ' + (next[r.tier] || ''), 4200);
-  if (r.tier === 1) tip('quest2', '📜 You\'re on an adventure! Tap 📜 up top to see the Great Quest — a legendary treasure waits deep below!');
+  showToast('✨ You made the ' + r.name + '! ' + ((TOOL_MADE_MSG[r.kind] || {})[r.tier] || ''), 4200);
+  if (r.kind === 'pick' && r.tier === 1) tip('quest2', '📜 You\'re on an adventure! Tap 📜 up top to see the Great Quest — a legendary treasure waits deep below!');
 }
 function craftArmor(r) {
   const at = goals.armorTier();
@@ -1851,13 +1920,15 @@ function updateInventory(pulse) {
   const el = document.getElementById('inv-bar');
   if (!el || !goals) return;
   const keys = ['wood', 'stone', 'coal', 'iron', 'ingot'];
-  const any = goals.pickTier() > 0 || goals.armorTier() > 0 || keys.some((k) => goals.itemCount(k) > 0);
+  const any = goals.pickTier() > 0 || goals.toolTier('axe') > 0 || goals.toolTier('shovel') > 0 || goals.armorTier() > 0 || keys.some((k) => goals.itemCount(k) > 0);
   el.style.display = any ? 'flex' : 'none';
   if (!any) return;
   let html = '';
   for (const k of keys) if (goals.itemCount(k) > 0 || k !== 'ingot') html += '<span class="invi' + (k === pulse ? ' pop' : '') + '">' + ITEM_ICON[k] + goals.itemCount(k) + '</span>';
   const tier = goals.pickTier();
   if (tier > 0) html += '<span class="invi pick">' + PICK_LABEL[tier] + '</span>';
+  if (goals.toolTier('axe') > 0) html += '<span class="invi pick">' + AXE_LABEL[goals.toolTier('axe')] + '</span>';
+  if (goals.toolTier('shovel') > 0) html += '<span class="invi pick">' + SHOVEL_LABEL[goals.toolTier('shovel')] + '</span>';
   const at = goals.armorTier();
   if (at > 0) html += '<span class="invi pick">' + ARMOR_LABEL[at] + '</span>';
   el.innerHTML = html;
@@ -2991,6 +3062,11 @@ function drawMinimap() {
       mmCtx.fillStyle = '#ff8c1a'; mmCtx.strokeStyle = '#5a2e00'; mmCtx.lineWidth = 1.5;
       mmCtx.beginPath(); mmCtx.arc(stevePos[0] * s, stevePos[2] * s, 4, 0, Math.PI * 2); mmCtx.fill(); mmCtx.stroke();
     }
+    // The 🛠️ crafting workshop (table + furnace) near spawn — a brown marker so
+    // Ezra can always find where to craft tools.
+    { const cxm = (Math.floor(world.spawn[0]) - 3) * s, czm = Math.floor(world.spawn[2]) * s;
+      mmCtx.fillStyle = '#a9743a'; mmCtx.strokeStyle = '#5a3a18'; mmCtx.lineWidth = 1.5;
+      mmCtx.fillRect(cxm - 3, czm - 3, 6, 6); mmCtx.strokeRect(cxm - 3, czm - 3, 6, 6); }
     // The Deep Vault — a gold ✦ showing where to dig down for the Relic (until claimed).
     if (world.vault && !goals.done.champion) {
       const vx = world.vault[0] * s, vz = world.vault[2] * s;
@@ -3540,7 +3616,10 @@ function init() {
     sword: () => character.holdSword,
     gems: () => goals.gems,
     openCraft: () => openCrafting(),
-    craft: (tier) => { const r = RECIPES.find((x) => x.tier === tier); if (r) craftItem(r); },
+    craft: (tier, kind) => { const list = kind === 'axe' ? AXE_RECIPES : kind === 'shovel' ? SHOVEL_RECIPES : RECIPES; const r = list.find((x) => x.tier === tier); if (r) craftTool(r); },
+    craftAxe: (tier) => { const r = AXE_RECIPES.find((x) => x.tier === tier); if (r) craftTool(r); },
+    craftShovel: (tier) => { const r = SHOVEL_RECIPES.find((x) => x.tier === tier); if (r) craftTool(r); },
+    toolTier: (k) => goals.toolTier(k || 'pick'),
     openFurnace: () => openFurnace(),
     smelt: (n) => doSmelt(n || 1),
     craftArmor: (tier) => { const r = ARMOR_RECIPES.find((x) => x.tier === tier); if (r) craftArmor(r); },

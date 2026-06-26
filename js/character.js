@@ -137,6 +137,21 @@ function buildPick(head) {
     addBox(A, 0.18, -0.018, -0.535, 0.235, 0.035, -0.47, head);                   // right tip
   };
 }
+// A little axe (crafted at the table) — a handle with a blade on one side.
+function buildAxe(head) {
+  return (A) => {
+    addBox(A, -0.022, -0.022, -0.46, 0.022, 0.022, 0.14, [0.45, 0.30, 0.16]);   // handle
+    addBox(A, 0.02, -0.06, -0.55, 0.16, 0.12, -0.43, head);                       // axe head block
+    addBox(A, 0.13, -0.10, -0.57, 0.21, 0.15, -0.41, head);                       // blade edge
+  };
+}
+// A little shovel (crafted at the table) — a handle with a flat scoop blade.
+function buildShovel(head) {
+  return (A) => {
+    addBox(A, -0.022, -0.022, -0.40, 0.022, 0.022, 0.14, [0.45, 0.30, 0.16]);   // handle
+    addBox(A, -0.085, -0.05, -0.58, 0.085, 0.05, -0.40, head);                    // scoop blade
+  };
+}
 // Forged armor (crafted at the table): a chestplate over the torso + a helmet
 // cap over the head. Colour = tier (iron grey, diamond cyan). Drawn over the
 // body/head parts so it moves with the kid.
@@ -175,13 +190,14 @@ export class Character {
     this._buildParts();
     this.crown = mesh(gl, buildCrown); this.wearCrown = false;
     this.sword = mesh(gl, buildSword); this.holdSword = false;
-    this.picks = {
-      wood: mesh(gl, buildPick([0.55, 0.38, 0.20])),
-      stone: mesh(gl, buildPick([0.56, 0.57, 0.62])),
-      iron: mesh(gl, buildPick([0.86, 0.87, 0.92])),
-      diamond: mesh(gl, buildPick([0.36, 0.86, 0.82])),
-    };
+    const TIER_COL = { wood: [0.55, 0.38, 0.20], stone: [0.56, 0.57, 0.62], iron: [0.86, 0.87, 0.92], diamond: [0.36, 0.86, 0.82] };
+    const toolSet = (build) => ({ wood: mesh(gl, build(TIER_COL.wood)), stone: mesh(gl, build(TIER_COL.stone)), iron: mesh(gl, build(TIER_COL.iron)), diamond: mesh(gl, build(TIER_COL.diamond)) });
+    this.picks = toolSet(buildPick);
+    this.axes = toolSet(buildAxe);
+    this.shovels = toolSet(buildShovel);
     this.holdPick = false;          // false, or a tier name ('wood'|'stone'|'iron'|'diamond')
+    this.holdAxe = false;
+    this.holdShovel = false;
     const IRON_A = [0.78, 0.79, 0.84], DIAMOND_A = [0.40, 0.85, 0.82];
     this.armorChest = [null, mesh(gl, buildChest(IRON_A)), mesh(gl, buildChest(DIAMOND_A))];
     this.armorHelm = [null, mesh(gl, buildHelmet(IRON_A)), mesh(gl, buildHelmet(DIAMOND_A))];
@@ -243,11 +259,15 @@ export class Character {
       p.m.draw(prog);
       if (this.armor > 0 && p.body && this.armorChest[this.armor]) this.armorChest[this.armor].draw(prog);
       if (this.armor > 0 && p.head && this.armorHelm[this.armor]) this.armorHelm[this.armor].draw(prog);
-      if (p.action && (this.holdPick || this.holdSword)) {
+      const heldTool = this.holdPick ? this.picks[this.holdPick]
+        : this.holdAxe ? this.axes[this.holdAxe]
+        : this.holdShovel ? this.shovels[this.holdShovel]
+        : this.holdSword ? this.sword : null;
+      if (p.action && heldTool) {
         mat4.translate(this._T2, 0, -0.46, -0.02);
         mat4.multiply(this._M2, this._M, this._T2);
         gl.uniformMatrix4fv(prog.u.uModel, false, this._M2);
-        (this.holdPick && this.picks[this.holdPick] ? this.picks[this.holdPick] : this.sword).draw(prog);
+        heldTool.draw(prog);
       }
     }
     if (this.def.ball && !seated) {        // a soccer ball resting beside you
