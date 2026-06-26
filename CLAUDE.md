@@ -1478,6 +1478,43 @@ more uses + there's always a next tool. Built that on
   item (could join the craft ladder next). Next depth rungs offered: a sword craft
   ladder, a Nether "netherite"-style top tier, repeatable deeper vaults.
 
+## Status (session 45) — 🧭 UI restructure: a calm top bar + a ✨ Fun menu
+Dad: "the game's grown a lot — does the front layout need a restructure? Pet
+button's not used much, worlds are a separate button… make it seamless/coherent
+and easy for Ezra but still engaging." Audited it: the top bar had grown to **~15
+tiny buttons** (a jumble of go-places / view / fly / night / fish / vehicles /
+character / build-big…). Via AskUserQuestion he picked **"Group toys into a ✨ Fun
+menu."** Shipped on **`claude/ezra-minecraft-next-2y6301`** → `main`. **sw v42→v43.**
+1. **Top bar slimmed 15 → 6.** Now shows only the most-used: 🏠 Home, 🌍 Worlds,
+   ⭐ Goals, 🕊️ Fly, ✨ Fun, and the block picker. Core controls (joystick, Build,
+   Dig, block picker) untouched — no muscle-memory disruption.
+2. **✨ Fun menu** (`#funmenu`, reuses `.portal-choice` like the world menu) holds
+   the occasional toys: Character, Big Builds, Fishing, Day/Night, Switch view,
+   Make-a-portal (flint), Adventure, the Great Quest, and the vehicles. **Built
+   dynamically + context-aware** (`FUN_ITEMS` with a `when()` per entry): pony &
+   dragon show in the overworld, rover & rocket in space, quest only overworld/
+   pre-champion, etc. **Low-risk design:** the moved buttons stay in the DOM
+   (hidden via `#topbar .tucked{display:none!important}`) so ALL their existing
+   wiring/state still works — each Fun entry just **dispatches a pointerdown on
+   its hidden button** (`triggerBtn`). The **✨ button glows** (`updateFunButton`,
+   each frame) when an adventure/quest is ready to claim, so the nudge isn't lost
+   (and the ready entry gets a gold `ready-choice` glow inside the menu).
+3. **Retired the Pet button → tap-to-pet.** `tapPetHit(dir)` ray-tests animals/
+   nethermobs/ants in the tap routing (before flint/doAction); tapping a friendly
+   creature pets it (like everything else in the game). The action row is now a
+   cleaner **Jump / Dig / Build** (3 big buttons). `holdButton('btn-pet')` removed.
+   Verified headless (CDP, **0 errors**): top bar = exactly 6 visible buttons (15
+   tucked); actions = jump/dig/build; Fun menu lists the right items in overworld
+   (8) vs with unlocks (+pony/dragon) vs space (+rover/rocket, −pony/−quest);
+   tapping a Fun entry opens that feature + closes the menu; **a real point-blank
+   canvas tap on an animal pets it (count 0→1)**; the ✨ button glows when quest-
+   ready; **save/reload keeps the 6-button layout**; world-hop clean. Screenshots
+   of the new calm top bar + the Fun menu. Debug: `__ezra.openFunMenu()` (via the
+   button). Tuning candidates: Fun-menu labels are static (don't show on/off
+   state — e.g. "Day or night" doesn't say which is active); flint ("Make a
+   portal") is a power-user tool buried mid-list (fine); if any toy feels too
+   buried, easy to promote back to the bar.
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept
