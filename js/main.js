@@ -3340,8 +3340,16 @@ function saveGame() {
 
 function loadGame() {
   let obj;
-  try { obj = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { return false; }
+  const raw = localStorage.getItem(SAVE_KEY);
+  try { obj = JSON.parse(raw); } catch (e) { return false; }
   if (!obj) return false;
+  // One-time safety net: before the home world is deepened (which reshapes the
+  // saved world), stash the original save so we can always recover it.
+  try {
+    const over = obj.worlds && obj.worlds.over;
+    if (over && over.d && over.d[1] !== SY && !localStorage.getItem(SAVE_KEY + '.bak.preDeep'))
+      localStorage.setItem(SAVE_KEY + '.bak.preDeep', raw);
+  } catch (e) { /* backup is best-effort */ }
   if (typeof obj.sel === 'number' && BLOCKS[obj.sel]) selected = obj.sel;
   if (typeof obj.char === 'string') selectedChar = charById(obj.char).id;   // resolves old ids too
   if (typeof obj.zoom === 'number' && VIEW_PRESETS[obj.zoom]) {
@@ -3560,6 +3568,8 @@ function init() {
     confirmPlace: () => confirmPlacement(),
     save: () => saveGame(),
     saveSize: () => (localStorage.getItem(SAVE_KEY) || '').length,
+    // Recover the pre-deepening backup (the original save) if anything looks off.
+    restoreBackup: () => { const b = localStorage.getItem(SAVE_KEY + '.bak.preDeep'); if (b) { localStorage.setItem(SAVE_KEY, b); location.reload(); return 'restored'; } return 'no backup'; },
     placing: () => (pendingBuild ? pendingBuild.name : null),
     endFunRide: () => { if (ride) endRide(); },
     funRiding: () => (ride ? ride.att.id : null),
