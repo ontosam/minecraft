@@ -102,6 +102,10 @@ body {
   box-shadow: 0 1px 0 rgba(0, 0, 0, .18);
 }
 
+/* Buttons moved into the ✨ Fun menu — kept in the DOM (so their wiring/state
+   still works) but never shown in the top bar. */
+#topbar .tucked { display: none !important; }
+
 /* A "mini" toggle that's currently on (e.g. Fly) gets a gold ring. */
 .mini.on {
   box-shadow: 0 0 0 4px #ffd23f, 0 3px 0 rgba(0, 0, 0, .18);
@@ -142,6 +146,7 @@ body {
 #portalmenu,
 #buildmenu,
 #worldmenu,
+#funmenu,
 #ride,
 #ridemenu,
 #popcorn,
@@ -173,6 +178,7 @@ body {
 #portalmenu.hidden,
 #buildmenu.hidden,
 #worldmenu.hidden,
+#funmenu.hidden,
 #ride.hidden,
 #ridemenu.hidden,
 #popcorn.hidden,
@@ -947,6 +953,10 @@ body {
   opacity: .55;
   border-style: dashed;
 }
+
+/* A Fun-menu entry with something ready to claim gets a gold glow. */
+.portal-choice.ready-choice { box-shadow: 0 0 0 4px #ffd23f, 0 3px 0 rgba(0, 0, 0, .18); }
+.portal-choice.ready-choice small { color: #b07a00; font-weight: 800; }
 
 /* The Big-Build cards carry a little hint line under the name. */
 .portal-choice small {

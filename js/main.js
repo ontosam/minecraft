@@ -1156,6 +1156,19 @@ function doPet() {
     (m.ants && m.ants.petNearest(player));
   if (p) { sound.play('pet'); spawnHearts(p); goals.onPet(); }
 }
+// Did this tap land on a friendly, pettable creature? (Replaces the Pet button —
+// you just tap an animal to pet it, like everything else in the game.)
+function tapPetHit(dir) {
+  const m = mobs();
+  for (const grp of [m.animals, m.nethermobs, m.ants]) {
+    if (!grp || !grp.list) continue;
+    for (const a of grp.list) {
+      if (!a.pos) continue;
+      if (rayHitsSphere(camPos, dir, a.pos[0], a.pos[1] + 0.5, a.pos[2], 0.95)) return true;
+    }
+  }
+  return false;
+}
 
 // The Build/Dig buttons pick the "tool"; a quick tap on the world acts there.
 function doAction(hit) { if (lastTool === 'dig') doDig(hit); else doBuild(hit); }
@@ -2648,6 +2661,49 @@ function buildWorldMenu() {
 function openWorldMenu() { buildWorldMenu(); document.getElementById('worldmenu').classList.remove('hidden'); }
 function closeWorldMenu() { document.getElementById('worldmenu').classList.add('hidden'); }
 
+// --- ✨ Fun menu: the occasional toys live here (instead of a dozen top-bar
+// buttons), so the bar stays calm. Each entry just triggers its (hidden) button,
+// reusing all the existing wiring; only the ones available right now are listed.
+function triggerBtn(id) {
+  const b = document.getElementById(id);
+  if (b) b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+}
+const FUN_ITEMS = [
+  { icon: '🙂', label: 'Be someone new', btn: 'btn-char', when: () => true },
+  { icon: '🏗️', label: 'Build something big', btn: 'btn-buildkit', when: () => true },
+  { icon: '🎣', label: 'Go fishing', btn: 'btn-fish', when: () => true },
+  { icon: '🌙', label: 'Day or night', btn: 'btn-night', when: () => true },
+  { icon: '🔍', label: 'Switch view', btn: 'btn-view', when: () => true },
+  { icon: '🔥', label: 'Make a portal', btn: 'btn-flint', when: () => true },
+  { icon: '📖', label: 'Adventure with friends', btn: 'btn-adventure', when: () => true, ready: () => advReady() },
+  { icon: '📜', label: 'The Great Quest', btn: 'btn-quest', when: () => dimension === 'over' && !goals.done.champion, ready: () => questReadyToClaim() },
+  { icon: '🐴', label: 'Ride your pony', btn: 'btn-ride', when: () => goals.hasUnlock('pony') && dimension === 'over' },
+  { icon: '🛸', label: 'Drive the Rover', btn: 'btn-rover', when: () => goals.hasUnlock('rover') && dimension === 'space' },
+  { icon: '🚀', label: 'Fly the Rocket', btn: 'btn-rocket', when: () => dimension === 'space' },
+  { icon: '🐉', label: 'Fly your Dragon', btn: 'btn-dragon', when: () => goals.hasUnlock('dragonride') },
+];
+function buildFunMenu() {
+  const body = document.getElementById('funmenu-body');
+  body.innerHTML = '';
+  for (const it of FUN_ITEMS) {
+    if (!it.when()) continue;
+    const ready = it.ready && it.ready();
+    const btn = document.createElement('button');
+    btn.className = 'portal-choice' + (ready ? ' ready-choice' : '');
+    btn.innerHTML = '<span class="pe">' + it.icon + '</span><b>' + it.label + '</b>' + (ready ? '<small>⭐ Ready!</small>' : '');
+    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); closeFunMenu(); triggerBtn(it.btn); });
+    body.appendChild(btn);
+  }
+}
+function openFunMenu() { buildFunMenu(); document.getElementById('funmenu').classList.remove('hidden'); }
+function closeFunMenu() { document.getElementById('funmenu').classList.add('hidden'); }
+// Glow the ✨ Fun button when something inside is ready to claim (adventure/quest).
+function updateFunButton() {
+  const b = document.getElementById('btn-fun');
+  if (!b || !goals) return;
+  b.classList.toggle('ready', advReady() || questReadyToClaim());
+}
+
 // --- Secret World fun-park rides: tap a ride → pay 💎 → enjoy. The reward is
 // pure fun + a ⭐; rides NEVER pay diamonds (you earn those working elsewhere). ---
 function openRidePrompt(att) {
@@ -2893,7 +2949,7 @@ function wireUI() {
   document.getElementById('picker').addEventListener('pointerdown', (e) => { if (e.target.id === 'picker') closePicker(); });
   holdButton('btn-build', () => { setTool('build'); doBuild(targetCells()); }, false);
   holdButton('btn-dig', () => { setTool('dig'); doDig(targetCells()); }, false);
-  holdButton('btn-pet', doPet, false);
+  // (The Pet button retired — tap an animal to pet it now; see the tap routing.)
   setTool('build');
 
   const jb = document.getElementById('btn-jump');
@@ -2928,6 +2984,10 @@ function wireUI() {
   });
   document.getElementById('worldmenu-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeWorldMenu(); });
   document.getElementById('worldmenu').addEventListener('pointerdown', (e) => { if (e.target.id === 'worldmenu') closeWorldMenu(); });
+
+  document.getElementById('btn-fun').addEventListener('pointerdown', (e) => { e.preventDefault(); sound.resume(); openFunMenu(); });
+  document.getElementById('funmenu-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeFunMenu(); });
+  document.getElementById('funmenu').addEventListener('pointerdown', (e) => { if (e.target.id === 'funmenu') closeFunMenu(); });
 
   document.getElementById('ride-yes').addEventListener('pointerdown', (e) => { e.preventDefault(); confirmRide(); });
   document.getElementById('ride-no').addEventListener('pointerdown', (e) => { e.preventDefault(); closeRidePrompt(); });
@@ -3237,6 +3297,7 @@ function frameBody(now) {
   }
 
   updateAdventureButton();          // gold ring on 📖 when a chapter is ready to claim
+  updateFunButton();                // glow the ✨ Fun button when something inside is ready
   updateBuddy(dt);                   // the friend strolls up now and then
 
   const m = mobs();
@@ -3274,6 +3335,7 @@ function frameBody(now) {
       rayHitsSphere(camPos, dir, buddy.pos[0], buddy.pos[1] + 0.9, buddy.pos[2], 1.2);
     const stv = (!dg && !cr && !zb && !sp && !sk && !vl && !bd && stevePos && dimension === 'over') &&
       rayHitsSphere(camPos, dir, stevePos[0], stevePos[1] + 0.9, stevePos[2], 1.2);
+    const pk = (!fk && !dg && !cr && !zb && !sp && !sk && !vl && !as && !bd && !stv && !flintMode) ? tapPetHit(dir) : false;
     if (ride) { /* enjoying a ride — taps do nothing */ }
     else if (fk) { if (fk.kind === 'stand') openStand(fk.id); else openRidePrompt(rideById(fk.id)); }
     else if (dg) doDragonTap(dg);
@@ -3285,6 +3347,7 @@ function frameBody(now) {
     else if (as) talkToAstronaut(as);
     else if (bd) openAdventure();
     else if (stv) openSteveMenu();
+    else if (pk) doPet();                   // tap a friendly animal → pet it (no more Pet button)
     else if (flintMode) flintTap(dir);     // flint & steel: light TNT / a portal frame
     else {
       const hit = world.raycast(camPos, dir, REACH);

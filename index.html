@@ -30,22 +30,25 @@
 
     <div id="topbar">
       <button id="btn-home" class="mini" title="Go home">🏠</button>
-      <button id="btn-goals" class="mini" title="Goals">⭐0</button>
-      <button id="btn-adventure" class="mini" title="Adventure with friends">📖</button>
-      <button id="btn-view" class="mini" title="Switch view (zoom)">🔍</button>
-      <button id="btn-fly" class="mini" title="Fly">🕊️</button>
-      <button id="btn-flint" class="mini" title="Flint & steel — make a portal">🔥</button>
       <button id="btn-worlds" class="mini" title="Go to a world">🌍</button>
-      <button id="btn-night" class="mini" title="Day / Night">🌙</button>
-      <button id="btn-ride" class="mini" title="Ride your pony" style="display:none">🐴</button>
-      <button id="btn-rover" class="mini" title="Drive the Space Rover" style="display:none">🛸</button>
-      <button id="btn-rocket" class="mini" title="Launch the rocket!" style="display:none">🚀</button>
-      <button id="btn-dragon" class="mini" title="Fly your dragon" style="display:none">🐉</button>
-      <button id="btn-fish" class="mini" title="Go fishing (near water)">🎣</button>
-      <button id="btn-quest" class="mini" title="The Great Quest" style="display:none">📜</button>
-      <button id="btn-char" class="mini" title="Choose your character">🙂</button>
-      <button id="btn-buildkit" class="mini" title="Build something big">🏗️</button>
+      <button id="btn-goals" class="mini" title="Goals">⭐0</button>
+      <button id="btn-fly" class="mini" title="Fly">🕊️</button>
+      <button id="btn-fun" class="mini" title="Fun things to do!">✨</button>
       <button id="btn-blocks" title="Pick a block"></button>
+      <!-- These now live in the ✨ Fun menu — kept here (hidden) so all their
+           wiring/state still works; the menu just triggers them. -->
+      <button id="btn-adventure" class="mini tucked" title="Adventure with friends">📖</button>
+      <button id="btn-view" class="mini tucked" title="Switch view (zoom)">🔍</button>
+      <button id="btn-flint" class="mini tucked" title="Flint & steel — make a portal">🔥</button>
+      <button id="btn-night" class="mini tucked" title="Day / Night">🌙</button>
+      <button id="btn-ride" class="mini tucked" title="Ride your pony">🐴</button>
+      <button id="btn-rover" class="mini tucked" title="Drive the Space Rover">🛸</button>
+      <button id="btn-rocket" class="mini tucked" title="Launch the rocket!">🚀</button>
+      <button id="btn-dragon" class="mini tucked" title="Fly your dragon">🐉</button>
+      <button id="btn-fish" class="mini tucked" title="Go fishing (near water)">🎣</button>
+      <button id="btn-quest" class="mini tucked" title="The Great Quest">📜</button>
+      <button id="btn-char" class="mini tucked" title="Choose your character">🙂</button>
+      <button id="btn-buildkit" class="mini tucked" title="Build something big">🏗️</button>
     </div>
 
     <div id="hearts-bar"></div>
@@ -53,7 +56,6 @@
     <div id="inv-bar" style="display:none"></div>
 
     <div id="actions">
-      <button id="btn-pet" class="act pet"><span>🐾</span><b>Pet</b></button>
       <button id="btn-jump" class="act jump"><span>⬆️</span><b>Jump</b></button>
       <button id="btn-dig" class="act dig"><span>⛏️</span><b>Dig</b></button>
       <button id="btn-build" class="act build"><span>🧱</span><b>Build</b></button>
@@ -141,6 +143,13 @@
     <div class="picker-panel">
       <div class="picker-head"><span>Go to a world! 🌍</span><button id="worldmenu-close">✕</button></div>
       <div id="worldmenu-body"></div>
+    </div>
+  </div>
+
+  <div id="funmenu" class="hidden">
+    <div class="picker-panel">
+      <div class="picker-head"><span>Fun things to do! ✨</span><button id="funmenu-close">✕</button></div>
+      <div id="funmenu-body"></div>
     </div>
   </div>
 
