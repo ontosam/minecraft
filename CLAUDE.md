@@ -1437,6 +1437,47 @@ caves world), accepting a careful reshape of his saved world. Shipped on
    later); **iPad perf** with the 1.5× taller world — ask the dad to confirm FPS;
    the guaranteed cave mouth could rarely clip a near-spawn fixture (cosmetic).
 
+## Status (session 44) — 🪓🥄 The full toolkit: craftable Axes & Shovels
+Dad (after loving the deep world): "Ezra's into mining; the tool table was nice
+but I'm not sure it worked as in Minecraft; we have lots of WIDTH but not DEPTH —
+keep him engaged. Open to your builds." Diagnosed: the crafting table *works* but
+was **pickaxe-only** (4 tiers + armor) — thin. Minecraft depth = a full toolkit
+where each tool makes a different job satisfyingly faster, so every material has
+more uses + there's always a next tool. Built that on
+**`claude/ezra-minecraft-next-2y6301`**, mirrored to `main`. **sw v41→v42.** Now
+**63 goals**.
+- **Two new tool ladders** (wood→stone→iron→diamond, like the pickaxe), crafted at
+  the table: **🪓 Axe** (chops natural wood fast) + **🥄 Shovel** (digs natural
+  dirt/sand/gravel fast). `AXE_RECIPES`/`SHOVEL_RECIPES`; `goals.tools` gained
+  `axe`/`shovel`; generic `goals.toolTier(kind)`/`setToolTier(kind,t)` (pickTier
+  is now an alias). Each ladder is independent (you can make an axe without a
+  pickaxe — both just need wood early).
+- **Break-time is now tool-category aware** (`toolCategory(id)` → pick/axe/shovel;
+  `toolPowerFor(id)` = the owned tier of the matching tool). A NATURAL block takes
+  ~2 chips bare and **1 with the matching tool** (the power-up feel); **anything
+  YOU placed still breaks in 1 tap** so creative building stays snappy. The game
+  **auto-uses the best tool you own** for each block (no hotbar to manage) and
+  **shows it in your hand** (`showHeldFor(id)` sets `holdPick`/`holdAxe`/
+  `holdShovel`; new tier-coloured axe/shovel meshes in character.js, drawn via a
+  generalized held-tool block).
+- **UX/findability** (the dad's "did it work" concern): crafting dialog reorganized
+  into **Pickaxes / Axes / Shovels / Armor** sections; the materials HUD shows your
+  🪓/🥄 tiers; a brown **🛠️ crafting marker on the minimap** points to the workshop
+  near spawn; crafting tip rewritten to name all three tools.
+- New goals: **Lumberjack** (craft an axe), **Dig dig dig** (craft a shovel),
+  **Master Toolsmith** (a full diamond set → counts.mastertool).
+  Verified: Node logic (tool ladders + craftaxe/craftshovel/mastertool counters +
+  save round-trip) + headless CDP (**0 errors**): craft dialog shows all 4
+  sections; craft axe+shovel; **behavioral break-time via `__ezra.mine` — LOG/
+  DIRT/STONE each 2 taps bare vs 1 with the matching tool; a PLACED log stays 1
+  tap**; HUD shows the tools; save/reload keeps them; world-hop clean. Debug:
+  `__ezra.craftAxe(t)/craftShovel(t)/toolTier(k)`. Tuning candidates: natural
+  dirt/grass now take 2 taps bare (the shovel incentive — gentle, +1 tap; lower
+  HARDNESS if it feels slow); the held axe/shovel swing is brief (headless capture
+  couldn't freeze it — same proven path as the pickaxe); sword is still a 💎-shop
+  item (could join the craft ladder next). Next depth rungs offered: a sword craft
+  ladder, a Nether "netherite"-style top tier, repeatable deeper vaults.
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept
