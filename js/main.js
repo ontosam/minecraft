@@ -3356,7 +3356,11 @@ function loadGame() {
         if (!data || !WORLD_KINDS[k]) continue;
         const w = new World(gl);
         w[WORLD_KINDS[k].gen]();              // fresh terrain first (so a grown world has land around old builds)
-        if (!w.loadFrom(data)) { if (k === 'over') return false; continue; }
+        // The overworld got much deeper: an old (shallower) save lifts its builds
+        // up onto the new deep terrain instead of overlaying its shallow crust.
+        const oldHeight = data.d && data.d[1] !== SY;
+        const ok = (k === 'over' && oldHeight) ? w.liftOldBuildsInto(data) : w.loadFrom(data);
+        if (!ok) { if (k === 'over') return false; continue; }
         if (k === 'space') migrateSpaceIfOld(w);   // upgrade old floating-island space → the new moon (keeps builds)
         registerDim(k, w);
       }
@@ -3364,6 +3368,9 @@ function loadGame() {
       worlds.over.world.carveBeachIfClear();
       for (const k of Object.keys(worlds)) { tidyPortals(k); regroundHome(k); worlds[k].world.rebuildAll(); }
       Object.assign(positions, obj.pos || {});
+      // After deepening the home world, the old saved standing position is now
+      // buried underground — drop the player back at the new surface spawn.
+      if (worlds.over.world.deepMigrated) positions.over = worlds.over.world.spawn.slice();
       // If a migrated Space World left the arrival point hanging over the void,
       // drop it onto the new moon so you never load mid-fall.
       if (worlds.space) {

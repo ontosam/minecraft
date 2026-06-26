@@ -3,11 +3,14 @@
 
 import { GLMesh, getUV, TILE } from './gfx.js';
 
-export const SX = 96, SY = 32, SZ = 96;   // world size in blocks
+export const SX = 96, SY = 48, SZ = 96;   // world size in blocks (taller now — a real underground)
 export const CHUNK = 16;                   // chunk footprint (CHUNK x CHUNK x SY)
 const CXN = SX / CHUNK, CZN = SZ / CHUNK;  // chunks per axis
+// Overworld surface sits high so there's a real, deep underground to mine down
+// through (caves, layered ore, the Deep Vault) — like Minecraft, not a thin crust.
+export const GROUND = 26;
 // The beach lagoon (overworld): centre, radius, and water surface height.
-const BEACH = { x: 18, z: 44, r: 10, waterY: 4 };
+const BEACH = { x: 18, z: 44, r: 10, waterY: GROUND - 2 };
 
 // Block ids
 export const B = {
@@ -266,6 +269,7 @@ const LIGHT_EMIT = {
 // collision — so the kid still stands on a clean cube surface.
 const STUD_CENTERS = [[0.3, 0.3], [0.7, 0.3], [0.3, 0.7], [0.7, 0.7]];
 const STUD_R = 0.16, STUD_H = 0.17;
+let _lightQueue = null;   // shared BFS scratch for computeLight (one world lit at a time)
 export function isLego(id) { return id >= B.LEGO_RED && id <= B.LEGO_LIME; }
 
 function mulberry32(seed) {
@@ -347,17 +351,20 @@ export class World {
     this.data.fill(B.AIR);
     this.placed = new Set();
     this.portals = [];
-    // Gentle rolling hills of grass.
+    // Gentle rolling hills of grass on top — but a deep column beneath: grass,
+    // a few dirt, a thick stone layer, then dark deepslate down near bedrock. So
+    // digging straight down is a real descent through ~20+ blocks, like Minecraft.
     for (let x = 0; x < SX; x++) {
       for (let z = 0; z < SZ; z++) {
-        let h = 6 + 1.6 * Math.sin(x * 0.18) + 1.6 * Math.cos(z * 0.16)
-          + 1.3 * Math.sin((x + z) * 0.09);
-        h = Math.max(3, Math.min(13, Math.round(h)));
+        let h = GROUND + 1.8 * Math.sin(x * 0.18) + 1.8 * Math.cos(z * 0.16)
+          + 1.4 * Math.sin((x + z) * 0.09);
+        h = Math.max(GROUND - 5, Math.min(GROUND + 5, Math.round(h)));
         for (let y = 0; y <= h; y++) {
           let id;
           if (y === 0) id = B.BEDROCK;
           else if (y === h) id = B.GRASS;
           else if (y >= h - 2) id = B.DIRT;
+          else if (y <= 7) id = B.DEEPSLATE;   // the deep, dark layer near bedrock
           else id = B.STONE;
           this.data[this.idx(x, y, z)] = id;
         }
@@ -383,18 +390,21 @@ export class World {
       trees++;
     }
 
-    // Hidden treasure to discover by digging: pockets of gold + diamond, kept
-    // down in the stone layer so they feel like a real find.
-    for (let i = 0; i < 34; i++) {
-      const id = rand() < 0.6 ? B.GOLD : B.DIAMOND;
+    // Hidden treasure to discover by digging: gold in the stone band, diamond
+    // kept deep down near bedrock — so the deeper you dig, the better the find.
+    for (let i = 0; i < 30; i++) {
+      const deep = rand() < 0.4;
+      const id = deep ? B.DIAMOND : B.GOLD;
       const x = 2 + Math.floor(rand() * (SX - 4)), z = 2 + Math.floor(rand() * (SZ - 4));
       const surf = this.heightAt(x, z);
-      if (surf < 5) continue;
-      const cy = 1 + Math.floor(rand() * (surf - 3));   // within the stone band
+      if (surf < 12) continue;
+      const cy = deep ? (1 + Math.floor(rand() * 6))                    // diamond: y1-6 (deepslate)
+                      : (9 + Math.floor(rand() * Math.max(1, surf - 12)));  // gold: mid stone band
       const n = 1 + Math.floor(rand() * 3);
       for (let k = 0; k < n; k++) {
         const bx = x + Math.floor(rand() * 2), by = cy + Math.floor(rand() * 2), bz = z + Math.floor(rand() * 2);
-        if (this.get(bx, by, bz) === B.STONE) this.data[this.idx(bx, by, bz)] = id;
+        const cur = this.get(bx, by, bz);
+        if (cur === B.STONE || cur === B.DEEPSLATE) this.data[this.idx(bx, by, bz)] = id;
       }
     }
 
@@ -418,25 +428,30 @@ export class World {
     if (hasOre || !hasStone) return;
     let s = (0x9e3779b1 ^ this.data.length) >>> 0;   // small local RNG (no global state)
     const rand = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
-    const seed = (id, count, hiFrac) => {
+    // Seed an ore vein. `loFrac..hiFrac` is the depth band (0 = bedrock, 1 =
+    // surface), so coal sits high, iron mid, gold/diamond deep — the deeper you
+    // mine, the better the reward. Veins go into natural stone OR deepslate.
+    const seed = (id, count, loFrac, hiFrac) => {
       for (let i = 0; i < count; i++) {
         const x = 2 + Math.floor(rand() * (SX - 4)), z = 2 + Math.floor(rand() * (SZ - 4));
         const surf = this.heightAt(x, z);
-        if (surf < 4) continue;
-        const cy = 1 + Math.floor(rand() * Math.max(1, Math.floor(surf * hiFrac) - 1));
+        if (surf < 6) continue;
+        const lo = Math.max(1, Math.floor(surf * loFrac)), hi = Math.max(lo + 1, Math.floor(surf * hiFrac));
+        const cy = lo + Math.floor(rand() * (hi - lo));
         const n = 2 + Math.floor(rand() * 4);
         for (let k = 0; k < n; k++) {
           const bx = x + (Math.floor(rand() * 3) - 1), by = cy + Math.floor(rand() * 2), bz = z + (Math.floor(rand() * 3) - 1);
           if (bx < 1 || bx >= SX - 1 || bz < 1 || bz >= SZ - 1 || by < 1 || by >= SY) continue;
           const key = this.idx(bx, by, bz);
-          if (this.get(bx, by, bz) === B.STONE && !this.placed.has(key)) this.data[key] = id;
+          const cur = this.get(bx, by, bz);
+          if ((cur === B.STONE || cur === B.DEEPSLATE) && !this.placed.has(key)) this.data[key] = id;
         }
       }
     };
-    seed(B.COAL_ORE, 54, 1.0);   // coal: common, any depth in the stone
-    seed(B.IRON_ORE, 32, 0.7);   // iron: a bit rarer, lower down
-    seed(B.GOLD, 6, 0.4);        // gold: deeper
-    seed(B.DIAMOND, 6, 0.3);     // diamond: the deepest reward — sparse, brave the caves!
+    seed(B.COAL_ORE, 90, 0.25, 1.0);   // coal: common, upper-to-mid depths
+    seed(B.IRON_ORE, 60, 0.10, 0.65);  // iron: mid depths
+    seed(B.GOLD, 16, 0.05, 0.35);      // gold: deep
+    seed(B.DIAMOND, 14, 0.0, 0.22);    // diamond: the deepest reward — brave the dark caves!
   }
 
   // Carve gentle caves into the stone: wandering tunnels + a few caverns + a
@@ -456,44 +471,55 @@ export class World {
         if (protect.has(colKey(x, z))) continue;
         const k = this.idx(x, y, z);
         const id = this.data[k];
-        if ((id === B.STONE || id === B.DIRT || id === B.COAL_ORE || id === B.IRON_ORE) && !this.placed.has(k)) this.data[k] = B.AIR;
+        if ((id === B.STONE || id === B.DIRT || id === B.DEEPSLATE || id === B.COAL_ORE || id === B.IRON_ORE) && !this.placed.has(k)) this.data[k] = B.AIR;
       }
     };
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-    // Wandering tunnels.
-    for (let w = 0; w < 8; w++) {
+    // Wandering tunnels through the whole deep column — they roam up and down so
+    // a dig at any depth tends to break into one. More + longer now there's room.
+    for (let w = 0; w < 16; w++) {
       let x = 4 + rand() * (SX - 8), z = 4 + rand() * (SZ - 8);
-      let y = 2 + rand() * 4;
-      let ax = rand() - 0.5, az = rand() - 0.5, ay = (rand() - 0.5) * 0.3;
-      const steps = 45 + (rand() * 45 | 0);
+      let y = 3 + rand() * (GROUND - 6);                  // start anywhere in the depth
+      let ax = rand() - 0.5, az = rand() - 0.5, ay = (rand() - 0.5) * 0.5;
+      const steps = 55 + (rand() * 60 | 0);
       for (let s = 0; s < steps; s++) {
         x = clamp(x + ax, 1, SX - 2); z = clamp(z + az, 1, SZ - 2); y += ay;
         ax = clamp(ax + (rand() - 0.5) * 0.3, -1, 1); az = clamp(az + (rand() - 0.5) * 0.3, -1, 1);
-        ay = clamp(ay + (rand() - 0.5) * 0.2, -0.4, 0.4);
+        ay = clamp(ay + (rand() - 0.5) * 0.25, -0.5, 0.5);
         const surf = this.heightAt(Math.round(x), Math.round(z));
-        y = clamp(y, 2, Math.max(2, surf - 1));            // always stay underground
-        carveSphere(x, y, z, 1 + (rand() < 0.3 ? 1 : 0));
+        y = clamp(y, 2, Math.max(2, surf - 2));            // always stay underground
+        carveSphere(x, y, z, 1 + (rand() < 0.35 ? 1 : 0));
       }
     }
-    // A few bigger caverns.
-    for (let c = 0; c < 4; c++) {
+    // Bigger open caverns at varied depths — the rooms you light up with torches.
+    for (let c = 0; c < 8; c++) {
       const cx = 6 + (rand() * (SX - 12) | 0), cz = 6 + (rand() * (SZ - 12) | 0);
-      const cy = clamp(3 + (rand() * 3 | 0), 2, Math.max(2, this.heightAt(cx, cz) - 2));
-      carveSphere(cx, cy, cz, 2 + (rand() * 2 | 0));
+      const surf = this.heightAt(cx, cz);
+      const cy = clamp(3 + (rand() * (surf - 6) | 0), 2, Math.max(2, surf - 3));
+      carveSphere(cx, cy, cz, 2 + (rand() * 3 | 0));
     }
     // Surface entrances: a wandering sloped shaft down through open grass, so a
-    // kid can spot the hole and walk/drift down into a cave.
-    for (let e = 0; e < 6; e++) {
+    // kid can spot the hole and walk/drift down into the deep caves.
+    for (let e = 0; e < 9; e++) {
       const x0 = 4 + (rand() * (SX - 8) | 0), z0 = 4 + (rand() * (SZ - 8) | 0);
       if (protect.has(colKey(x0, z0))) continue;
       const surf = this.heightAt(x0, z0);
       if (surf < 5 || this.get(x0, surf, z0) !== B.GRASS) continue;   // only open grassy ground
       let ex = x0, ez = z0;
       for (let y = surf; y >= 2; y--) {
-        carveSphere(ex, y, ez, 1);
+        carveSphere(ex, y, ez, 1 + (rand() < 0.3 ? 1 : 0));
         ex = clamp(ex + (rand() - 0.5) * 0.9, 1, SX - 2);
         ez = clamp(ez + (rand() - 0.5) * 0.9, 1, SZ - 2);
       }
+    }
+    // A guaranteed obvious cave mouth a few steps from spawn so a 6-yr-old finds
+    // the caves on his very first wander — a wide pit down into a little cavern.
+    // (Offset from spawn so he never loads standing over the hole.)
+    if (!protect.size) {
+      const sx = clamp((SX >> 1) + 6, 2, SX - 3), sz = clamp((SZ >> 1) + 6, 2, SZ - 3);
+      const surf = this.heightAt(sx, sz);
+      for (let y = surf; y >= 3; y--) carveSphere(sx, y, sz, y > surf - 3 ? 2 : 1);
+      carveSphere(sx, 5, sz, 3);   // a little room at the bottom
     }
   }
 
@@ -1199,8 +1225,9 @@ export class World {
     const N = SX * SY * SZ;
     if (!this.skyLight || this.skyLight.length !== N) this.skyLight = new Uint8Array(N);
     if (!this.blockLight || this.blockLight.length !== N) this.blockLight = new Uint8Array(N);
-    if (!this._lightQ || this._lightQ.length !== N) this._lightQ = new Int32Array(N);
-    const sky = this.skyLight, blk = this.blockLight, data = this.data, q = this._lightQ;
+    // One world is lit at a time, so the BFS queue is a shared scratch buffer.
+    if (!_lightQueue || _lightQueue.length !== N) _lightQueue = new Int32Array(N);
+    const sky = this.skyLight, blk = this.blockLight, data = this.data, q = _lightQueue;
     sky.fill(0); blk.fill(0);
 
     // Skylight: each column is lit (15) from the top down until the first block
@@ -1408,6 +1435,50 @@ export class World {
     }
     this.portals = (obj.portals || []).map((p) => ({ f: p.f.slice(), dest: p.dest, a: p.a.slice(), active: !!p.active }));
     if (obj.cs) this.crystalSpots = obj.cs.map((c) => c.slice());   // End-world crystal pillars
+    return true;
+  }
+
+  // Migrate an OLD (shallower) overworld save into this freshly-generated DEEP
+  // overworld: KEEP the new deep terrain + caves + vault, and lift the player's
+  // builds straight up onto the new, higher surface so nothing is lost. Each
+  // build column shifts by (new ground height − old ground height), preserving
+  // its shape and keeping it grounded. Used only the first time an old save loads
+  // into the deeper world; afterwards saves are already deep (exact load).
+  liftOldBuildsInto(obj) {
+    if (!obj || !obj.w) return false;
+    const [osx, osy, osz] = obj.d || [64, 32, 64];
+    const total = osx * osy * osz;
+    let bytes = base64ToBytes(obj.w);
+    if (obj.rle) bytes = rleDecode(bytes, total);
+    if (bytes.length !== total) return false;
+    const oIdx = (x, y, z) => x + z * osx + y * osx * osz;
+    const oldPlaced = new Set(obj.p || []);
+    // Old natural ground height per column = highest solid the player did NOT place.
+    const oldGround = (x, z) => {
+      for (let y = osy - 1; y >= 0; y--) { const k = oIdx(x, y, z); if (bytes[k] !== B.AIR && !oldPlaced.has(k)) return y; }
+      return 0;
+    };
+    const shiftCache = new Map();
+    const colShift = (x, z) => {
+      const key = x + z * SX; let s = shiftCache.get(key);
+      if (s === undefined) { s = this.heightAt(x, z) - oldGround(x, z); shiftCache.set(key, s); }
+      return s;
+    };
+    this.placed = new Set();
+    for (const k of oldPlaced) {
+      const ox = k % osx, oz = Math.floor(k / osx) % osz, oy = Math.floor(k / (osx * osz));
+      if (ox < 0 || ox >= SX || oz < 0 || oz >= SZ) continue;
+      const id = bytes[oIdx(ox, oy, oz)];
+      if (id === B.AIR) continue;
+      const ny = oy + colShift(ox, oz);
+      if (ny < 1 || ny >= SY) continue;
+      const nk = this.idx(ox, ny, oz);
+      this.data[nk] = id;
+      this.placed.add(nk);
+    }
+    // Portals are rebuilt at the new ground by tidyPortals/regroundHome after load.
+    this.portals = (obj.portals || []).map((p) => ({ f: p.f.slice(), dest: p.dest, a: p.a.slice(), active: !!p.active }));
+    this.deepMigrated = true;   // signal the loader to drop the player at the new surface
     return true;
   }
 }
