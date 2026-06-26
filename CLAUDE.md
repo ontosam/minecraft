@@ -1386,6 +1386,57 @@ all of s38–41 already live — the old 403 relay recovered).
    torches that also *drop* from crafting (coal+stick) for the full loop,
    biome-flavoured caves (lush/lava), repeatable higher-tier vaults.
 
+## Status (session 43) — ⛏️ Deepen the home world (a real underground)
+Dad playtested s42 and reported: in the home world "it's only digging so far and
+grey appears" — he expected Minecraft caves. **Diagnosed the real problem:** the
+overworld was only **~5 blocks of stone before bedrock** (spawn column was
+`grass·dirt·dirt·stone×5·bedrock`), so digging hit the unbreakable bottom before
+he could find a cave — all the caves/ores/vault were crammed into a 5-block
+sliver. Via AskUserQuestion he picked **"Deepen the home world"** (over a separate
+caves world), accepting a careful reshape of his saved world. Shipped on
+**`claude/ezra-minecraft-next-2y6301`**, mirrored to `main`. **sw v40→v41.**
+1. **World height `SY` 32→48** (in js/world.js:6 — flows everywhere as a constant,
+   no hardcoded ceilings). Other worlds just gain harmless extra sky; only the
+   overworld is redesigned for depth.
+2. **Deep overworld terrain** (`generate()` + new `export const GROUND = 26`):
+   surface hills at ~y21–31 over a deep column — grass → 2 dirt → thick **stone**
+   → dark **deepslate** (y1–7, near bedrock) → bedrock. **~28 blocks of digging
+   depth** (was 5). Beach water level follows `GROUND`.
+3. **Caves rebuilt for the depth** (`carveCaves`): 16 winding tunnels that roam
+   up/down through the whole column, 8 caverns at varied depths, 9 surface
+   entrances, **+ a GUARANTEED wide cave mouth a few steps from spawn** (offset so
+   he never loads standing over it) so a 6-yr-old finds a cave on his first
+   wander. carveSphere/ore now also cut/seed **deepslate**.
+4. **Depth-layered ore** (`sprinkleOre` now takes a `loFrac..hiFrac` band):
+   coal high (90), iron mid (60), gold deep (16), **diamond deepest near bedrock**
+   (14) — brave the dark for the best loot. Buried-treasure gold/diamond likewise
+   biased by depth.
+5. **Build-safe migration (the careful part).** New `World.liftOldBuildsInto(obj)`:
+   when an old (shallower) overworld save loads, KEEP the new deep terrain + caves
+   + vault and **lift the player's builds straight up** — each build column shifts
+   by `newGround − oldGround` (from the old bytes, ignoring placed), so builds stay
+   **grounded and intact**. Wired in the v4 loader (`oldHeight = data.d[1] !== SY`
+   → lift instead of the generic same-coords overlay) + `deepMigrated` flag →
+   reset `positions.over` to the new surface (old standing pos is now underground).
+   Other worlds use the existing same-coords overlay (their content unchanged,
+   extra sky on top; placed indices are y-independent so they survive). One-time:
+   after the first deep save (`d:[96,48,96]`) every later load is a stable exact
+   load. **Light BFS queue is now a shared module-level scratch** (`_lightQueue`)
+   so the taller worlds don't multiply memory.
+   Verified: Node logic (fresh world: spawn dig-depth 28, layered ore by avg-Y
+   [coal 14.8 / iron 8.3 / diamond 3.3], 12.9k cave-air cells, vault deep,
+   guaranteed mouth near spawn; **migration: a 30-block synthetic build [gold
+   patio + diamond tower] preserved + grounded on the new surface**) + headless
+   CDP (**0 errors**): deep boot, deepslate cave + torch, **6-world hop**, and
+   the **real scenario — inject an old `d:[96,32,96]` v4 save → reload → all 30
+   builds preserved + world deep + player at surface; save→reload again is a
+   stable exact load (no re-migration), save ~58KB**. Screenshots: surface, a
+   deep deepslate cave lit by a torch, the preserved build. Tuning candidates:
+   per-column grounding means a *flat* build gently terraces over the new hills
+   (stays grounded — chosen over float/bury; could flatten terrain under builds
+   later); **iPad perf** with the 1.5× taller world — ask the dad to confirm FPS;
+   the guaranteed cave mouth could rarely clip a near-spawn fixture (cosmetic).
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept
@@ -1448,7 +1499,8 @@ diamonds on fun**. Scaffold already in place: **`js/legoworld.js`** (a documente
 - Keep the rule: **no `goals.addGems` anywhere in Lego World.**
 
 **Constraints / gotchas:**
-- World size is a global `SX=64,SY=32,SZ=64` (js/world.js:6). "Much bigger" can't
+- World size is a global `SX=96,SY=48,SZ=96` (js/world.js:6; SY 32→48 in s43 for
+  a deep overworld). "Much bigger" can't
   be per-world cheaply — options: (a) use the full 64×64 baseplate densely with
   attractions (recommended, no engine change), or (b) a real size refactor (big:
   arrays, minimap MM_SIZE, save format all key off SX/SZ — only if he insists).
@@ -1499,7 +1551,7 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
   (16×16 of 16px tiles, `TILE`); `getUV`, `blockPreview` (UI swatches), `GLMesh`
   (clears 5 attrib locs), `cubeMesh`, `frameMesh`. NOTE: `makeLineProgram`,
   `cubeMesh` and `frameMesh` are now unused (the hover indicator was removed).
-- `js/world.js` — voxels (`SX=64,SY=32,SZ=64`), `B` ids, `BLOCKS` defs,
+- `js/world.js` — voxels (`SX=96,SY=48,SZ=96`; deep overworld, s43), `B` ids, `BLOCKS` defs,
   `CATEGORIES`/`PALETTE`, terrain gen (gentle hills + pond + trees), **chunk
   mesher** (16×16 columns, face culling + baked AO + per-voxel sky/block light),
   **`computeLight()`** (s42: skylight column scan + block-light flood-fill from
