@@ -45,6 +45,7 @@ export const B = {
   PUZZLE: 133,                 // a colorful cube — tap for a color-memory mini-game
   COAL_ORE: 134, IRON_ORE: 135, // session 38: mine these for crafting materials
   RELIC: 136,                   // session 40: the legendary treasure in the Deep Vault
+  TORCH: 137,                   // session 42: a placeable light to brighten dark caves
 };
 
 const W = [1, 1, 1]; // white tint for textured blocks
@@ -246,6 +247,16 @@ const FACES = [
 ];
 const AO_LEVEL = [0.62, 0.76, 0.9, 1.0];   // gentle ambient occlusion (softer shadows)
 
+// Block light: how brightly a block glows (0..15), flooding into nearby air with
+// a 1-level falloff per step. Torches/glowstone/lava light up dark caves; lit
+// blocks keep their warm glow even at night (skylight fades, block light doesn't).
+const LIGHT_EMIT = {
+  [B.TORCH]: 14, [B.GLOWSTONE]: 15, [B.SEA_LANTERN]: 15, [B.LANTERN]: 14,
+  [B.LAVA]: 13, [B.REDLAMP_ON]: 14, [B.MAGMA]: 9, [B.GLOW_CRYSTAL]: 13,
+  [B.PLASMA]: 13, [B.RELIC]: 11, [B.NEON_PINK]: 8, [B.NEON_GREEN]: 8,
+  [B.NEON_BLUE]: 8, [B.NEON_ORANGE]: 8, [B.NEON_PURPLE]: 8,
+};
+
 // 3-D Lego studs: four little raised bumps drawn on an exposed Lego top so the
 // bricks read as real Lego instead of flat cubes. Each stud is a tiny box (its
 // top + 4 sides; the bottom sits flush on the brick). Visual only — never in
@@ -325,6 +336,7 @@ export class World {
     if (y < 0 || y >= SY || x < 0 || x >= SX || z < 0 || z >= SZ) return;
     this.data[this.idx(x, y, z)] = id;
     this.markDirty(x, z);
+    this.lightDirty = true;   // any block change can move light (open/close a path)
   }
 
   generate() {
@@ -1158,18 +1170,91 @@ export class World {
     return AO_LEVEL[ao];
   }
 
+  // --- Light fields (session 42) -----------------------------------------
+  // Two derived per-voxel light levels (0..15), recomputed from the blocks:
+  //  • skylight — bright (15) above the surface, 0 the moment a solid block is
+  //    overhead. So the open world stays bright but caves/roofed rooms go dark.
+  //  • blocklight — a flood-fill from glowing blocks (torches, glowstone, lava…)
+  //    that spreads through air with a 1-level falloff, so a torch lights a pool
+  //    around it. Light passes through air + see-through blocks (glass/leaves).
+  // Derived only (never saved): recomputed on load and after any block change.
+  lightPasses(id) { return id === B.AIR || (BLOCKS[id] && BLOCKS[id].seethrough); }
+
+  // Light of the empty cell a face looks into (its outward neighbour), 0..15.
+  // Above the world counts as open sky; out-of-bounds sides are dark (and culled).
+  lightSkyAt(x, y, z) {
+    if (y >= SY) return 15;
+    if (!this.skyLight || x < 0 || x >= SX || y < 0 || z < 0 || z >= SZ) return 15;
+    return this.skyLight[this.idx(x, y, z)];
+  }
+  lightBlkAt(x, y, z) {
+    if (!this.blockLight || x < 0 || x >= SX || y < 0 || y >= SY || z < 0 || z >= SZ) return 0;
+    return this.blockLight[this.idx(x, y, z)];
+  }
+
+  computeLight() {
+    const N = SX * SY * SZ;
+    if (!this.skyLight || this.skyLight.length !== N) this.skyLight = new Uint8Array(N);
+    if (!this.blockLight || this.blockLight.length !== N) this.blockLight = new Uint8Array(N);
+    if (!this._lightQ || this._lightQ.length !== N) this._lightQ = new Int32Array(N);
+    const sky = this.skyLight, blk = this.blockLight, data = this.data, q = this._lightQ;
+    sky.fill(0); blk.fill(0);
+
+    // Skylight: each column is lit (15) from the top down until the first block
+    // that blocks light; everything below that is 0 (needs torches). Cheap, and
+    // gives clean "outside bright / inside dark" without ugly soft shadows.
+    for (let x = 0; x < SX; x++) {
+      for (let z = 0; z < SZ; z++) {
+        let i = this.idx(x, SY - 1, z);
+        for (let y = SY - 1; y >= 0; y--, i -= SX * SZ) {
+          if (!this.lightPasses(data[i])) break;
+          sky[i] = 15;
+        }
+      }
+    }
+
+    // Block light: seed every glowing block, then flood outward through passable
+    // cells losing one level per step (a classic voxel light BFS).
+    let head = 0, tail = 0;
+    for (let i = 0; i < N; i++) {
+      const e = LIGHT_EMIT[data[i]] || 0;
+      if (e > 0) { blk[i] = e; q[tail++] = i; }
+    }
+    const SXZ = SX * SZ;
+    while (head < tail) {
+      const i = q[head++];
+      const lvl = blk[i];
+      if (lvl <= 1) continue;
+      const x = i % SX, y = (i / SXZ) | 0, z = ((i / SX) | 0) % SZ;
+      const nbrs = [
+        x > 0 ? i - 1 : -1, x < SX - 1 ? i + 1 : -1,
+        z > 0 ? i - SX : -1, z < SZ - 1 ? i + SX : -1,
+        y > 0 ? i - SXZ : -1, y < SY - 1 ? i + SXZ : -1,
+      ];
+      for (const ni of nbrs) {
+        if (ni < 0) continue;
+        if (blk[ni] >= lvl - 1) continue;
+        if (!this.lightPasses(data[ni])) continue;   // light stops at solid blocks
+        blk[ni] = lvl - 1;
+        if (tail < N) q[tail++] = ni;                // guard: never overflow the queue
+      }
+    }
+    this.lightDirty = false;
+  }
+
   buildChunkArrays(cx, cz) {
-    const pos = [], uv = [], col = [], light = [], idxArr = [];
+    const pos = [], uv = [], col = [], light = [], blight = [], idxArr = [];
     const x0 = cx * CHUNK, z0 = cz * CHUNK;
     let base = 0;
     // Push one quad (4 corners, CCW) for a Lego stud face: textured with the
-    // brick's side tile + tint so the bump matches the brick colour.
-    const studQuad = (corners, sh, rs, t) => {
+    // brick's side tile + tint so the bump matches the brick colour. Studs sit
+    // on top of the brick, so they take the light of the cell above.
+    const studQuad = (corners, sh, rs, t, sN, bN) => {
       const uvs = [[0, 0], [1, 0], [1, 1], [0, 1]];
       for (let k = 0; k < 4; k++) {
         pos.push(corners[k][0], corners[k][1], corners[k][2]);
         uv.push(uvs[k][0] ? rs.u1 : rs.u0, uvs[k][1] ? rs.v1 : rs.v0);
-        col.push(t[0], t[1], t[2]); light.push(sh);
+        col.push(t[0], t[1], t[2]); light.push(sh * sN); blight.push(sh * bN);
       }
       idxArr.push(base, base + 1, base + 2, base, base + 2, base + 3); base += 4;
     };
@@ -1191,11 +1276,15 @@ export class World {
             const tile = def.tiles[f.slot];
             const r = getUV(tile);
             const t = def.tint;
+            // Light comes from the empty cell this face looks into (its neighbour),
+            // split into skylight (fades at night) and block light (torches/glow).
+            const sN = this.lightSkyAt(nx, ny, nz) / 15, bN = this.lightBlkAt(nx, ny, nz) / 15;
             for (const vert of f.v) {
               pos.push(x + vert.o[0], y + vert.o[1], z + vert.o[2]);
               uv.push(vert.uv[0] ? r.u1 : r.u0, vert.uv[1] ? r.v1 : r.v0);
               col.push(t[0], t[1], t[2]);
-              light.push(f.shade * this.vertexAO(x, y, z, f.n, vert.o));
+              const sh = f.shade * this.vertexAO(x, y, z, f.n, vert.o);
+              light.push(sh * sN); blight.push(sh * bN);
             }
             idxArr.push(base, base + 1, base + 2, base, base + 2, base + 3);
             base += 4;
@@ -1205,21 +1294,22 @@ export class World {
           // overflow the Uint16 index range between the per-block check above.
           if (isLego(id) && this.get(x, y + 1, z) === B.AIR && base + 80 <= 0xffff) {
             const rs = getUV(def.tiles.side), t = def.tint;
+            const sN = this.lightSkyAt(x, y + 1, z) / 15, bN = this.lightBlkAt(x, y + 1, z) / 15;
             for (const [sx, sz] of STUD_CENTERS) {
               const ax = x + sx - STUD_R, bx = x + sx + STUD_R;
               const az = z + sz - STUD_R, bz = z + sz + STUD_R;
               const y0 = y + 1, y1 = y + 1 + STUD_H;
-              studQuad([[ax, y1, bz], [bx, y1, bz], [bx, y1, az], [ax, y1, az]], 1.00, rs, t); // top
-              studQuad([[bx, y0, az], [ax, y0, az], [ax, y1, az], [bx, y1, az]], 0.70, rs, t); // -z
-              studQuad([[ax, y0, bz], [bx, y0, bz], [bx, y1, bz], [ax, y1, bz]], 0.85, rs, t); // +z
-              studQuad([[ax, y0, az], [ax, y0, bz], [ax, y1, bz], [ax, y1, az]], 0.65, rs, t); // -x
-              studQuad([[bx, y0, bz], [bx, y0, az], [bx, y1, az], [bx, y1, bz]], 0.80, rs, t); // +x
+              studQuad([[ax, y1, bz], [bx, y1, bz], [bx, y1, az], [ax, y1, az]], 1.00, rs, t, sN, bN); // top
+              studQuad([[bx, y0, az], [ax, y0, az], [ax, y1, az], [bx, y1, az]], 0.70, rs, t, sN, bN); // -z
+              studQuad([[ax, y0, bz], [bx, y0, bz], [bx, y1, bz], [ax, y1, bz]], 0.85, rs, t, sN, bN); // +z
+              studQuad([[ax, y0, az], [ax, y0, bz], [ax, y1, bz], [ax, y1, az]], 0.65, rs, t, sN, bN); // -x
+              studQuad([[bx, y0, bz], [bx, y0, az], [bx, y1, az], [bx, y1, bz]], 0.80, rs, t, sN, bN); // +x
             }
           }
         }
       }
     }
-    return { pos, uv, col, light, idxArr };
+    return { pos, uv, col, light, blight, idxArr };
   }
 
   rebuildChunk(ci) {
@@ -1231,12 +1321,17 @@ export class World {
     mesh.setAttrib('aUV', new Float32Array(a.uv), 2);
     mesh.setAttrib('aColor', new Float32Array(a.col), 3);
     mesh.setAttrib('aLight', new Float32Array(a.light), 1);
+    mesh.setAttrib('aBlockLight', new Float32Array(a.blight), 1);
     mesh.setIndex(new Uint16Array(a.idxArr));
   }
 
   rebuildAll() { for (let i = 0; i < this.meshes.length; i++) this.rebuildChunk(i); }
 
   flushDirty(limit) {
+    // Refresh the light field once before re-meshing any changed chunks, so the
+    // new mesh bakes in the updated torch/sky light. The dirty 3×3 chunk halo
+    // around each edit comfortably covers a single torch's 15-block reach.
+    if (this.lightDirty) this.computeLight();
     let n = 0;
     for (const ci of this.dirty) {
       this.rebuildChunk(ci);

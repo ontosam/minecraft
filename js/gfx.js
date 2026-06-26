@@ -89,10 +89,12 @@ attribute vec3 aPos;
 attribute vec2 aUV;
 attribute vec3 aColor;
 attribute float aLight;
+attribute float aBlockLight;
 uniform mat4 uProj, uView, uModel;
 varying vec2 vUV;
 varying vec3 vColor;
 varying float vLight;
+varying float vBlock;
 varying float vDist;
 void main() {
   vec4 world = uModel * vec4(aPos, 1.0);
@@ -101,6 +103,7 @@ void main() {
   vUV = aUV;
   vColor = aColor;
   vLight = aLight;
+  vBlock = aBlockLight;
   vDist = length(viewPos.xyz);
 }`;
 
@@ -109,15 +112,19 @@ precision mediump float;
 varying vec2 vUV;
 varying vec3 vColor;
 varying float vLight;
+varying float vBlock;
 varying float vDist;
 uniform sampler2D uTex;
 uniform vec3 uFogColor;
-uniform float uFogNear, uFogFar, uAlpha, uDayLight;
+uniform float uFogNear, uFogFar, uAlpha, uDayLight, uAmbient;
 void main() {
   vec4 tex = texture2D(uTex, vUV);
   if (tex.a < 0.5) discard;            // cutout transparency (glass, leaves)
-  float lit = max(vLight, 0.3);        // ambient floor so caves are dim, not pitch-black
-  vec3 c = tex.rgb * vColor * lit * uDayLight;
+  // Skylight (vLight) fades toward night; block light (vBlock, from torches and
+  // glowing blocks) stays warm. uAmbient is a per-world floor so unlit caves are
+  // dim-but-navigable, never pitch-black (and only the overworld goes truly dark).
+  float lit = max(max(vLight * uDayLight, vBlock), uAmbient);
+  vec3 c = tex.rgb * vColor * lit;
   float fog = clamp((vDist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
   c = mix(c, uFogColor, fog);
   gl_FragColor = vec4(c, uAlpha);
@@ -154,8 +161,8 @@ void main() { gl_FragColor = uColor; }`;
 
 export function makeWorldProgram(gl) {
   return makeProgram(gl, WORLD_VS, WORLD_FS,
-    ['aPos', 'aUV', 'aColor', 'aLight'],
-    ['uProj', 'uView', 'uModel', 'uTex', 'uFogColor', 'uFogNear', 'uFogFar', 'uAlpha', 'uDayLight']);
+    ['aPos', 'aUV', 'aColor', 'aLight', 'aBlockLight'],
+    ['uProj', 'uView', 'uModel', 'uTex', 'uFogColor', 'uFogNear', 'uFogFar', 'uAlpha', 'uDayLight', 'uAmbient']);
 }
 
 export function makeLineProgram(gl) {
@@ -661,8 +668,10 @@ export class GLMesh {
   draw(prog, mode) {
     const gl = this.gl;
     if (!this.count) return;
-    // Clear any attribute arrays a previous program/mesh left enabled.
-    for (let i = 0; i < 4; i++) gl.disableVertexAttribArray(i);
+    // Clear any attribute arrays a previous program/mesh left enabled. (The world
+    // program uses 5 attributes — incl. aBlockLight at loc 4 — so meshes without
+    // it, like characters, fall back to the default 0 rather than a stale buffer.)
+    for (let i = 0; i < 5; i++) gl.disableVertexAttribArray(i);
     for (const name in prog.a) {
       const loc = prog.a[name];
       const entry = this.attribs[name];

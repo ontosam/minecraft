@@ -311,6 +311,7 @@ function registerDim(key, w) {
   if (key === 'over') { w.carveCavesIfNone(); w.carveVaultIfNone(); }  // caves + the Deep Vault for older saves (build-safe)
   else if (w.findVault) w.findVault();    // locate the relic in any world that has one
   w.sprinkleOre();                        // seed coal/iron/deep treasure to mine (new worlds + older saves)
+  w.computeLight();                       // bake skylight + torch/glow block light before meshing
   w.rebuildAll();
   w.updateRedstone();                    // light any saved lamps wired to on-levers
   scanSaplings(w);                        // resume growing any saved saplings
@@ -3262,6 +3263,10 @@ function frameBody(now) {
   gl.uniform1f(worldProg.u.uFogFar, kind.fog[1] * 1.7);
   gl.uniform1f(worldProg.u.uAlpha, 1);
   gl.uniform1f(worldProg.u.uDayLight, dayLight);
+  // Ambient floor: only the overworld goes truly dark underground (so its caves
+  // need torches). Every other world keeps a bright floor — nothing surprising
+  // ever goes dark in Lego/Build/Secret/Space/etc.
+  gl.uniform1f(worldProg.u.uAmbient, dimension === 'over' ? 0.18 : 0.42);
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, atlas);
   gl.uniform1i(worldProg.u.uTex, 0);
