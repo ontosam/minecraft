@@ -611,6 +611,7 @@ function doBuild(hit) {
   if (selected !== B.WATER && selected !== B.SAPLING) world.placed.add(world.idx(x, y, z));
   sound.play('place'); saveDirty = true; actionAnim = 1; minimapDirty = true;
   goals.onBuild(selected);
+  if (selected === B.TORCH) { goals.bump('torch'); tip('torchplaced', '🔦 Nice! Torches glow even at night. Light up your caves and rooms!'); }
   if (isRedstone(selected)) {
     world.updateRedstone();   // a new wire/lamp may light up
     tip('redstone', '⚙️ Put a Lamp next to a Lever, then tap the Lever!');
@@ -3107,6 +3108,12 @@ function frameBody(now) {
     if (stevePos) { const dx = player.pos[0] - stevePos[0], dz = player.pos[2] - stevePos[2]; if (dx * dx + dz * dz < 30) tip('steve', '🍗 Tap Steve for math games and snacks!'); }
     const vs = mobs().villagers;
     if (vs) for (const v of vs.list) { const dx = player.pos[0] - v.pos[0], dz = player.pos[2] - v.pos[2]; if (dx * dx + dz * dz < 16) { tip('villager', '🧑‍🌾 Tap a villager for a job + 💎!'); break; } }
+    // First time underground in the dark → nudge toward torches.
+    if (world.skyLight) {
+      const px = player.pos[0] | 0, py = player.pos[1] | 0, pz = player.pos[2] | 0;
+      if (py > 1 && py < SY && px >= 0 && px < SX && pz >= 0 && pz < SZ && world.skyLight[world.idx(px, py, pz)] === 0)
+        tip('darkcave', '🌑 So dark! Open the Light 💡 tab and place Torches to see your way.');
+    }
   }
 
   // Step into a portal swirl → travel to its destination world.

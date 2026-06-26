@@ -93,6 +93,7 @@ export const BLOCKS = {
   [B.COAL_ORE]: nat(TILE.COAL_ORE, '#3a3a42'),
   [B.IRON_ORE]: nat(TILE.IRON_ORE, '#c9a06a'),
   [B.RELIC]: nat(TILE.RELIC, '#c98cff'),
+  [B.TORCH]: nat(TILE.TORCH, '#ffb43a'),
   [B.BOOKSHELF]: nat3(TILE.PLANKS, TILE.BOOKSHELF, TILE.PLANKS, '#9a6b3a'),
   [B.GLOWSTONE]: nat(TILE.GLOWSTONE, '#e8c24a'),
   [B.PUMPKIN]: nat3(TILE.PUMPKIN_TOP, TILE.PUMPKIN_SIDE, TILE.PUMPKIN_TOP, '#e07b1e'),
@@ -218,6 +219,8 @@ export const CATEGORIES = [
   { name: 'Shiny 💎', blocks: [B.COAL_ORE, B.IRON_ORE, B.IRON_BLOCK, B.GOLD_BLOCK, B.DIAMOND_BLOCK, B.EMERALD_BLOCK, B.LAPIS_BLOCK, B.REDSTONE_BLOCK, B.COAL_BLOCK, B.COPPER, B.COPPER_OX, B.AMETHYST, B.GOLD, B.DIAMOND, B.ICE, B.PACKED_ICE] },
   { name: 'Wood', blocks: [B.PLANKS, B.BIRCH_PLANKS, B.DARK_PLANKS, B.CHERRY_PLANKS, B.CRIMSON_PLANKS, B.WARPED_PLANKS, B.BOOKSHELF] },
   { name: 'Decor 🪑', blocks: [B.MELON, B.HAY, B.HONEY, B.NOTE_BLOCK, B.SPONGE, B.SCULK, B.PUMPKIN, B.GLOWSTONE, B.SEA_LANTERN] },
+  // Lights for brightening dark caves (and cozy rooms at night).
+  { name: 'Light 💡', blocks: [B.TORCH, B.LANTERN, B.GLOWSTONE, B.SEA_LANTERN, B.GLOW_CRYSTAL] },
   // A special group of wild blocks for crazy builds!
   { name: 'Creative ✨', blocks: [B.PUZZLE, B.NEON_PINK, B.NEON_GREEN, B.NEON_BLUE, B.NEON_ORANGE, B.NEON_PURPLE, B.GLOW_CRYSTAL, B.STARRY, B.CLOUD, B.CHECKER, B.CANDY, B.CHROME] },
   // Out-of-this-world blocks for building moon bases (alien goo is sticky!).

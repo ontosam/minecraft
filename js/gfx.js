@@ -43,6 +43,8 @@ export const TILE = {
   COAL_ORE: 121, IRON_ORE: 122,
   // session 40: the legendary treasure at the bottom of the Deep Vault
   RELIC: 123,
+  // session 42: a torch — a stick with a bright flame to light dark caves
+  TORCH: 124,
 };
 
 export function initGL(canvas) {
@@ -578,6 +580,16 @@ function buildAtlasCanvas() {
     ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(q[0] + h - 0.5, q[1], 1, T); ctx.fillRect(q[0], q[1] + h - 0.5, T, 1);
     ctx.fillStyle = '#fff'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('?', q[0] + h, q[1] + h + 1); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; }
+
+  // Torch: a dark cave-stone backdrop with a wooden stick rising up to a bright
+  // flame at the top — reads as "a torch on the wall" even as a full cube.
+  { const q = at(TILE.TORCH); noise(ctx, q[0], q[1], 0x35302a, 0.10, 530);   // dark backdrop
+    ctx.fillStyle = shade(0x6b4a2a, 1); ctx.fillRect(q[0] + 7, q[1] + 7, 2, 8);          // wooden stick
+    ctx.fillStyle = shade(0x4a331d, 1); ctx.fillRect(q[0] + 7, q[1] + 11, 1, 4);         // stick shading
+    ctx.fillStyle = shade(0xff7a18, 1); ctx.fillRect(q[0] + 6, q[1] + 3, 4, 5);          // outer flame (orange)
+    ctx.fillStyle = shade(0xffc83a, 1); ctx.fillRect(q[0] + 6, q[1] + 4, 3, 3);          // inner flame (yellow)
+    ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(q[0] + 7, q[1] + 5, 1, 1);      // hot white core
+    ctx.fillStyle = 'rgba(255,170,40,0.45)'; ctx.fillRect(q[0] + 5, q[1] + 2, 6, 7); }    // soft glow halo
 
   return c;
 }
