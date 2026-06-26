@@ -1326,6 +1326,66 @@ s38–40). **sw v38→v39.** Now **59 goals**, **137 block ids** (RELIC 136).
   overworld-only; the surface shaft can clip a hillside (cosmetic). Next rungs:
   axe/shovel, torches + real cave darkness, more vault tiers / a deeper boss.
 
+## Status (session 42) — 🔦 Torches + real dark caves (a block-light system)
+Dad: "deeper, not wider — pick a direction, I'll steer." Offered 3 backlog rungs
+via AskUserQuestion; he picked **Torches & dark caves**. This is the iconic
+Minecraft cave moment and the piece missing from the middle of the mining spine
+(caves were lit, so torches had no reason to exist + going deep didn't *feel*
+like an expedition). Shipped on **`claude/ezra-minecraft-next-2y6301`**, mirrored
+to `main`. **sw v39→v40.** Now **60 goals**, **138 block ids** (TORCH 137), **125
+atlas tiles** (TORCH 124). First confirmed main was green (clean boot, 0 errors,
+all of s38–41 already live — the old 403 relay recovered).
+1. **A real block-light engine (`js/world.js` `computeLight`).** Each world now
+   bakes **two derived per-voxel light fields** (0..15), recomputed on load and
+   after any edit (`lightDirty` → recompute in `flushDirty`; the existing dirty
+   3×3 chunk halo covers a torch's 15-block reach). Never saved — purely derived,
+   so **no save-format change/migration** (verified: a placed torch reloads with
+   its light recomputed to 14).
+   • **skylight** — a cheap column scan: bright (15) above the surface, 0 the
+     moment a solid block is overhead → open world stays bright, caves/roofed
+     rooms go dark. • **block light** — a flood-fill BFS from glowing blocks
+     (`LIGHT_EMIT`: torch 14, glowstone/sea-lantern 15, lantern 14, lava 13,
+     glow-crystal/plasma 13, redlamp-on 14, magma 9, relic 11, neon 8) that
+     spreads through air **and see-through blocks** (glass/leaves) losing 1/level,
+     stopping at solid blocks. (Node-verified: 14→13→12… falloff, glass passes,
+     stone blocks, enclosed tunnel skylight 0.)
+2. **Shader (`js/gfx.js`).** World VS/FS gained a 2nd light attribute
+   **`aBlockLight`** so block light stays warm **even at night** while skylight
+   fades (`lit = max(max(vLight*uDayLight, vBlock), uAmbient)`). New per-world
+   **`uAmbient`** floor: **overworld 0.18** (caves go genuinely dark) / **0.42
+   everywhere else** — so nothing surprising darkens in Lego/Build/Secret/Space/
+   Ant/etc. (the change is *contained* to where caves live). **Critical fix:**
+   `GLMesh.draw` now clears 5 attrib locations (was 4) so meshes without
+   `aBlockLight` (characters/mobs/shadows) fall back to 0, not a stale buffer.
+   Characters keep their own shade (not world-lit), so **the kid is always
+   visible even in a pitch-dark cave** (non-scary). Mesher (`buildChunkArrays`)
+   samples the face's neighbour-air sky/block light → two vertex light values
+   (studs sample the cell above); `rebuildChunk` sets `aBlockLight`.
+3. **🔦 The Torch** (B.TORCH 137, TILE.TORCH 124 — a dark block with a bright
+   procedural flame). Emits light 14. Lives in a new **'Light 💡' picker tab**
+   (torch + lantern + glowstone + sea-lantern + glow-crystal) — **always
+   available, never gated**, so a kid is never stuck in a black cave (the game's
+   #1 rule). One-time tips: first time underground in the dark ("open the Light
+   💡 tab, place Torches") + on first torch placed. New **'Torch bearer'** goal
+   (place 3 torches). `goals.bump('torch')` in `doBuild`.
+   Verified: Node logic (skylight column scan, block-light BFS falloff/glass/
+   stone, max levels) + headless CDP (**0 errors**): surface unchanged & bright,
+   caves genuinely dark, glowstone/torch light a warm pool with falloff; Light
+   tab present w/ torch swatch; torch places→lights→goal ticks; **6-world hop
+   (lego/nether/gold/space/end/over) zero errors**; **save/reload keeps the torch
+   (id 137) + recomputes its light to 14**; night surface unregressed. Screenshots
+   of a dark cave, a glowstone-lit cave, and a **torch-lined tunnel** (the hero
+   shot). Tuning candidates: ambient floors 0.18/0.42 are first picks (easy to
+   nudge if the dad wants caves darker/lighter on the real iPad); torch is a solid
+   full cube (engine has no thin/attached geometry) — reads fine via its texture;
+   torch picker swatch is a touch dark (it's a dark block by design).
+   **iPad caveat (flag to dad):** this is a *shader* change; it passed in ANGLE/
+   SwiftShader headless but iOS Safari GL is stricter (cf. the s26 crash) — ask
+   him to confirm caves look right on the actual iPad after a full app
+   close/reopen (to pick up sw v40). **Next rungs offered:** axe/shovel tools,
+   torches that also *drop* from crafting (coal+stick) for the full loop,
+   biome-flavoured caves (lush/lava), repeatable higher-tier vaults.
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept
@@ -1434,14 +1494,16 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
 - `js/math.js` — `mat4` (perspective, lookAt, multiply, `model`=T·Ry·S,
   translate, rotateX, transformPoint), clamp.
 - `js/gfx.js` — WebGL init; **world shader** (textured · per-vertex tint · baked
-  light · fog · `uAlpha`); procedural **texture atlas** (8×8 of 16px tiles,
-  `TILE`); `getUV`, `blockPreview` (UI swatches), `GLMesh`, `cubeMesh`,
-  `frameMesh` (configurable wireframe). NOTE: `makeLineProgram`, `cubeMesh` and
-  `frameMesh` are now unused (the hover build/dig indicator was removed) — safe
-  to delete.
+  AO + **block-light system** [`aLight`=skylight, `aBlockLight`=torch/glow light,
+  `uAmbient` per-world floor; s42] · fog · `uAlpha`); procedural **texture atlas**
+  (16×16 of 16px tiles, `TILE`); `getUV`, `blockPreview` (UI swatches), `GLMesh`
+  (clears 5 attrib locs), `cubeMesh`, `frameMesh`. NOTE: `makeLineProgram`,
+  `cubeMesh` and `frameMesh` are now unused (the hover indicator was removed).
 - `js/world.js` — voxels (`SX=64,SY=32,SZ=64`), `B` ids, `BLOCKS` defs,
   `CATEGORIES`/`PALETTE`, terrain gen (gentle hills + pond + trees), **chunk
-  mesher** (16×16 columns, face culling + baked ambient occlusion), `raycast`
+  mesher** (16×16 columns, face culling + baked AO + per-voxel sky/block light),
+  **`computeLight()`** (s42: skylight column scan + block-light flood-fill from
+  `LIGHT_EMIT` sources; derived, recomputed on edit via `lightDirty`), `raycast`
   (DDA), save/load (base64 of the byte array + `placed`: a Set of packed indices
   of **player-placed** blocks, so creepers target your house not nature; +
   `arrival`: the portal drop point; `portalFrame` for (de)activation). Terrain
