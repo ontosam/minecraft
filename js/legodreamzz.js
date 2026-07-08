@@ -91,6 +91,26 @@ function buildNightmare(A) {
   addBox(A, 0, 0.34, -0.28, 0.10, 0.03, 0.02, [0.15, 0.08, 0.2]);  // frown
 }
 
+// --- The Nightmare KING: a big, grander grumpy blob with a gold crown, bigger
+// horns and glowing eyes — the boss you chase down (still cartoony, never scary). ---
+const KING = [0.36, 0.20, 0.50], KING_D = [0.26, 0.13, 0.38], KING_EYE = [1.0, 0.42, 0.14], CROWN = [1.0, 0.84, 0.28];
+function buildKing(A) {
+  addBox(A, 0, 0.44, 0, 0.46, 0.42, 0.42, KING);        // big body
+  addBox(A, 0, 0.10, 0, 0.50, 0.10, 0.46, KING_D);      // base
+  addBox(A, 0, 0.90, 0, 0.30, 0.22, 0.26, KING);        // head lump
+  addBox(A, -0.28, 1.16, 0.12, 0.07, 0.16, 0.07, [0.2, 0.1, 0.28]);   // horns
+  addBox(A, 0.28, 1.16, 0.12, 0.07, 0.16, 0.07, [0.2, 0.1, 0.28]);
+  addBox(A, -0.15, 0.92, -0.24, 0.10, 0.07, 0.05, KING_EYE, true);    // glowing eyes
+  addBox(A, 0.15, 0.92, -0.24, 0.10, 0.07, 0.05, KING_EYE, true);
+  addBox(A, -0.15, 1.01, -0.22, 0.12, 0.03, 0.04, [0.15, 0.08, 0.2]); // brows
+  addBox(A, 0.15, 1.01, -0.22, 0.12, 0.03, 0.04, [0.15, 0.08, 0.2]);
+  addBox(A, 0, 0.72, -0.44, 0.17, 0.04, 0.02, [0.12, 0.06, 0.18]);    // frown
+  addBox(A, 0, 1.14, 0, 0.31, 0.05, 0.29, CROWN);                     // crown band
+  for (const dx of [-0.22, 0, 0.22]) addBox(A, dx, 1.22, 0, 0.05, 0.07, 0.05, CROWN);   // crown points
+  addBox(A, -0.48, 0.46, 0, 0.07, 0.18, 0.11, KING_D);               // arms
+  addBox(A, 0.48, 0.46, 0, 0.07, 0.18, 0.11, KING_D);
+}
+
 // --- Dream Brick: a glowing gold 2-stud brick to collect (spins + bobs). ---
 const GOLD = [1.0, 0.84, 0.28], GOLD_T = [1.0, 0.95, 0.6];
 function buildDreamBrick(A) {
@@ -113,7 +133,7 @@ function makeMesh(gl, build) {
   return mesh;
 }
 
-const MATEO_PICK = 1.2, ZBLOB_PICK = 1.0, NM_PICK = 1.1, BRICK_GRAB = 1.7;
+const MATEO_PICK = 1.2, ZBLOB_PICK = 1.0, NM_PICK = 1.1, KING_PICK = 1.7, BRICK_GRAB = 1.7;
 
 export class DreamCrew {
   constructor(gl, world) {
@@ -122,9 +142,11 @@ export class DreamCrew {
     this.mateoMesh = makeMesh(gl, buildMateo);
     this.zblobMesh = makeMesh(gl, buildZBlob);
     this.nmMesh = makeMesh(gl, buildNightmare);
+    this.kingMesh = makeMesh(gl, buildKing);
     this.brickMesh = makeMesh(gl, buildDreamBrick);
     this.mateo = null;
-    this.zblob = null;
+    this.zblob = null;       // { pos, yaw, t, ridden }
+    this.king = null;        // the Nightmare King boss { pos, yaw, t, hp, maxHp, hurtT }
     this.nightmares = [];   // { pos, yaw, t, hp }
     this.bricks = [];       // { pos, t, got }
     this.t = 0;
@@ -139,9 +161,26 @@ export class DreamCrew {
     const mx = sp[0] + 3, mz = sp[2] + 2;
     this.mateo = { pos: [mx, this.groundY(mx, mz), mz], yaw: Math.PI, targetYaw: Math.PI, t: Math.random() * 6 };
     const zx = mx + 1.2, zz = mz + 0.6;
-    this.zblob = { pos: [zx, this.groundY(zx, zz), zz], yaw: 0, t: 0, hop: 0 };
+    this.zblob = { pos: [zx, this.groundY(zx, zz), zz], yaw: 0, t: 0, ridden: false };
+    this.king = null;
     this.nightmares = [];
     this.bricks = [];
+  }
+
+  // The Nightmare King appears for the boss chase — starts across the plaza and
+  // FLEES from you (a fun chase); tap him hp times to shoo him for good.
+  spawnKing(hp, player) {
+    const sp = this.world.spawn;
+    const a = Math.random() * Math.PI * 2, r = 14;
+    const x = sp[0] + Math.cos(a) * r, z = sp[2] + Math.sin(a) * r;
+    this.king = { pos: [x, this.groundY(x, z), z], yaw: 0, t: 0, hp, maxHp: hp, hurtT: 0 };
+  }
+  clearKing() { this.king = null; }
+  bonkKing() {
+    if (!this.king) return false;
+    this.king.hp -= 1; this.king.hurtT = 0.35;
+    if (this.king.hp <= 0) { this.king = null; return true; }
+    return false;
   }
 
   // Scatter n glowing Dream Bricks around the baseplate for the collect stage.
@@ -187,8 +226,9 @@ export class DreamCrew {
       else { a.targetYaw += 0; }
       const gy = this.groundY(a.pos[0], a.pos[2]); if (gy >= 1) a.pos[1] += (gy - a.pos[1]) * Math.min(1, dt * 6);
     }
-    // Z-Blob: hops along behind the player like an eager puppy.
-    if (this.zblob) {
+    // Z-Blob: hops along behind the player like an eager puppy (unless you're
+    // riding him — then main.js draws him snapped to your feet).
+    if (this.zblob && !this.zblob.ridden) {
       const z = this.zblob; z.t += dt;
       const behindX = player.pos[0] - Math.sin(player.yaw) * 1.4;
       const behindZ = player.pos[2] - Math.cos(player.yaw) * 1.4;
@@ -211,6 +251,29 @@ export class DreamCrew {
       turn(nm, player.pos[0], player.pos[2], 3);
       const gy = this.groundY(nm.pos[0], nm.pos[2]); if (gy >= 1) nm.pos[1] += (gy - nm.pos[1]) * Math.min(1, dt * 6);
     }
+    // The Nightmare King: FLEES from the player (a fun chase). Keeps his distance,
+    // scampers away when you close in, and gently drifts when you back off. He
+    // stays inside a friendly radius of spawn so a 6-yr-old can always corner him.
+    if (this.king) {
+      const k = this.king; k.t += dt;
+      if (k.hurtT > 0) k.hurtT = Math.max(0, k.hurtT - dt);
+      const sp = this.world.spawn;
+      const dx = player.pos[0] - k.pos[0], dz = player.pos[2] - k.pos[2];
+      const dist = Math.hypot(dx, dz) || 1;
+      // Flee directly away from the player when close; speed up the nearer he is.
+      const flee = dist < 9 ? (dist < 3 ? 4.2 : 3.2) : 0;
+      if (flee > 0) {
+        let ax = -dx / dist, az = -dz / dist;
+        // Curve back toward spawn so he never runs off the baseplate edge.
+        const sdx = sp[0] - k.pos[0], sdz = sp[2] - k.pos[2], sd = Math.hypot(sdx, sdz) || 1;
+        if (sd > 16) { ax += (sdx / sd) * 1.3; az += (sdz / sd) * 1.3; }
+        const an = Math.hypot(ax, az) || 1;
+        const spd = (flee + Math.sin(k.t * 3) * 0.4) * dt;
+        k.pos[0] += (ax / an) * spd; k.pos[2] += (az / an) * spd;
+      }
+      turn(k, player.pos[0], player.pos[2], 4);
+      const gy = this.groundY(k.pos[0], k.pos[2]); if (gy >= 1) k.pos[1] += (gy - k.pos[1]) * Math.min(1, dt * 6);
+    }
     // Dream Bricks: grabbed when you get close (no aiming — kid-friendly).
     for (const b of this.bricks) {
       if (b.got) continue; b.t += dt;
@@ -230,6 +293,8 @@ export class DreamCrew {
       return d2 > r * r ? Infinity : tca;
     };
     let best = null, bestT = Infinity;
+    // The King is big — check him first with a generous radius so he's easy to tap.
+    if (this.king) { const t = test(this.king.pos, 0.9, KING_PICK); if (t < bestT) { bestT = t; best = { kind: 'king', obj: this.king }; } }
     for (const nm of this.nightmares) { const t = test(nm.pos, 0.5, NM_PICK); if (t < bestT) { bestT = t; best = { kind: 'nightmare', obj: nm }; } }
     if (this.mateo) { const t = test(this.mateo.pos, 0.9, MATEO_PICK); if (t < bestT) { bestT = t; best = { kind: 'mateo', obj: this.mateo }; } }
     if (this.zblob) { const t = test(this.zblob.pos, 0.4, ZBLOB_PICK); if (t < bestT) { bestT = t; best = { kind: 'zblob', obj: this.zblob }; } }
@@ -250,11 +315,19 @@ export class DreamCrew {
       mat4.model(this._m, this.mateo.pos[0], this.mateo.pos[1] + bob, this.mateo.pos[2], this.mateo.yaw, 1, 1, 1);
       gl.uniformMatrix4fv(prog.u.uModel, false, this._m); this.mateoMesh.draw(prog);
     }
-    if (this.zblob) {
+    if (this.zblob && !this.zblob.ridden) {
       const hop = Math.abs(Math.sin(this.t * 6)) * (this.zblob.moving ? 0.18 : 0.06);
       const squish = 1 + Math.sin(this.t * 6) * 0.06;
       mat4.model(this._m, this.zblob.pos[0], this.zblob.pos[1] + hop, this.zblob.pos[2], this.zblob.yaw, 1, 1 / squish, 1);
       gl.uniformMatrix4fv(prog.u.uModel, false, this._m); this.zblobMesh.draw(prog);
+    }
+    if (this.king) {
+      const k = this.king;
+      const bob = Math.abs(Math.sin(k.t * 3.5)) * 0.16;
+      // A quick squishy "ow!" flinch when tapped.
+      const flinch = k.hurtT > 0 ? 1 + Math.sin(k.hurtT * 40) * 0.12 : 1;
+      mat4.model(this._m, k.pos[0], k.pos[1] + bob, k.pos[2], k.yaw, flinch, 1 / flinch, flinch);
+      gl.uniformMatrix4fv(prog.u.uModel, false, this._m); this.kingMesh.draw(prog);
     }
     for (const nm of this.nightmares) {
       const bob = Math.abs(Math.sin(nm.t * 4)) * 0.12;
@@ -266,5 +339,15 @@ export class DreamCrew {
       mat4.model(this._m, b.pos[0], b.pos[1] + bob, b.pos[2], b.t * 1.6, 1, 1, 1);
       gl.uniformMatrix4fv(prog.u.uModel, false, this._m); this.brickMesh.draw(prog);
     }
+  }
+
+  // Draw the ridden Z-Blob big under the seated kid (main.js calls this from its
+  // mount-draw pass, like the pony/rover). A springy squish sells the bounce.
+  drawRiddenBlob(prog, x, y, z, yaw, moving) {
+    const s = 1.55;
+    const squish = 1 + Math.sin(this.t * 8) * (moving ? 0.12 : 0.05);
+    mat4.model(this._m, x, y, z, yaw, s, (s / squish), s);
+    this.gl.uniformMatrix4fv(prog.u.uModel, false, this._m);
+    this.zblobMesh.draw(prog);
   }
 }

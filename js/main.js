@@ -109,6 +109,7 @@ let rocketBoost = 0;      // eased 0..1 engine-flame intensity
 let rocketKick = 0;       // brief blast-off window that lifts him skyward at launch
 let spaceRace = null;     // the glowing-ring race course in Space World
 let ride = null;          // an active fun-park ride: { att, t, dur, returnPos }
+let dreamRide = false;    // riding Z-Blob during a Lego Dream Adventure
 let resting = null;       // lying on a pillow: { x, y, z, zt } — cozy heart regen
 let pendingRide = null;   // a ride waiting on the "Ride for 💎?" prompt
 let fishing = null;       // an active cast: { wx, wy, wz, t } while waiting for a bite
@@ -280,6 +281,7 @@ function drawShadows(m) {
   if (dragonRiding) shadowAt(player.pos[0], player.pos[2], 2.0);   // the dragon's big shadow below
   else if (rocketState !== 'off') shadowAt(player.pos[0], player.pos[2], 1.6);
   else if (roving) shadowAt(player.pos[0], player.pos[2], 1.5);    // the rover's footprint
+  else if (dreamRide) shadowAt(player.pos[0], player.pos[2], 1.5); // Z-Blob's squishy footprint
   else if (resting) shadowAt(player.pos[0], player.pos[2], 1.4);   // lying down spreads the shadow
   else if (!riding) shadowAt(player.pos[0], player.pos[2], 0.9);
   if (stevePos && dimension === 'over') shadowAt(stevePos[0], stevePos[2], 0.9);
@@ -287,7 +289,8 @@ function drawShadows(m) {
   if (dimension === 'lego' && m.dreamzz) {
     const dc = m.dreamzz;
     if (dc.mateo) shadowAt(dc.mateo.pos[0], dc.mateo.pos[2], 0.85);
-    if (dc.zblob) shadowAt(dc.zblob.pos[0], dc.zblob.pos[2], 0.9);
+    if (dc.zblob && !dc.zblob.ridden) shadowAt(dc.zblob.pos[0], dc.zblob.pos[2], 0.9);
+    if (dc.king) shadowAt(dc.king.pos[0], dc.king.pos[2], 1.6);
     for (const nm of dc.nightmares) shadowAt(nm.pos[0], nm.pos[2], 1.0);
   }
   const groups = [
@@ -364,7 +367,7 @@ function setDimension(key) {
   updateRoverButton();
   updateRocketButton();
   updateQuestButton();           // the 📜 Great Quest is an overworld journey
-  if (key === 'lego') resetDream();   // fresh Dream Adventure each time you visit Lego World
+  resetDream();   // fresh Dream Adventure on entering Lego World; stops the Z-Blob ride on leaving
   minimapDirty = true;
 }
 
@@ -2078,100 +2081,92 @@ function astroOk() {
   closeAstro();
 }
 
-// --- 🌙 LEGO DREAMZzz Dream Adventure (Lego World) ------------------------------
-// Mateo gives a GUIDED, staged quest — build a tower → collect Dream Bricks →
-// shoo the Nightmares → claim your prize — and a persistent on-screen objective
-// banner ALWAYS shows the next thing to do (so a 6-yr-old is never lost). Z-Blob
-// bounces along as a buddy. Difficulty ramps each time you finish (taller towers,
-// more bricks + more nightmares). Idle → build → stars → nightmare → claim.
+// --- 🌙 LEGO DREAMZzz: Chase the Nightmare King (Lego World) --------------------
+// An ACTION-ADVENTURE hosted by Mateo: hop on Z-Blob (a bouncy squish-mount),
+// ZOOM around grabbing glowing Dream Bricks, then the Nightmare King bursts in —
+// CHASE him down and tap-tap-tap to catch him. A persistent on-screen banner +
+// floating markers ALWAYS show the next thing to do (so a 6-yr-old is never lost).
+// Difficulty ramps each finish (more bricks, tougher King). idle → collect → boss → claim.
 let dreamStage = 'idle';
-const dream = { towerN: 3, brickTarget: 3, brickGot: 0, nmTarget: 1 };
+const dream = { brickTarget: 4, brickGot: 0, kingHp: 4 };
 function dreamCrew() { return dimension === 'lego' ? mobs().dreamzz : null; }
 function dreamLevel() { return goals.counts.dream || 0; }
+
+// Hop on / off Z-Blob — a squishy bouncing mount (like the pony). It's the star of
+// the adventure: boosts speed + jump so you zoom around and chase the King.
+function startDreamRide() {
+  const dc = mobs().dreamzz; if (!dc || !dc.zblob) return;
+  dreamRide = true; dc.zblob.ridden = true;
+  player.pos[1] += 0.05;
+  player.mountSpeed = 1.9; player.mountJump = 1.35;
+  camYaw = player.yaw;
+  sound.play('coo');
+}
+function stopDreamRide() {
+  if (!dreamRide) return;
+  dreamRide = false;
+  const dc = (mobs() && mobs().dreamzz) ? mobs().dreamzz : null;
+  if (dc && dc.zblob) { dc.zblob.ridden = false; dc.zblob.pos = player.pos.slice(); }
+  player.mountSpeed = 1; player.mountJump = 1;
+}
 function resetDream() {
   dreamStage = 'idle'; dream.brickGot = 0;
-  if (puzzle && puzzle.dream) closePuzzle();
-  const dc = mobs().dreamzz; if (dc) { dc.clearBricks(); dc.clearNightmares(); }
+  stopDreamRide();
+  const dc = (mobs() && mobs().dreamzz) ? mobs().dreamzz : null;
+  if (dc) { dc.clearBricks(); dc.clearNightmares(); dc.clearKing(); }
 }
+// Start the chase: scatter Dream Bricks and hop the kid straight onto Z-Blob.
 function startDream() {
   const lvl = dreamLevel();
-  dream.towerN = Math.min(6, 3 + lvl);
-  dream.brickTarget = Math.min(6, 3 + lvl);
-  dream.nmTarget = Math.min(4, 1 + lvl);
+  dream.brickTarget = Math.min(8, 4 + lvl);
+  dream.kingHp = Math.min(9, 4 + lvl);
   dream.brickGot = 0;
-  dreamStage = 'build';
+  dreamStage = 'collect';
+  const dc = mobs().dreamzz; if (dc) dc.setBricks(dream.brickTarget);
+  startDreamRide();
   sound.play('portal');
-  showToast('🌙 Dream Adventure! Build a tower ' + dream.towerN + ' blocks tall! 🗼 (Tap 🏗️ → Tower)', 5000);
+  showToast('🌙 Dream Adventure! Zoom around on Z-Blob 💙 and grab ' + dream.brickTarget + ' Dream Bricks! ✨', 5200);
 }
-// A tower = a column with N stacked player-placed blocks (the 🏗️ Tower builds one).
-function dreamHasTower(n) {
-  const cols = new Map();
-  for (const key of world.placed) {
-    const col = key % (SX * SZ), y = Math.floor(key / (SX * SZ));
-    let arr = cols.get(col); if (!arr) { arr = []; cols.set(col, arr); }
-    arr.push(y);
-  }
-  for (const arr of cols.values()) {
-    arr.sort((a, b) => a - b);
-    let run = 1;
-    for (let i = 1; i < arr.length; i++) { run = (arr[i] === arr[i - 1] + 1) ? run + 1 : 1; if (run >= n) return true; }
-  }
-  return false;
-}
+// A Dream Brick was grabbed (proximity, no aiming). Collect them all → the boss.
 function onDreamBrick(pos) {
-  if (dreamStage !== 'stars') return;
+  if (dreamStage !== 'collect') return;
   dream.brickGot++;
   sound.play('treasure'); spawnParticles(pos, '✨', 'puff', 4, 44);
-}
-// Detected on the build event (instant, not polled) — advance the build stage
-// the moment a tall-enough tower exists.
-function dreamOnBuild() {
-  if (dimension !== 'lego' || dreamStage !== 'build') return;
-  const dc = mobs().dreamzz; if (!dc) return;
-  if (dreamHasTower(dream.towerN)) {
-    dreamStage = 'stars'; dc.setBricks(dream.brickTarget);
-    sound.play('coo'); showToast('🧱 Great tower! Now grab ' + dream.brickTarget + ' glowing Dream Bricks! ✨ (pink dots on the map)', 5000);
+  const dc = mobs().dreamzz;
+  if (dream.brickGot >= dream.brickTarget && dc) {
+    dreamStage = 'boss';
+    dc.spawnKing(dream.kingHp, player);
+    sound.play('uhoh');
+    if (dc.king) spawnParticles([dc.king.pos[0], dc.king.pos[1] + 1.2, dc.king.pos[2]], '💥', 'puff', 10, 80);
+    showToast('👑 The Nightmare King grabbed the dream! CHASE him and TAP him ' + dream.kingHp + ' times! 🌙', 5200);
+    tip('king', '👑 The Nightmare King runs away! Ride Z-Blob to catch him, then tap-tap-tap!');
   }
 }
-// Cheap per-frame checks for the collect + shoo stages (just count comparisons).
+// Cheap per-frame safety check (keeps Z-Blob's ride flag in sync).
 function dreamCheck() {
   if (dimension !== 'lego') return;
   const dc = mobs().dreamzz; if (!dc) return;
-  if (dreamStage === 'stars' && dream.brickGot >= dream.brickTarget) {
-    dreamStage = 'puzzle';
-    sound.play('coo'); showToast("💙 Z-Blob has a Dream Code puzzle — watch, then tap it back!", 4600);
-    startDreamPuzzle();
-  } else if (dreamStage === 'nightmare' && dc.nightmares.length === 0) {
-    dreamStage = 'claim'; sound.play('coo');
-    showToast('🎉 You beat the Nightmares! Tap Mateo for your prize! 🏆', 5000);
-  }
-}
-// Z-Blob's Dream Code — a Simon-says memory puzzle (Ezra loves puzzles). Reuses
-// the colour-puzzle mechanic but, in dream mode, ONE solve advances the adventure
-// (instead of looping for 💎). Length ramps with the dream level.
-function startDreamPuzzle() {
-  puzzle = { level: Math.min(6, 3 + dreamLevel()), seq: [], pos: 0, showing: false, dream: true };
-  document.getElementById('puzzle').classList.remove('hidden');
-  sound.play('pet');
-  startPuzzleRound();
-}
-function dreamAfterPuzzle() {
-  if (dreamStage !== 'puzzle') return;
-  const dc = mobs().dreamzz; if (!dc) return;
-  dreamStage = 'nightmare';
-  dc.spawnNightmares(dream.nmTarget, player);
-  sound.play('uhoh');
-  showToast('🌙 The Dream Code woke the Nightmares! Tap them to chase them away! 👋', 4600);
+  if (dreamRide && dc.zblob && !dc.zblob.ridden) dc.zblob.ridden = true;
 }
 function doDreamTap(dc) {
-  if (dreamStage === 'puzzle') { if (!puzzle) startDreamPuzzle(); return; }   // tap the crew to re-open the Dream Code
-  if (dc.kind === 'nightmare') {
-    const shooed = mobs().dreamzz.bonkNightmare(dc.obj);
-    sound.play('poof'); spawnParticles([dc.obj.pos[0], dc.obj.pos[1] + 0.5, dc.obj.pos[2]], '💥', 'puff', 5, 50);
-    if (shooed) { goals.bump('dreamnm'); spawnParticles([dc.obj.pos[0], dc.obj.pos[1] + 0.6, dc.obj.pos[2]], '⭐', 'puff', 3, 44); }
+  if (dc.kind === 'king') {
+    const beat = mobs().dreamzz.bonkKing();
+    sound.play('poof'); shake = Math.min(0.6, shake + 0.16);
+    spawnParticles([dc.obj.pos[0], dc.obj.pos[1] + 0.9, dc.obj.pos[2]], '💥', 'puff', 6, 56);
+    if (beat) {
+      dreamStage = 'claim'; goals.bump('dreamnm'); sound.play('coo');
+      spawnParticles([player.pos[0], player.pos[1] + 1.2, player.pos[2]], '⭐', 'puff', 8, 70);
+      showToast('🎉 You caught the Nightmare King! Tap Mateo for your prize! 🏆', 5000);
+    } else {
+      showToast('👑 Bonk! ' + dc.obj.hp + ' more — keep chasing! 💪', 1500);
+    }
+  } else if (dc.kind === 'nightmare') {   // legacy safety (no longer spawned)
+    if (mobs().dreamzz.bonkNightmare(dc.obj)) goals.bump('dreamnm');
+    sound.play('poof');
   } else if (dc.kind === 'zblob') {
-    sound.play('pet'); spawnHearts([dc.obj.pos[0], dc.obj.pos[1] + 0.5, dc.obj.pos[2]]); goals.onPet();
-    tip('zblob', '💙 Z-Blob loves you! He follows you around Lego World.');
+    // Mid-adventure, tapping Z-Blob hops you back ON (if you slid off); else a pet.
+    if ((dreamStage === 'collect' || dreamStage === 'boss') && !dreamRide) { startDreamRide(); showToast('💙 Wheee! Riding Z-Blob!'); }
+    else { sound.play('pet'); spawnHearts([dc.obj.pos[0], dc.obj.pos[1] + 0.5, dc.obj.pos[2]]); goals.onPet(); tip('zblob', '💙 Z-Blob loves you! Tap him to hop on and ride!'); }
   } else { openDream(); }        // tapped Mateo
 }
 function openDream() { sound.play('pet'); showDream(dreamStage); }
@@ -2179,15 +2174,15 @@ function showDream(state) {
   const msg = document.getElementById('dream-msg'), btn = document.getElementById('dream-ok');
   const lvl = dreamLevel();
   if (state === 'idle') {
-    msg.innerHTML = '<div class="qface">🧑‍🔧</div>Hi! I\'m <b>Mateo</b> 👋<br>and this is <b>Z-Blob</b>! 💙<br>Let\'s do a <b>Dream Adventure</b>:<br>🧱 build a tower · ✨ grab Dream Bricks · 🌙 shoo Nightmares!';
+    msg.innerHTML = '<div class="qface">🧑‍🔧</div>Hi! I\'m <b>Mateo</b> 👋<br>Hop on <b>Z-Blob</b> 💙 and let\'s chase the <b>Nightmare King</b>! 👑<br>✨ Grab Dream Bricks · 🌙 catch the King!';
     btn.textContent = 'Let\'s go! 🌙';
   } else if (state === 'claim') {
-    msg.innerHTML = '<div class="qface">🎉</div>You did it, <b>Dream Chaser</b>! 🏆<br>Here\'s <b>💎' + (3 + lvl * 2) + '</b>!<br>Tap me again for a <b>harder</b> one! 💪';
+    msg.innerHTML = '<div class="qface">🎉</div>You caught him, <b>Dream Hero</b>! 🏆<br>Here\'s <b>💎' + (4 + lvl * 2) + '</b>!<br>Tap me for a <b>harder</b> chase! 💪';
     btn.textContent = 'Yay! 🎉';
   } else {
-    let hint = (state === 'build') ? '🧱 Build a tower <b>' + dream.towerN + '</b> tall! Tap 🏗️ → 🗼 Tower.'
-      : (state === 'stars') ? '✨ Grab the Dream Bricks! <b>' + dream.brickGot + '/' + dream.brickTarget + '</b> (pink map dots)'
-      : '🌙 Tap the Nightmares! <b>' + (mobs().dreamzz ? mobs().dreamzz.nightmares.length : 0) + '</b> left.';
+    const king = mobs().dreamzz && mobs().dreamzz.king;
+    const hint = (state === 'collect') ? '✨ Grab the Dream Bricks! <b>' + dream.brickGot + '/' + dream.brickTarget + '</b> (ride Z-Blob 💙)'
+      : '👑 Chase the Nightmare King and tap him! <b>' + (king ? king.hp : 0) + '</b> to go.';
     msg.innerHTML = '<div class="qface">🧑‍🔧</div>Keep going, friend!<br>' + hint;
     btn.textContent = 'Okay!';
   }
@@ -2197,12 +2192,12 @@ function closeDream() { document.getElementById('dream').classList.add('hidden')
 function dreamOk() {
   if (dreamStage === 'idle') { closeDream(); startDream(); return; }
   if (dreamStage === 'claim') {
-    const reward = 3 + dreamLevel() * 2;
+    const reward = 4 + dreamLevel() * 2;
     goals.addGems(reward); updateGems();
     goals.bump('dream');           // completes 'Dream Chaser' + ramps difficulty next time
     sound.play('treasure');
     spawnParticles([player.pos[0], player.pos[1] + 1, player.pos[2]], '🎉', 'puff', 12, 90);
-    showToast('🌙🏆 Dream Chaser! +💎' + reward + ' — tap Mateo for a harder one!', 4600);
+    showToast('🌙🏆 Dream Hero! +💎' + reward + ' — tap Mateo for a harder chase!', 4600);
     resetDream(); closeDream(); return;
   }
   closeDream();
@@ -2216,15 +2211,13 @@ function updateDreamGoal() {
   const dc = mobs().dreamzz;
   let txt;
   if (dreamStage === 'idle') txt = 'Tap <b>Mateo</b> (the boy 🧑‍🔧) to start a Dream Adventure!';
-  else if (dreamStage === 'build') txt = 'Build a tower <b>' + dream.towerN + '</b> blocks tall! (Tap 🏗️ → 🗼 Tower)';
-  else if (dreamStage === 'stars') txt = 'Collect the ✨ Dream Bricks! <b>' + dream.brickGot + '/' + dream.brickTarget + '</b>';
-  else if (dreamStage === 'puzzle') txt = "Solve Z-Blob's Dream Code! 💙 (watch, then tap it back)";
-  else if (dreamStage === 'nightmare') txt = 'Chase the 🌙 Nightmares — tap them! <b>' + (dc ? dc.nightmares.length : 0) + '</b> left';
+  else if (dreamStage === 'collect') txt = 'Ride 💙 Z-Blob — grab the ✨ Dream Bricks! <b>' + dream.brickGot + '/' + dream.brickTarget + '</b>';
+  else if (dreamStage === 'boss') txt = 'Chase the 👑 Nightmare King — tap him! <b>' + (dc && dc.king ? dc.king.hp : 0) + '</b> to go';
   else txt = '🎉 You did it! Tap <b>Mateo</b> for your prize!';
   el.innerHTML = '🎯 ' + txt;
 }
 // Floating on-screen markers that hover over the current targets (Dream Bricks,
-// Nightmares, or Mateo) — so a 6-year-old can always SEE exactly where to go.
+// the King, or Mateo) — so a 6-year-old can always SEE exactly where to go.
 let dreamMarkerEls = null;
 function ensureDreamMarkers() {
   if (dreamMarkerEls) return;
@@ -2238,9 +2231,14 @@ function updateDreamMarkers() {
   const dc = (dimension === 'lego') ? mobs().dreamzz : null;
   let targets = [];
   if (dc) {
-    if (dreamStage === 'stars') targets = dc.bricks.map((b) => ({ x: b.pos[0], y: b.pos[1] + 1.1, z: b.pos[2], cls: 'brick', html: '<span class="dm-emoji">✨</span>' }));
-    else if (dreamStage === 'nightmare') targets = dc.nightmares.map((n) => ({ x: n.pos[0], y: n.pos[1] + 1.35, z: n.pos[2], cls: 'nm', html: '<span class="dm-emoji">🌙</span>tap!' }));
-    else if ((dreamStage === 'idle' || dreamStage === 'claim') && dc.mateo) targets = [{ x: dc.mateo.pos[0], y: dc.mateo.pos[1] + 1.9, z: dc.mateo.pos[2], cls: 'mateo', html: '<span class="dm-emoji">🧑‍🔧</span>' + (dreamStage === 'claim' ? 'prize!' : 'tap me!') }];
+    if (dreamStage === 'collect') {
+      targets = dc.bricks.map((b) => ({ x: b.pos[0], y: b.pos[1] + 1.1, z: b.pos[2], cls: 'brick', html: '<span class="dm-emoji">✨</span>' }));
+      if (!dreamRide && dc.zblob) targets.push({ x: dc.zblob.pos[0], y: dc.zblob.pos[1] + 1.2, z: dc.zblob.pos[2], cls: 'mateo', html: '<span class="dm-emoji">💙</span>ride!' });
+    } else if (dreamStage === 'boss' && dc.king) {
+      targets = [{ x: dc.king.pos[0], y: dc.king.pos[1] + 1.8, z: dc.king.pos[2], cls: 'nm', html: '<span class="dm-emoji">👑</span>tap!' }];
+    } else if ((dreamStage === 'idle' || dreamStage === 'claim') && dc.mateo) {
+      targets = [{ x: dc.mateo.pos[0], y: dc.mateo.pos[1] + 1.9, z: dc.mateo.pos[2], cls: 'mateo', html: '<span class="dm-emoji">🧑‍🔧</span>' + (dreamStage === 'claim' ? 'prize!' : 'tap me!') }];
+    }
   }
   for (let i = 0; i < dreamMarkerEls.length; i++) {
     const el = dreamMarkerEls[i];
@@ -2302,15 +2300,6 @@ function puzzleTap(ci) {
   } else { puzzleFail(); }
 }
 function puzzleWin() {
-  // Dream mode: one solve cracks Z-Blob's Dream Code and moves the adventure on.
-  if (puzzle.dream) {
-    goals.bump('puzzle'); sound.play('treasure');
-    setPuzzleMsg('🎉 You cracked the Dream Code! 💙');
-    puzzle.showing = true;
-    const p = puzzle;
-    setTimeout(() => { if (puzzle === p) { closePuzzle(); dreamAfterPuzzle(); } }, 1400);
-    return;
-  }
   const reward = Math.max(1, Math.min(3, Math.floor(puzzle.level / 2)));  // 1 → 3 as it gets longer
   goals.addGems(reward); updateGems(); goals.bump('puzzle');
   sound.play('treasure');
@@ -2419,7 +2408,7 @@ function startChapter(i) {
   goals.save();
   recheckBuild();
 }
-function recheckBuild() { const ch = activeChapter(); buildMet = !!(ch && ch.task.kind === 'build' && runBuildCheck(ch.task)); dreamOnBuild(); }
+function recheckBuild() { const ch = activeChapter(); buildMet = !!(ch && ch.task.kind === 'build' && runBuildCheck(ch.task)); }
 function advProgress(ch) {
   const t = ch.task;
   if (t.kind === 'build') return buildMet ? t.n : 0;
@@ -3297,6 +3286,7 @@ function drawMinimap() {
       if (dc.mateo) { mmCtx.fillStyle = '#20b0b0'; mmCtx.strokeStyle = '#0a4a4a'; mmCtx.lineWidth = 1.5; mmCtx.beginPath(); mmCtx.arc(dc.mateo.pos[0] * s, dc.mateo.pos[2] * s, 4, 0, Math.PI * 2); mmCtx.fill(); mmCtx.stroke(); }
       for (const b of dc.bricks) { mmCtx.fillStyle = '#ffd11a'; mmCtx.strokeStyle = '#7a5a00'; mmCtx.lineWidth = 1.2; mmCtx.beginPath(); mmCtx.arc(b.pos[0] * s, b.pos[2] * s, 3, 0, Math.PI * 2); mmCtx.fill(); mmCtx.stroke(); }
       for (const nm of dc.nightmares) { mmCtx.fillStyle = '#8a4dd0'; mmCtx.strokeStyle = '#3a1860'; mmCtx.lineWidth = 1.2; mmCtx.beginPath(); mmCtx.arc(nm.pos[0] * s, nm.pos[2] * s, 3.4, 0, Math.PI * 2); mmCtx.fill(); mmCtx.stroke(); }
+      if (dc.king) { mmCtx.fillStyle = '#c23bd6'; mmCtx.strokeStyle = '#ffd11a'; mmCtx.lineWidth = 2; mmCtx.beginPath(); mmCtx.arc(dc.king.pos[0] * s, dc.king.pos[2] * s, 5, 0, Math.PI * 2); mmCtx.fill(); mmCtx.stroke(); }
     }
   }
   // Secret World markers: rides (pink) + stands incl. the ticket booth (gold).
@@ -3605,11 +3595,15 @@ function frameBody(now) {
     rocketT += dt; ensureRocket();
     rocketShip.draw(worldProg, player.pos[0], player.pos[1], player.pos[2], player.yaw, rocketBoost, rocketT);
   }
+  // Z-Blob (Dream Adventure): a bouncy squish-mount at the kid's feet.
+  if (dreamRide && m.dreamzz) {
+    m.dreamzz.drawRiddenBlob(worldProg, player.pos[0], player.pos[1], player.pos[2], player.yaw, player.moveAmt > 0.15);
+  }
   // Engine hum: idles when seated, revs up as you drive. Only touch it on change.
   const wantEngine = roving ? (player.moveAmt > 0.15 ? roverSpeedIdx + 1 : 1) : 0;
   if (wantEngine !== engineLevel) { engineLevel = wantEngine; sound.engine(engineLevel); }
   const seatRide = ride && ride.att.id !== 'balloon';     // sit in the gondola/carousel
-  const seated = !!riding || !!seatRide || roving || dragonRiding || rocketState !== 'off';
+  const seated = !!riding || !!seatRide || roving || dragonRiding || rocketState !== 'off' || dreamRide;
   character.draw(worldProg, player.pos[0], player.pos[1] + (seated ? 0.62 : 0), player.pos[2], player.yaw, player.walkPhase, player.moveAmt, actionAnim, seated, !!resting);
   drawMobs(m);
   if (dimension === 'space') { ensureSpaceRace(); spaceRace.draw(worldProg, now / 1000); }
@@ -3932,7 +3926,10 @@ function init() {
     dreamStage: () => dreamStage,
     openDream: () => openDream(),
     dreamOk: () => dreamOk(),
-    dreamState: () => ({ stage: dreamStage, level: dreamLevel(), towerN: dream.towerN, brickGot: dream.brickGot, brickTarget: dream.brickTarget, nm: mobs().dreamzz ? mobs().dreamzz.nightmares.length : 0 }),
+    dreamRiding: () => dreamRide,
+    dreamState: () => ({ stage: dreamStage, level: dreamLevel(), riding: dreamRide, brickGot: dream.brickGot, brickTarget: dream.brickTarget, bricks: mobs().dreamzz ? mobs().dreamzz.bricks.length : 0, kingHp: mobs().dreamzz && mobs().dreamzz.king ? mobs().dreamzz.king.hp : 0 }),
+    grabBrick: () => { const dc = mobs().dreamzz; if (dc && dc.bricks.length) { const b = dc.bricks[0]; b.got = true; onDreamBrick(b.pos.slice()); dc.bricks = dc.bricks.filter((x) => !x.got); } },
+    bonkKing: () => { const dc = mobs().dreamzz; if (dc && dc.king) doDreamTap({ kind: 'king', obj: dc.king }); },
     recheckBuild: () => recheckBuild(),
     lieDown: (x, y, z) => lieDown(x != null ? x : Math.floor(player.pos[0]), y != null ? y : Math.floor(player.pos[1]) - 1, z != null ? z : Math.floor(player.pos[2])),
     sleepBed: (x, y, z) => sleepInBed(x, y, z),

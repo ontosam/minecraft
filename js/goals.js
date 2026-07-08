@@ -73,7 +73,7 @@ export const GOAL_DEFS = [
   { id: 'mastertool', icon: '🛠️', title: 'Master Toolsmith', desc: 'Forge a full set of Diamond tools', metric: 'mastertool', target: 1 },
   { id: 'dreamchaser', icon: '🌙', title: 'Dream Chaser', desc: "Finish Mateo's Dream Adventure in Lego World", metric: 'dream', target: 1 },
   { id: 'dreammaster', icon: '🏆', title: 'Dream Master', desc: 'Finish 5 Dream Adventures', metric: 'dream', target: 5 },
-  { id: 'nightmarechaser', icon: '👋', title: 'Nightmare chaser', desc: 'Chase away 5 Nightmares', metric: 'dreamnm', target: 5 },
+  { id: 'nightmarechaser', icon: '👑', title: 'King catcher', desc: 'Catch the Nightmare King 3 times', metric: 'dreamnm', target: 3 },
 ];
 
 const KEY = 'ezrablocks.goals.v1';
