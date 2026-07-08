@@ -1547,6 +1547,44 @@ Fun-menu approach** and kept everything VISIBLE — just tidier. Shipped on
   shrink keeps it on one line; a 2-row grid would need moving gem-bar/hearts/inv
   down — deferred); flint stays on the bar (he wanted buttons visible).
 
+## Status (session 46) — 🌙 LEGO DREAMZzz Dream Adventure (Mateo + Z-Blob)
+Ezra's request (Dad translating): "Lego Dreamzz… Mateo to do adventures with him,
+and Z-Blob." Plus two great Dad notes: **add challenge to keep him engaged**, and
+**"I lose him when he doesn't know what to do."** So this is a GUIDED, staged
+quest in Lego World with a persistent objective banner (the "lost" fix). Shipped
+on **`claude/ezra-minecraft-next-2y6301`** → `main`. **sw v44→v45.** Now **66
+goals**.
+- **`js/legodreamzz.js` `DreamCrew`** (a mob-manager like astronaut.js), added to
+  `WORLD_KINDS.lego.mobs = ['dreamzz']`:
+  • **Mateo** — a blocky boy inventor (teal hoodie, goggles) who hosts the quest;
+    stands near spawn, turns to greet.  • **Z-Blob** — his squishy blue blob
+    sidekick; hops along BEHIND the player like a puppy, pettable (tap-to-pet).
+    • **Nightmares** — gentle grumpy purple blobs that hop toward you; tap 3× to
+    shoo (the challenge; poof, no harm).  • **Dream Bricks** — glowing gold
+    bricks collected on proximity (no aiming — kid-friendly).
+- **The adventure (main.js)** — idle → build → stars → nightmare → claim:
+  tap Mateo → 🧱 build a tower (detected on the build event via `dreamOnBuild()` in
+  `recheckBuild`, not polled) → ✨ collect Dream Bricks → 🌙 shoo the Nightmares →
+  🎉 tap Mateo to claim 💎. **Difficulty RAMPS** each finish (`dreamLevel()` =
+  `goals.counts.dream`): towerN/bricks 3→6, nightmares 1→4, reward 3+lvl·2 💎.
+  Resets to idle in `setDimension('lego')` (fresh each visit; level persists).
+- **The "doesn't know what to do" fix:** a big always-on **`#dreamgoal` banner**
+  (purple pill under the top bar, shown only in Lego World) that states the
+  current objective + progress every frame (`updateDreamGoal()`), plus **minimap
+  markers** (Mateo teal / bricks gold / nightmares purple).
+- New goals: **Dream Chaser** (finish 1), **Dream Master** (finish 5), **Nightmare
+  chaser** (shoo 5). Debug: `__ezra.dreamState()/openDream()/dreamOk()/dreamCrew()`.
+  Verified: headless CDP (**0 errors**): arrive Lego → Mateo+Z-Blob spawn + banner
+  shows; tap Mateo → start; build a 3-tower → **stars stage + 3 bricks spawn**;
+  walk over bricks → **nightmare stage + nightmare spawns**; **pickRay hits the
+  nightmare + bonk×3 shoos it** (detection + logic proven; tap routing is the same
+  path as the proven pet/creeper tap); clear → claim → **+💎5 + Dream Chaser goal +
+  reset to idle**; full 4-world hop clean. Screenshots of Mateo + Z-Blob + a
+  Nightmare + the banner. Tuning candidates: Mateo/Z-Blob spawn close together so a
+  point-blank tap can hit Z-Blob instead of Mateo (Z-Blob follows the player away
+  once you move, so fine in play); tower detection needs a real build event
+  (`recheckBuild`) — direct byte edits won't trip it (only matters for tests).
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept
@@ -1701,6 +1739,12 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
   timer (`onFirework`). `pickRay` → an attraction; main shows a "Ride for 💎X?"
   prompt, `goals.spend`s, then runs a scripted ride (see `ride`/`updateRide` in
   main.js). **Never grants 💎** — it's a pure diamond *sink*.
+- `js/legodreamzz.js` — the **LEGO DREAMZzz Dream Adventure** crew for Lego World
+  (`DreamCrew`, `WORLD_KINDS.lego.mobs=['dreamzz']`; s46). Box meshes: **Mateo**
+  (boy inventor host), **Z-Blob** (blue blob that hops behind you), **Nightmares**
+  (tap 3× to shoo), **Dream Bricks** (collect on proximity). The staged quest +
+  the always-on `#dreamgoal` objective banner live in main.js (`dreamStage`,
+  `dreamOnBuild`/`dreamCheck`, `doDreamTap`, `showDream`, `updateDreamGoal`).
 - `js/zombies.js` — night-time `Zombies` (built like creepers, but they **chase +
   attack**): spawn around the player at night, bonk a heart on a cooldown
   (`onEvent('hit')`), take two `bonk`s to defeat (`pickRay`), fade out by day.
