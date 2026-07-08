@@ -1584,6 +1584,20 @@ goals**.
   point-blank tap can hit Z-Blob instead of Mateo (Z-Blob follows the player away
   once you move, so fine in play); tower detection needs a real build event
   (`recheckBuild`) — direct byte edits won't trip it (only matters for tests).
+  **Follow-up (same session, dad: "he found it! make it more engaging, he likes
+  puzzles"):** added (1) a **🧩 puzzle stage** — "Z-Blob's Dream Code", a
+  Simon-says colour-memory woven into the flow (build → collect → **puzzle** →
+  shoo → claim). Reuses the colour-puzzle (`puzzle.dream` flag → one solve calls
+  `dreamAfterPuzzle()` → nightmares, instead of looping for 💎); length = 3+level.
+  (2) **Floating on-screen markers** (`#dreammarkers`, `updateDreamMarkers`,
+  projected like the ride signs) that hover over the current targets — Dream
+  Bricks / Nightmares / Mateo — so he can always SEE where to go (the "3rd brick"
+  findability fix); bricks also spawn closer (`7+rnd*10`). **sw v45→v46.** Verified
+  headless (0 errors): brick markers over all bricks, collect→puzzle opens→solve→
+  nightmares+markers→claim +💎 + Puzzle goal, markers hide outside Lego. Note: the
+  headless server had died in a container restart → a first test run showed all
+  `__ezra` calls `undefined` (blank page), not a code bug — always re-check the
+  server is up (`curl localhost:8000`) before trusting a red result.
 
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
