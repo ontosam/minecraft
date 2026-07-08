@@ -1599,6 +1599,53 @@ goals**.
   `__ezra` calls `undefined` (blank page), not a code bug — always re-check the
   server is up (`curl localhost:8000`) before trusting a red result.
 
+## Status (session 47) — 🐉👑 Dream Adventure revamp: Chase the Nightmare King
+Dad: "he's done the dream adventure a few times and the **color puzzles aren't
+his favorite**. I'm thinking **more of an adventure, more Minecraft like and Lego
+like**. Go crazy — make it fun for him." So I reworked the whole Dream Adventure
+into an **action-adventure with a rideable buddy + a boss chase** (Ezra loves the
+pony/dragon mounts and boss-y games). Shipped on
+**`claude/ezra-minecraft-next-2y6301`** → `main`. **sw v46→v47.** Still 66 goals.
+1. **Dropped the color-puzzle stage** entirely (the standalone 🧩 puzzle *cube*
+   stays in every world — only the forced dream-stage puzzle is gone). Removed
+   `startDreamPuzzle`/`dreamAfterPuzzle`/`puzzle.dream`, the tower-build stage
+   (`dreamOnBuild`/`dreamHasTower`), and the `dreamOnBuild()` call in `recheckBuild`.
+2. **🔵 Rideable Z-Blob (the headline).** Tap Mateo to start and you **auto-hop
+   onto Z-Blob** — a squishy bouncing mount (same pattern as the pony): `dreamRide`
+   flag, `player.mountSpeed=1.9`/`mountJump=1.35`, drawn **big under the seated
+   kid** (`DreamCrew.drawRiddenBlob`, springy squish) + a blob shadow. `zblob.ridden`
+   guards its normal "hop behind you" AI + its own draw/shadow so main draws the
+   mounted copy. Tap Z-Blob to re-mount if you slid off; else it's a pet.
+3. **👑 Nightmare King boss (`js/legodreamzz.js` `buildKing`/`spawnKing`/`bonkKing`).**
+   A big grumpy blob with a **gold crown, horns, glowing eyes**, a **hurt-flinch**
+   squish on each tap, and **flee-chase AI** (runs directly away when you close in,
+   curving back toward spawn so he never leaves the baseplate). `pickRay` checks him
+   first with a generous `KING_PICK=1.7` radius (easy to tap). HP scales with level.
+4. **New flow `idle → collect → boss → claim`.** Hop on Z-Blob → **zoom around
+   grabbing Dream Bricks** (`onDreamBrick`, proximity, markers show them) → all in →
+   the **King bursts in and flees** → **chase + tap him** (camera `shake` +💥 on each
+   bonk) → **tap Mateo to claim** 💎. **Ramps** each finish (`dreamLevel()`): bricks
+   4→8, King HP 4→9, reward 4+lvl·2 💎.
+5. **Guidance kept intact** (the "doesn't know what to do" fix): the `#dreamgoal`
+   banner + floating `#dreammarkers` (✨ bricks / 👑 King / 💙 "ride!" / 🧑‍🔧 Mateo)
+   + a **pink-gold King minimap dot** all track the current target.
+6. **Dismount on leave/reset:** `setDimension` now always calls `resetDream()`
+   (stops the ride on leaving Lego, fresh adventure on entering). Repurposed the
+   now-unreachable "Nightmare chaser" goal → **👑 King catcher** (`dreamnm`, catch
+   the King 3×, bumped on defeat). Debug: `__ezra.dreamState()/dreamRiding()/
+   grabBrick()/bonkKing()`.
+   Verified headless (CDP, **0 errors**): travel to Lego → start → **auto-ride
+   (mountSpeed 1.9, zblob.ridden)** → grab all bricks → **King spawns (hp 4)** →
+   bonk to defeat → claim pays **+💎6** (4 base + the goal bonus) + Dream Chaser +
+   King-catcher goals + **resets to idle + ride stopped + mountSpeed 1**; round-2
+   **ramps to 5 bricks**; **leaving Lego stops the ride** (over: riding false,
+   mountSpeed 1); over→space→lego world-hop clean. Screenshots of the kid **seated
+   on Z-Blob** + the King marker. Tuning candidates: the King is a *chase* boss so
+   from third-person he can be small until you close in on the mount (markers +
+   minimap guide there; `KING_PICK` is generous); flee speed 3.2–4.2 (catchable on
+   the 1.9× mount); Mateo/Z-Blob still spawn near spawn. Backlog: a wing-flap or
+   trail on Z-Blob, more boss variety (2nd-phase King), a repeatable higher tier.
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept
