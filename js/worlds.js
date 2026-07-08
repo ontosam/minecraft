@@ -66,7 +66,7 @@ export const WORLD_KINDS = {
     name: 'Lego World', emoji: '🧱',
     sky: [0.74, 0.90, 1.0], fog: [60, 120],
     gen: 'generateLego', ground: B.LEGO_GREEN,
-    mobs: [],                   // a clean, calm Lego table to build on
+    mobs: ['dreamzz'],          // Mateo + Z-Blob run the DREAMZzz Dream Adventure here
     flint: true,
     locked: 'legoworld',        // the big-ticket 💎 reward (lots of diamonds!)
   },

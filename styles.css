@@ -160,6 +160,7 @@ body {
 #astro,
 #puzzle,
 #adventure,
+#dream,
 #chars,
 #math,
 #steve {
@@ -191,11 +192,37 @@ body {
 #astro.hidden,
 #puzzle.hidden,
 #adventure.hidden,
+#dream.hidden,
 #chars.hidden,
 #math.hidden,
 #steve.hidden {
   display: none;
 }
+
+/* 🌙 Dream Adventure objective banner — a big, friendly "here's what to do now"
+   pill under the top bar, so a 6-year-old is never lost in the Lego quest. */
+#dreamgoal {
+  position: absolute;
+  top: 74px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 92vw;
+  background: linear-gradient(135deg, rgba(90, 70, 200, .95), rgba(150, 90, 230, .95));
+  color: #fff;
+  font-size: 19px;
+  font-weight: 800;
+  text-align: center;
+  padding: 9px 18px;
+  border-radius: 16px;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, .22), 0 0 0 3px rgba(255, 255, 255, .5);
+  pointer-events: none;
+  white-space: nowrap;
+  line-height: 1.25;
+  animation: dreampulse 2.4s ease-in-out infinite;
+}
+#dreamgoal b { color: #ffe24a; }
+@keyframes dreampulse { 0%, 100% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.03); } }
+@media (max-width: 800px) { #dreamgoal { font-size: 16px; padding: 7px 13px; white-space: normal; } }
 /* Color-memory puzzle: a 2×2 pad of big colored buttons that flash a sequence. */
 #puzzle-msg { font-size: 22px; font-weight: 800; color: #2a2a33; text-align: center; margin-bottom: 12px; line-height: 1.4; }
 #puzzle-pad { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: min(260px, 66vw); margin: 4px auto 16px; }

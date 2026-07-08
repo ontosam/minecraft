@@ -71,13 +71,16 @@ export const GOAL_DEFS = [
   { id: 'axemaker', icon: '🪓', title: 'Lumberjack', desc: 'Craft an Axe to chop wood fast', metric: 'craftaxe', target: 1 },
   { id: 'shovelmaker', icon: '🥄', title: 'Dig dig dig', desc: 'Craft a Shovel to dig dirt fast', metric: 'craftshovel', target: 1 },
   { id: 'mastertool', icon: '🛠️', title: 'Master Toolsmith', desc: 'Forge a full set of Diamond tools', metric: 'mastertool', target: 1 },
+  { id: 'dreamchaser', icon: '🌙', title: 'Dream Chaser', desc: "Finish Mateo's Dream Adventure in Lego World", metric: 'dream', target: 1 },
+  { id: 'dreammaster', icon: '🏆', title: 'Dream Master', desc: 'Finish 5 Dream Adventures', metric: 'dream', target: 5 },
+  { id: 'nightmarechaser', icon: '👋', title: 'Nightmare chaser', desc: 'Chase away 5 Nightmares', metric: 'dreamnm', target: 5 },
 ];
 
 const KEY = 'ezrablocks.goals.v1';
 
 export class Goals {
   constructor() {
-    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0, bought: 0, spider: 0, lamp: 0, monster: 0, lever: 0, bounce: 0, ride: 0, fish: 0, quest: 0, plant: 0, math: 0, snack: 0, skeleton: 0, crystal: 0, dragon: 0, story: 0, sleep: 0, funride: 0, treat: 0, space: 0, rover: 0, blackhole: 0, spacegem: 0, dragonfly: 0, rocketfly: 0, spacerace: 0, spacemission: 0, puzzle: 0, gather: 0, craft: 0, craftdia: 0, smelt: 0, suit: 0, wentdeep: 0, champion: 0, torch: 0, craftaxe: 0, craftshovel: 0, mastertool: 0 };
+    this.counts = { dist: 0, pet: 0, place: 0, dig: 0, defend: 0, treasure: 0, nether: 0, ghast: 0, blaze: 0, fly: 0, splash: 0, travel: 0, boom: 0, night: 0, zombie: 0, diamond: 0, doors: 0, bought: 0, spider: 0, lamp: 0, monster: 0, lever: 0, bounce: 0, ride: 0, fish: 0, quest: 0, plant: 0, math: 0, snack: 0, skeleton: 0, crystal: 0, dragon: 0, story: 0, sleep: 0, funride: 0, treat: 0, space: 0, rover: 0, blackhole: 0, spacegem: 0, dragonfly: 0, rocketfly: 0, spacerace: 0, spacemission: 0, puzzle: 0, gather: 0, craft: 0, craftdia: 0, smelt: 0, suit: 0, wentdeep: 0, champion: 0, torch: 0, craftaxe: 0, craftshovel: 0, mastertool: 0, dream: 0, dreamnm: 0 };
     this.usedTypes = new Set();
     this.done = {};
     this.stars = 0;
