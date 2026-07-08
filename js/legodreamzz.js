@@ -151,8 +151,8 @@ export class DreamCrew {
     let seed = 0x1234 ^ n;
     const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
     for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2 + rnd() * 0.8;
-      const r = 10 + rnd() * 16;
+      const a = (i / n) * Math.PI * 2 + rnd() * 0.6;
+      const r = 7 + rnd() * 10;
       const x = Math.round(sp[0] + Math.cos(a) * r), z = Math.round(sp[2] + Math.sin(a) * r);
       const gy = this.groundY(x, z);
       this.bricks.push({ pos: [x + 0.5, (gy < 1 ? sp[1] : gy) + 0.4, z + 0.5], t: rnd() * 6, got: false });

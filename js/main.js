@@ -2090,6 +2090,7 @@ function dreamCrew() { return dimension === 'lego' ? mobs().dreamzz : null; }
 function dreamLevel() { return goals.counts.dream || 0; }
 function resetDream() {
   dreamStage = 'idle'; dream.brickGot = 0;
+  if (puzzle && puzzle.dream) closePuzzle();
   const dc = mobs().dreamzz; if (dc) { dc.clearBricks(); dc.clearNightmares(); }
 }
 function startDream() {
@@ -2137,14 +2138,33 @@ function dreamCheck() {
   if (dimension !== 'lego') return;
   const dc = mobs().dreamzz; if (!dc) return;
   if (dreamStage === 'stars' && dream.brickGot >= dream.brickTarget) {
-    dreamStage = 'nightmare'; dc.spawnNightmares(dream.nmTarget, player);
-    sound.play('uhoh'); showToast('🌙 Uh-oh, Nightmares! Tap them to chase them away! 👋', 4600);
+    dreamStage = 'puzzle';
+    sound.play('coo'); showToast("💙 Z-Blob has a Dream Code puzzle — watch, then tap it back!", 4600);
+    startDreamPuzzle();
   } else if (dreamStage === 'nightmare' && dc.nightmares.length === 0) {
     dreamStage = 'claim'; sound.play('coo');
     showToast('🎉 You beat the Nightmares! Tap Mateo for your prize! 🏆', 5000);
   }
 }
+// Z-Blob's Dream Code — a Simon-says memory puzzle (Ezra loves puzzles). Reuses
+// the colour-puzzle mechanic but, in dream mode, ONE solve advances the adventure
+// (instead of looping for 💎). Length ramps with the dream level.
+function startDreamPuzzle() {
+  puzzle = { level: Math.min(6, 3 + dreamLevel()), seq: [], pos: 0, showing: false, dream: true };
+  document.getElementById('puzzle').classList.remove('hidden');
+  sound.play('pet');
+  startPuzzleRound();
+}
+function dreamAfterPuzzle() {
+  if (dreamStage !== 'puzzle') return;
+  const dc = mobs().dreamzz; if (!dc) return;
+  dreamStage = 'nightmare';
+  dc.spawnNightmares(dream.nmTarget, player);
+  sound.play('uhoh');
+  showToast('🌙 The Dream Code woke the Nightmares! Tap them to chase them away! 👋', 4600);
+}
 function doDreamTap(dc) {
+  if (dreamStage === 'puzzle') { if (!puzzle) startDreamPuzzle(); return; }   // tap the crew to re-open the Dream Code
   if (dc.kind === 'nightmare') {
     const shooed = mobs().dreamzz.bonkNightmare(dc.obj);
     sound.play('poof'); spawnParticles([dc.obj.pos[0], dc.obj.pos[1] + 0.5, dc.obj.pos[2]], '💥', 'puff', 5, 50);
@@ -2198,9 +2218,40 @@ function updateDreamGoal() {
   if (dreamStage === 'idle') txt = 'Tap <b>Mateo</b> (the boy 🧑‍🔧) to start a Dream Adventure!';
   else if (dreamStage === 'build') txt = 'Build a tower <b>' + dream.towerN + '</b> blocks tall! (Tap 🏗️ → 🗼 Tower)';
   else if (dreamStage === 'stars') txt = 'Collect the ✨ Dream Bricks! <b>' + dream.brickGot + '/' + dream.brickTarget + '</b>';
+  else if (dreamStage === 'puzzle') txt = "Solve Z-Blob's Dream Code! 💙 (watch, then tap it back)";
   else if (dreamStage === 'nightmare') txt = 'Chase the 🌙 Nightmares — tap them! <b>' + (dc ? dc.nightmares.length : 0) + '</b> left';
   else txt = '🎉 You did it! Tap <b>Mateo</b> for your prize!';
   el.innerHTML = '🎯 ' + txt;
+}
+// Floating on-screen markers that hover over the current targets (Dream Bricks,
+// Nightmares, or Mateo) — so a 6-year-old can always SEE exactly where to go.
+let dreamMarkerEls = null;
+function ensureDreamMarkers() {
+  if (dreamMarkerEls) return;
+  const layer = document.getElementById('dreammarkers'); if (!layer) return;
+  dreamMarkerEls = [];
+  for (let i = 0; i < 8; i++) { const el = document.createElement('div'); el.className = 'dreammark'; el.style.display = 'none'; layer.appendChild(el); dreamMarkerEls.push(el); }
+}
+function updateDreamMarkers() {
+  ensureDreamMarkers();
+  if (!dreamMarkerEls || !pv) return;
+  const dc = (dimension === 'lego') ? mobs().dreamzz : null;
+  let targets = [];
+  if (dc) {
+    if (dreamStage === 'stars') targets = dc.bricks.map((b) => ({ x: b.pos[0], y: b.pos[1] + 1.1, z: b.pos[2], cls: 'brick', html: '<span class="dm-emoji">✨</span>' }));
+    else if (dreamStage === 'nightmare') targets = dc.nightmares.map((n) => ({ x: n.pos[0], y: n.pos[1] + 1.35, z: n.pos[2], cls: 'nm', html: '<span class="dm-emoji">🌙</span>tap!' }));
+    else if ((dreamStage === 'idle' || dreamStage === 'claim') && dc.mateo) targets = [{ x: dc.mateo.pos[0], y: dc.mateo.pos[1] + 1.9, z: dc.mateo.pos[2], cls: 'mateo', html: '<span class="dm-emoji">🧑‍🔧</span>' + (dreamStage === 'claim' ? 'prize!' : 'tap me!') }];
+  }
+  for (let i = 0; i < dreamMarkerEls.length; i++) {
+    const el = dreamMarkerEls[i];
+    if (i >= targets.length) { el.style.display = 'none'; continue; }
+    const t = targets[i];
+    mat4.transformPoint(scratch4, pv, t.x, t.y, t.z);
+    if (scratch4[3] <= 0) { el.style.display = 'none'; continue; }   // behind the camera
+    el.className = 'dreammark ' + t.cls; el.innerHTML = t.html; el.style.display = 'flex';
+    el.style.left = (scratch4[0] / scratch4[3] * 0.5 + 0.5) * canvas.clientWidth + 'px';
+    el.style.top = (1 - (scratch4[1] / scratch4[3] * 0.5 + 0.5)) * canvas.clientHeight + 'px';
+  }
 }
 
 // --- 🧩 Color Puzzle: a "watch then repeat" colour-memory mini-game inside a
@@ -2251,6 +2302,15 @@ function puzzleTap(ci) {
   } else { puzzleFail(); }
 }
 function puzzleWin() {
+  // Dream mode: one solve cracks Z-Blob's Dream Code and moves the adventure on.
+  if (puzzle.dream) {
+    goals.bump('puzzle'); sound.play('treasure');
+    setPuzzleMsg('🎉 You cracked the Dream Code! 💙');
+    puzzle.showing = true;
+    const p = puzzle;
+    setTimeout(() => { if (puzzle === p) { closePuzzle(); dreamAfterPuzzle(); } }, 1400);
+    return;
+  }
   const reward = Math.max(1, Math.min(3, Math.floor(puzzle.level / 2)));  // 1 → 3 as it gets longer
   goals.addGems(reward); updateGems(); goals.bump('puzzle');
   sound.play('treasure');
@@ -3481,6 +3541,7 @@ function frameBody(now) {
   }
 
   updateRideSigns();   // floating "Tap to ride!" signs over Secret World attractions
+  updateDreamMarkers(); // floating markers over Dream Adventure targets (Lego World)
 
   // Sparkle Trail (shop reward): drop little ✨ behind you while you move.
   if (goals.hasUnlock('sparkle')) {

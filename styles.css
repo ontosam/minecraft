@@ -778,6 +778,22 @@ body {
 /* Floating "Tap to ride!" signs over Secret World attractions (positioned each
    frame from JS). Big, bright and tappable so a 6-year-old can't miss them. */
 #ridesigns { position: absolute; inset: 0; pointer-events: none; z-index: 7; }
+/* Floating markers that hover over Dream Adventure targets (bricks / nightmares /
+   Mateo) so a 6-year-old can always SEE where to go. */
+#dreammarkers { position: absolute; inset: 0; pointer-events: none; z-index: 7; }
+.dreammark {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  display: flex; align-items: center; gap: 4px;
+  padding: 5px 11px; border-radius: 14px;
+  font-weight: 800; font-size: 17px; white-space: nowrap;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, .35), 0 0 0 3px rgba(255, 255, 255, .6);
+  animation: ridebob 1s ease-in-out infinite;
+}
+.dreammark .dm-emoji { font-size: 22px; }
+.dreammark.brick { background: linear-gradient(#fff, #ffe27a); border: 2px solid #e0a800; color: #6a4a00; }
+.dreammark.nm { background: linear-gradient(#fff, #d9b8f5); border: 2px solid #8a4dd0; color: #3a1860; }
+.dreammark.mateo { background: linear-gradient(#fff, #b8f0ee); border: 2px solid #20b0b0; color: #0a4a4a; }
 .ridesign {
   position: absolute;
   transform: translate(-50%, -100%);
