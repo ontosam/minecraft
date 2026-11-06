@@ -76,7 +76,7 @@ export class Sound {
         this.tone(440, 0.09, 'triangle', 0.12, 300);
         break;
       case 'merge': { // rising chime — higher tiers sing higher
-        const n = Math.min(arg, 20);
+        const n = Math.min(arg, 10); // keep big-block chimes sweet, not shrill
         this.tone(this.note(n), 0.14, 'triangle', 0.16);
         this.tone(this.note(n + 2), 0.14, 'triangle', 0.14, 0, 0.06);
         this.tone(this.note(n + 4), 0.22, 'sine', 0.14, 0, 0.12);

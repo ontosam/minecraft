@@ -908,7 +908,16 @@ PANELS.workshop = {
 // --- Furnace
 PANELS.furnace = {
   title: () => 'Furnace', icon: () => iconURL('furnace', 96),
-  key() { const s = game.s; return JSON.stringify(s.furnace.map((f) => [f.t, Math.ceil(f.left)])) + JSON.stringify(s.store); },
+  key() { const s = game.s; return JSON.stringify(s.furnace.map((f) => f.t)) + JSON.stringify(s.store); },
+  // progress bars tick in place (rebuilding the panel every second could eat a tap)
+  tick() {
+    game.s.furnace.forEach((f, k) => {
+      const r = document.querySelectorAll('#panel-body .row.melting')[k];
+      if (!r) return;
+      r.querySelector('.bar i').style.width = Math.round((1 - f.left / f.total) * 100) + '%';
+      r.querySelector('.left').textContent = fmtTime(f.left);
+    });
+  },
   render(body) {
     const s = game.s;
     body.appendChild(el('div', 'note', 'Drag a block from your board onto the Furnace to melt it into bricks 🧱. Shiny ores become metal bars for pickaxes!'));
@@ -919,7 +928,9 @@ PANELS.furnace = {
       const sub = el('div');
       sub.appendChild(el('small', '', r.ingot ? `→ ${INGOTS[r.ingot].name.replace('Ingot', 'Bar')} + ${r.bricks} bricks` : `→ ${r.bricks} bricks`));
       const bar = el('div', 'bar'); const fill = el('i'); fill.style.width = Math.round((1 - f.left / f.total) * 100) + '%'; bar.appendChild(fill); sub.appendChild(bar);
-      body.appendChild(row(tierURL(f.t, 96), TIERS[f.t].name, sub, el('b', '', fmtTime(f.left))));
+      const rr = row(tierURL(f.t, 96), TIERS[f.t].name, sub, el('b', 'left', fmtTime(f.left)));
+      rr.classList.add('melting');
+      body.appendChild(rr);
     });
     for (let k = s.furnace.length; k < game.furnaceSlots(); k++) body.appendChild(row(null, 'Empty slot', 'Drop a block here!'));
     // what's good to melt
@@ -1255,7 +1266,7 @@ function frame(now) {
   restCheck(rdt);
   saveT += rdt; panelT += rdt;
   if (saveT > 5) { saveT = 0; if (!skipSave) save(); }
-  if (panelT > 0.4) { panelT = 0; refreshPanel(); }
+  if (panelT > 0.4) { panelT = 0; refreshPanel(); if (panelOpen && PANELS[panelOpen].tick) PANELS[panelOpen].tick(); }
   requestAnimationFrame(frame);
 }
 
