@@ -1759,6 +1759,64 @@ charge.) Same branch, mirrored to `main`.
   z-index 66), earned jar usable during a bought boost, pass doubles offline
   gold, bigger energy "+". **sw v48→v49.**
 
+## Status (session 48c) — ⛏️ Ezra's Mine v2: play like the real genre game
+A parity report ("Muse/Blue") said the mine should play *exactly like* the merge
+clicker Ezra loves. The dad picked (AskUserQuestion): **keep the energy bar**,
+**early blocks earn nothing / later blocks earn**, **monsters + 8 gear slots +
+Monster Hunt like the original**, and **remove Digby** (pickaxes only come from
+crafting). Still no copied names/art/text: every sprite is new and original
+(monsters Gloop/Grumble/Webby/Rocky/Magma Max, guide **Pip**), no Minecraft
+trademarks in the mine, no ads (boosters cost coins), pretend store + parent
+controls kept. Same branch, mirrored to `main`. **sw v49→v50.** Save key
+unchanged (`ezramine.save.v1`); state is now **`v: 2`** and `migrateV1()` carries
+Ezra's v1 progress over (coins/bricks/level/blocks/village/shaft, old pick →
+a worn pickaxe, ruby bars + Boom Blocks → emeralds, `s.migrated` → Pip says
+"your mine got an upgrade").
+- **Core loop (`game.js tapMine/openChest`):** 10 taps bare hand (8 stone pick,
+  `PICK_TAPS`) → a **wooden chest** drops on a random empty square → tap it to
+  open into the block. Board **starts at 6 squares**, +1 per level to 20
+  (`openCells`, 4×5). 18 tiers; Dirt/Log/Cobblestone earn **0 gold/s**
+  (`TIERS[].gps`). Level 1 = **40 XP**; a merge = **+2 XP, +1 brick**. Golden
+  treasure chests every ~2 min (level 2+). Board full → block goes to the Chest.
+- **Crafting (`RECIPES`, 3×3 `s.grid`):** drag a Log onto the **Chest** station,
+  then at the **Workbench**: Log→4 Planks, 2 Planks (vertical)→Stick, 2 Planks
+  + Stick→Wooden Sword, plus pickaxes/swords (wood→diamond), armor (iron+), bow
+  (string), magic orb. Shape-matching is position-free (`gridRecipe`); recipe
+  chips show a see-through ghost; "Fill it for me". Panel items drag via
+  `itemToken`/`initPanelDrag` (tap = quick place).
+- **Hero (`PANELS.hero`):** 8 slots (helmet/chest/legs/boots/sword/pick/bow/
+  orb), live avatar `heroURL(gear)`, attack/armor stats, 4 skins for emeralds.
+  Armor adds max energy (`ENERGY.perArmor`).
+- **Monsters (`MONSTERS`):** every 12–18 blocks one walks into the mine block
+  (HP bar, tap to hit, `attack()`): **Grumble 50 HP**, bare hand 3 / wooden
+  sword 5 → first kill pays **3,000 coins + Stone Pickaxe**. They never attack.
+- **Furnace:** iron/gold/diamond ore + 1 Coal → bars (`SMELT`), Take out returns
+  both to the Chest. **Village** opens after **29 merges** (`VILLAGE_MERGES`),
+  buildings cost bricks (Mine Shaft = bigger blocks). **Shop:** Boosters
+  (Damage x2, Gold x2, Block level +2 — 3 min, bought with coins) + blocks.
+- **Quests:** Tasks (sequential, 1,000-coin scale, shown on the goal card),
+  Achievements, Monster Hunt tabs; emeralds are green (`emeraldURL`; still
+  `s.gems` internally).
+- **Pip's tutorial (`TUT_STEPS` in main.js):** dig → open chest → merge → Log to
+  Chest → Workbench planks/stick/sword → equip → Grumble fight → wear the stone
+  pickaxe → done (`s.tut`). Each step is checked against real state (never
+  stuck), the hand points at the next tap, the bubble moves out of the way, Skip
+  asks first. After the lessons, idle hints wiggle a chest or a mergeable pair.
+- **Files:** data.js + game.js rewritten (v1 backups in git history), main.js
+  rebuilt (HUD, board, mine/monster, dock, panels, Pip), art.js appended
+  (`swordURL/pickURL/armorURL/itemURL/emeraldURL/monsterURL/guideURL/heroURL`).
+- **Balance (`node mine/tests/sim.mjs 12`):** robot kid with energy off: Ruby
+  ~14 min, Emerald Ore ~1h10, Star Block ~4h40; `ENERGY=1` and never buying:
+  Emerald ~2h17, Star ~5h33 (waits ~2.5 h for energy); `BOOST=1` buys coin
+  boosters: Star ~3h14.
+- **Verified:** `node mine/tests/e2e.mjs` = **161 checks** (the whole tutorial
+  with real taps, tap-tap merge, chest store/unstore, workbench drag + shifted
+  shapes + fill, furnace + take-out + no-coal, 29-merge village + shaft, quests
+  tabs + goal card, boosters, gps 0 early, board-full, treasure chest, level-up
+  grows the board, save/reload/offline gold, **v1 save carry-over**, parent
+  gate, pretend store/card/limit/energy, Start over keeps settings, all panels,
+  9 screen sizes) + a 4-dimension review workflow with skeptic verification.
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept

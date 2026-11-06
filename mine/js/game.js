@@ -1,14 +1,24 @@
-// The game rules for Ezra's Mine, with no screen code at all (so it can be
-// tested and balance-simulated in Node). The UI calls these methods and
+// The game rules for Ezra's Mine (v2), with no screen code at all (so it can
+// be tested and balance-simulated in Node). The UI calls these methods and
 // listens to events (game.on = (type, data) => ...) to animate things.
+//
+// The loop: tap the big block -> it breaks into a CHEST on the board -> tap
+// the chest to open it into a block -> drag twins together to merge ->
+// put materials in the chest -> craft gear on the 3x3 workbench -> equip it
+// on the hero -> chase off monsters that wander into the mine.
 
 import {
-  TIERS, MAX_TIER, COLS, ROWS, openCells, xpNeeded, mergeXP, MINE_XP,
-  PICKAXES, PICK_RECIPES, UPGRADES, INGOTS, BUILDINGS, shopPrice, POWERS,
-  chestEvery, QUESTS, offlineCapSecs, OFFLINE_RATE, caveFor, DROP_GAP, depthNeed,
-  SPARK_FULL, RUSH_FULL, RUSH_SECS, wellEvery,
-  ENERGY, CARD_PREFIX, CARD_DIGITS, storeItem,
+  TIERS, MAX_TIER, COLS, ROWS, openCells, xpNeeded, MERGE_XP, levelReward,
+  MATERIALS, GEAR, SLOTS, SWORD_ATK, PICK_TAPS, PICK_DROP, armorPoints, BOW_ATK, ORB_GOLD,
+  RECIPES, SMELT, FUEL_TIER, MONSTERS, monsterHp, monsterCoins, MONSTER_EVERY,
+  BOOSTERS, boosterPrice, VILLAGE_MERGES, DROP_GAP, shaftNeed, BUILDINGS, wellEvery,
+  treasureEvery, TASKS, ACHIEVEMENTS, HUNT, OFFLINE_RATE, offlineCapSecs, caveFor,
+  SKINS, ENERGY, CARD_PREFIX, CARD_DIGITS, storeItem, blockValue,
 } from './data.js';
+
+export const SAVE_KEY = 'ezramine.save.v1';
+export const N_CELLS = COLS * ROWS;
+export const VERSION = 2;
 
 // A pretend game card is valid when it is exactly 16 digits starting 0000.
 // (No real card number starts with 0000, so a real one is always declined.)
@@ -17,74 +27,113 @@ export function validateCard(digits) {
   return d.length === CARD_DIGITS && d.startsWith(CARD_PREFIX);
 }
 
-export const SAVE_KEY = 'ezramine.save.v1';
-export const N_CELLS = COLS * ROWS;
-
-// Cells unlock from the middle outwards so the open area always looks tidy.
+// Cells open from the bottom-middle outwards so the board grows tidily.
 export const UNLOCK_ORDER = (() => {
-  const cx = (COLS - 1) / 2, cy = (ROWS - 1) / 2 + 0.3;
+  const cx = (COLS - 1) / 2, cy = ROWS - 1.6;
   const idx = [...Array(N_CELLS).keys()];
   return idx.sort((a, b) => {
-    const da = Math.hypot(a % COLS - cx, Math.floor(a / COLS) - cy);
-    const db = Math.hypot(b % COLS - cx, Math.floor(b / COLS) - cy);
+    const da = Math.hypot((a % COLS - cx) * 1.15, Math.floor(a / COLS) - cy);
+    const db = Math.hypot((b % COLS - cx) * 1.15, Math.floor(b / COLS) - cy);
     return da - db || a - b;
   });
 })();
 
 export function freshState() {
   return {
-    v: 1,
+    v: VERSION,
     gold: 0, bricks: 0, gems: 0,
     level: 1, xp: 0,
-    board: Array(N_CELLS).fill(null),   // null | { t: tier } | { chest: 1 } | { boom: 1 }
-    mineHp: PICKAXES[0].taps,
-    pick: 0,
-    up: { depth: 0, helper: 0, lucky: 0 },
-    village: {},
-    store: {},                          // 'b<tier>' -> count, 'i:<ingot>' -> count
-    furnace: [],                        // queue of { k: 'b<tier>', left, total }
+    board: Array(N_CELLS).fill(null),   // null | { t } | { chest: 'wood', t } | { chest: 'gold' }
+    mineHp: PICK_TAPS.none,
+    monster: null,                      // { id, hp, max } while a monster is in the mine
+    monsterIn: 14,                      // blocks to break before the next monster
+    inv: {},                            // the storage chest: 'b<t>' | 'm:<id>' | 'g:<id>' -> count
+    equip: { helmet: null, chest: null, legs: null, boots: null, sword: null, pick: null, bow: null, orb: null },
+    grid: Array(9).fill(null),          // the workbench
+    furnace: [],                        // queue of { t, left, total }
     maxTier: 1,
-    seen: { 1: 1 },                     // tiers discovered
-    stats: { taps: 0, merges: 0, mined: 0, chests: 0, smelts: 0, stored: 0, supers: 0, rushes: 0, booms: 0 },
-    spark: 0,                           // fills as you mine -> Super Swing
-    rush: 0,                            // fills as you merge -> Gold Rush
-    wellN: 0,                           // merges counted toward the next well gem
+    seen: { 1: 1 },
+    stats: { taps: 0, merges: 0, mined: 0, opened: 0, kills: 0, smelts: 0, builds: 0, crafts: 0, armorCrafted: 0,
+      killBy: {}, craftBy: {}, equipBy: {} },
+    claimed: { t: {}, a: {}, h: {} },
+    boosts: { damage: 0, gold: 0, block: 0 },
+    treasureT: 0,
+    wellN: 0,
+    village: {},
+    villageOpen: 0,
+    skin: 'classic', skins: { classic: 1 },
     won: 0,
-    energy: ENERGY.max,                 // breaking a block uses 1; refills over time
-    energyT: 0,
-    iap: {},                            // pretend-store unlocks: { unlimited, pass }
-    purchases: [],                      // pretend purchase history { id, price, t, last4 }
-    cardSpent: 0,                       // pretend dollars spent (for the optional card limit)
-    booms: 0,                           // Boom Blocks kept in the chest
-    quest: 0,                           // index of the first quest not yet claimed
-    claimed: {},                        // quest index -> 1
-    boostLeft: 0,
-    chestT: 0,
-    helperT: 0,
+    energy: ENERGY.max, energyT: 0,
+    iap: {}, purchases: [], cardSpent: 0,
     lastSeen: 0,
     sound: true,
   };
 }
 
+// ---- turning a v1 save (the first version of the mine) into v2 -----------------
+const V1_TIER = { 1: 1, 2: 2, 3: 3, 4: 3, 5: 3, 6: 4, 7: 5, 8: 6, 9: 7, 10: 8, 11: 9, 12: 10, 13: 11, 14: 12, 15: 13, 16: 14, 17: 15, 18: 16, 19: 17, 20: 18 };
+export function migrateV1(old) {
+  const s = freshState();
+  for (const k of ['gold', 'bricks', 'gems', 'level', 'iap', 'purchases', 'cardSpent', 'settings', 'lastSeen', 'won', 'seenSt']) if (old[k] !== undefined) s[k] = old[k];
+  s.gold = Number(s.gold) || 0; s.level = Math.max(1, Number(s.level) || 1);
+  const blocks = [];
+  for (const c of old.board || []) if (c && c.t) blocks.push(V1_TIER[c.t] || 1);
+  const add = (k, n) => { s.inv[k] = (s.inv[k] || 0) + n; };
+  for (const k in old.store || {}) {
+    const n = old.store[k] || 0;
+    if (/^b\d+$/.test(k)) add('b' + (V1_TIER[Number(k.slice(1))] || 1), n);
+    else if (k === 'i:iron') add('m:iron', n);
+    else if (k === 'i:gold') add('m:gold', n);
+    else if (k === 'i:ruby' || k === 'i:copper') s.gems += n;
+  }
+  s.gems += old.booms || 0;
+  const open = UNLOCK_ORDER.slice(0, openCells(s.level));
+  blocks.sort((a, b) => b - a).forEach((t, k) => { if (k < open.length) s.board[open[k]] = { t }; else add('b' + t, 1); });
+  for (const t in old.seen || {}) s.seen[V1_TIER[t] || 1] = 1;
+  s.maxTier = V1_TIER[old.maxTier] || 1;
+  for (let t = 1; t <= s.maxTier; t++) s.seen[t] = 1;
+  const pick = old.pick || 0; // old pickaxe level -> a real pickaxe, already worn
+  const pm = pick >= 5 ? 'diamond' : pick >= 4 ? 'gold' : pick >= 3 ? 'iron' : pick >= 1 ? 'stone' : null;
+  if (pm) s.equip.pick = pm + '_pick';
+  s.stats.merges = (old.stats && old.stats.merges) || 0;
+  s.stats.mined = (old.stats && old.stats.mined) || 0;
+  s.stats.taps = (old.stats && old.stats.taps) || 0;
+  s.villageOpen = s.stats.merges >= VILLAGE_MERGES ? 1 : 0;
+  for (const id in old.village || {}) if (BUILDINGS.some((b) => b.id === id)) s.village[id] = old.village[id];
+  if (old.up && old.up.depth) s.village.shaft = Math.min(old.up.depth, 6);
+  s.energy = typeof old.energy === 'number' ? old.energy : ENERGY.max;
+  s.mineHp = PICK_TAPS[pm || 'none'];
+  s.migrated = 1;
+  return s;
+}
+
 export class Game {
   constructor(state, opts = {}) {
-    this.s = Object.assign(freshState(), state || {});
-    // Merge nested objects defensively (older saves may miss keys).
+    let st = state && typeof state === 'object' ? state : null;
+    if (st && !(st.v >= VERSION)) st = migrateV1(st);
     const f = freshState();
-    this.s.up = Object.assign(f.up, this.s.up || {});
-    this.s.stats = Object.assign(f.stats, this.s.stats || {});
-    if (!Array.isArray(this.s.board) || this.s.board.length !== N_CELLS) {
-      const old = Array.isArray(this.s.board) ? this.s.board : [];
-      this.s.board = Array(N_CELLS).fill(null).map((_, i) => old[i] || null);
+    this.s = Object.assign(f, st || {});
+    const s = this.s;
+    // Defensive defaults for older or partial saves.
+    s.stats = Object.assign(freshState().stats, s.stats || {});
+    for (const k of ['killBy', 'craftBy', 'equipBy']) if (!s.stats[k] || typeof s.stats[k] !== 'object') s.stats[k] = {};
+    s.equip = Object.assign(freshState().equip, s.equip || {});
+    s.boosts = Object.assign(freshState().boosts, s.boosts || {});
+    s.claimed = Object.assign({ t: {}, a: {}, h: {} }, s.claimed || {});
+    if (!s.inv || typeof s.inv !== 'object') s.inv = {};
+    for (const k of Object.keys(s.inv)) if (!/^(b\d+|m:\w+|g:\w+)$/.test(k) || !(s.inv[k] > 0)) delete s.inv[k];
+    if (!Array.isArray(s.grid) || s.grid.length !== 9) s.grid = Array(9).fill(null);
+    if (!Array.isArray(s.board) || s.board.length !== N_CELLS) {
+      const old = Array.isArray(s.board) ? s.board : [];
+      s.board = Array(N_CELLS).fill(null).map((_, i) => old[i] || null);
     }
-    // Older saves kept Boom Blocks as store.boom — move them to their own counter.
-    if (this.s.store && this.s.store.boom) { this.s.booms = (this.s.booms || 0) + this.s.store.boom; delete this.s.store.boom; }
-    for (const k of Object.keys(this.s.store || {})) if (!/^(b\d+|i:\w+)$/.test(k) || !(this.s.store[k] > 0)) delete this.s.store[k];
-    if (typeof this.s.booms !== 'number' || !(this.s.booms >= 0)) this.s.booms = 0;
-    if (!this.s.iap || typeof this.s.iap !== 'object') this.s.iap = {};
-    if (!Array.isArray(this.s.purchases)) this.s.purchases = [];
-    if (typeof this.s.energy !== 'number' || !(this.s.energy >= 0)) this.s.energy = ENERGY.max;
-    if (!(this.s.cardSpent >= 0)) this.s.cardSpent = 0;
+    if (!s.iap || typeof s.iap !== 'object') s.iap = {};
+    if (!Array.isArray(s.purchases)) s.purchases = [];
+    if (!Array.isArray(s.furnace)) s.furnace = [];
+    if (!s.skins || typeof s.skins !== 'object') s.skins = { classic: 1 };
+    if (typeof s.energy !== 'number' || !(s.energy >= 0)) s.energy = ENERGY.max;
+    if (!(s.cardSpent >= 0)) s.cardSpent = 0;
+    s.v = VERSION;
     this.rand = opts.rand || Math.random;
     this.on = opts.on || (() => {});
   }
@@ -92,37 +141,34 @@ export class Game {
   emit(type, data) { try { this.on(type, data); } catch (e) { console.error(e); } }
 
   // ---------------------------------------------------------------- derived
-  get pickaxe() { return PICKAXES[this.s.pick]; }
   villageLv(id) { return this.s.village[id] || 0; }
+  gearMat(slot) { const id = this.s.equip[slot]; return id && GEAR[id] ? GEAR[id].mat : null; }
+  tapsPerBlock() { return PICK_TAPS[this.gearMat('pick') || 'none']; }
+  attack() {
+    let a = SWORD_ATK[this.gearMat('sword') || 'none'];
+    if (this.s.equip.bow) a += BOW_ATK;
+    a += 2 * this.villageLv('yard');
+    return a;
+  }
+  armor() {
+    let n = 0;
+    for (const p of ['helmet', 'chest', 'legs', 'boots']) { const m = this.gearMat(p); if (m) n += armorPoints(p, m); }
+    return n;
+  }
+  armorWorn() { return ['helmet', 'chest', 'legs', 'boots'].filter((p) => this.s.equip[p]).length; }
   goldMult() {
-    return (1 + 0.1 * this.villageLv('hut')) * (1 + 0.25 * this.villageLv('castle')) * (this.s.boostLeft > 0 ? 2 : 1) * (this.s.iap.pass ? 2 : 1);
+    return (1 + 0.1 * this.villageLv('hut')) * (1 + 0.25 * this.villageLv('castle'))
+      * (this.s.boosts.gold > 0 ? 2 : 1) * (this.s.iap.pass ? 2 : 1) * (this.s.equip.orb ? ORB_GOLD : 1);
   }
-
-  // ------------------------------------------------------------- energy
-  energyOn() { return !(this.s.settings && this.s.settings.energy === false) && !this.s.iap.unlimited; }
-  energyMax() { return this.s.iap.pass ? ENERGY.passMax : ENERGY.max; }
-  energyRegenSecs() { return this.s.iap.pass ? ENERGY.passRegenSecs : ENERGY.regenSecs; }
-  secsToNextEnergy() { return Math.max(0, this.energyRegenSecs() - this.s.energyT); }
-  refillEnergy() { this.s.energy = Math.max(this.s.energy, this.energyMax()); this.s.energyT = 0; this.emit('energy', { full: true }); }
-  // A refill only makes sense when energy is on and not already full.
-  refillUseful() { return this.energyOn() && this.s.energy < this.energyMax(); }
-  refillWithGems() {
-    const s = this.s;
-    if (!this.refillUseful()) { this.emit('deny', { reason: 'energyfull' }); return false; }
-    if (s.gems < ENERGY.gemRefill) { this.emit('deny', { reason: 'gems' }); return false; }
-    s.gems -= ENERGY.gemRefill;
-    this.refillEnergy();
-    return true;
-  }
-  isOpen(i) { return UNLOCK_ORDER.indexOf(i) < openCells(this.s.level); }
-  unlockLevel(i) { // level at which cell i opens
+  isOpen(i) { const r = UNLOCK_ORDER.indexOf(i); return r >= 0 && r < openCells(this.s.level); }
+  unlockLevel(i) {
     const rank = UNLOCK_ORDER.indexOf(i);
     for (let lv = 1; lv < 200; lv++) if (rank < openCells(lv)) return lv;
     return 999;
   }
   baseGps() {
     let g = 0;
-    for (const c of this.s.board) if (c && c.t) g += TIERS[c.t].gps;
+    for (const c of this.s.board) if (c && c.t && !c.chest) g += TIERS[c.t].gps;
     return g;
   }
   gps() { return this.baseGps() * this.goldMult(); }
@@ -131,108 +177,143 @@ export class Game {
     for (let i = 0; i < N_CELLS; i++) if (!this.s.board[i] && this.isOpen(i)) out.push(i);
     return out;
   }
-  // Tier the mine block drops: grows with "Dig Deeper", but always stays
-  // DROP_GAP below your best block so there's always merging to do.
+  randomEmpty() { const e = this.emptyCells(); return e.length ? e[Math.floor(this.rand() * e.length)] : -1; }
+  // Tier the mine gives: grows with a better pickaxe and the Mine Shaft, but
+  // always stays DROP_GAP below your best block so merging is still needed.
   dropTier() {
-    return Math.max(1, Math.min(1 + this.s.up.depth, this.s.maxTier - DROP_GAP));
-  }
-  // Tiers of blocks kept in the chest (only 'b<number>' keys).
-  storedTiers() {
-    return Object.keys(this.s.store).filter((k) => /^b\d+$/.test(k) && this.s.store[k] > 0).map((k) => Number(k.slice(1)));
-  }
-  storedBlocks() {
-    let n = 0;
-    for (const t of this.storedTiers()) n += this.s.store['b' + t];
-    return n;
-  }
-  helperInterval() { return UPGRADES.helper.interval(this.s.up.helper); }
-
-  // Where a new block of tier t should land: the empty square closest to a
-  // twin (so little fingers only drag a short way), otherwise the one closest
-  // to the middle of the board. Returns -1 if the board is full.
-  placeFor(t) {
-    const empty = this.emptyCells();
-    if (!empty.length) return -1;
-    const xy = (i) => [i % COLS, Math.floor(i / COLS)];
-    const twins = [];
-    if (t) this.s.board.forEach((c, i) => { if (c && c.t === t) twins.push(xy(i)); });
-    const cx = (COLS - 1) / 2, cy = (ROWS - 1) / 2;
-    let best = -1, bestD = Infinity;
-    for (const i of empty) {
-      const [x, y] = xy(i);
-      let d = twins.length ? Math.min(...twins.map(([a, b]) => Math.abs(a - x) + Math.abs(b - y))) : Math.abs(x - cx) + Math.abs(y - cy);
-      d += UNLOCK_ORDER.indexOf(i) * 1e-3; // stable tie-break
-      if (d < bestD) { bestD = d; best = i; }
-    }
-    return best;
-  }
-
-  // A leftover block with no twin on the board, smaller than what the mine
-  // drops — the mine sends it a buddy so it can merge up (lowest first).
-  lonelyTier() {
-    const count = {};
-    for (const c of this.s.board) if (c && c.t) count[c.t] = (count[c.t] || 0) + 1;
-    const d = this.dropTier();
-    for (let t = 1; t < d; t++) if (count[t] === 1) return t;
-    return 0;
+    const base = 1 + PICK_DROP[this.gearMat('pick') || 'none'] + this.villageLv('shaft');
+    return Math.max(1, Math.min(base, this.s.maxTier - DROP_GAP));
   }
   cave() { return caveFor(this.s.maxTier); }
+  have(k) { return this.s.inv[k] || 0; }
+  addInv(k, n = 1) {
+    const s = this.s;
+    s.inv[k] = (s.inv[k] || 0) + n;
+    if (k[0] !== 'b') { s.everHad = s.everHad || {}; s.everHad[k] = 1; } // recipe book remembers it
+  }
+  takeInv(k, n = 1) {
+    if (this.have(k) < n) return false;
+    this.s.inv[k] -= n; if (!this.s.inv[k]) delete this.s.inv[k];
+    return true;
+  }
+  invBlocks() { let n = 0; for (const k in this.s.inv) if (k[0] === 'b') n += this.s.inv[k]; return n; }
+
+  // ------------------------------------------------------------- energy
+  energyOn() { return !(this.s.settings && this.s.settings.energy === false) && !this.s.iap.unlimited; }
+  energyMax() { return (this.s.iap.pass ? ENERGY.passMax : ENERGY.max) + ENERGY.perArmor * this.armor(); }
+  energyRegenSecs() { return Math.max(6, (this.s.iap.pass ? ENERGY.passRegenSecs : ENERGY.regenSecs) - 2 * this.villageLv('bakery')); }
+  secsToNextEnergy() { return Math.max(0, this.energyRegenSecs() - this.s.energyT); }
+  refillUseful() { return this.energyOn() && this.s.energy < this.energyMax(); }
+  refillEnergy() { this.s.energy = Math.max(this.s.energy, this.energyMax()); this.s.energyT = 0; this.emit('energy', { full: true }); }
+  refillWithGems() {
+    const s = this.s;
+    if (!this.refillUseful()) { this.emit('deny', { reason: 'energyfull' }); return false; }
+    if (s.gems < ENERGY.gemRefill) { this.emit('deny', { reason: 'gems' }); return false; }
+    s.gems -= ENERGY.gemRefill;
+    this.refillEnergy();
+    return true;
+  }
 
   // ------------------------------------------------------------- the mine
-  // One tap on the big block. Returns what happened (for the UI).
-  // Tapping ALWAYS works: if the board is full, new blocks hop into the
-  // storage chest instead, so nothing is ever lost or blocked.
-  tapMine(auto = false) {
+  // One tap on the big block. If a monster is in the mine, the tap hits it.
+  tapMine() {
     const s = this.s;
-    if (auto && !this.emptyCells().length) return { full: true }; // the mole waits politely
-    if (this.energyOn() && s.energy < 1) { if (!auto) this.emit('noEnergy', {}); return { noEnergy: true }; }
-    if (!auto) s.stats.taps++;
+    if (s.monster) return this.hitMonster();
+    if (this.energyOn() && s.energy < 1) { this.emit('noEnergy', {}); return { noEnergy: true }; }
+    s.stats.taps++;
     s.mineHp -= 1;
-    this.emit('hit', { auto, hp: s.mineHp, max: this.pickaxe.taps });
+    this.emit('hit', { hp: s.mineHp, max: this.tapsPerBlock() });
     if (s.mineHp > 0) return { hit: true };
-    // Block breaks!
-    s.mineHp = this.pickaxe.taps;
+    // The block breaks into a chest on the board.
+    s.mineHp = this.tapsPerBlock();
     s.stats.mined++;
-    if (this.energyOn() && !auto) s.energy = Math.max(0, s.energy - 1); // Digby digs for free
-    this.addXP(MINE_XP);
-    const superSwing = s.spark >= SPARK_FULL;
-    if (superSwing) { s.spark = 0; s.stats.supers++; } else s.spark++;
-    const tiers = [];
-    if (s.chestT >= chestEvery(this.villageLv('tower')) && s.level >= 2 && !s.board.some((c) => c && c.chest) && this.emptyCells().length) {
-      s.chestT = 0;
-      tiers.push('chest');
-    }
-    const n = superSwing ? 2 : (this.rand() < this.pickaxe.double ? 2 : 1);
-    for (let k = 0; k < n; k++) {
-      const buddy = !superSwing && k === 0 ? this.lonelyTier() : 0;
-      if (buddy) { tiers.push(buddy); continue; }
-      let t = this.dropTier() + (superSwing ? 1 : 0);
-      if (this.rand() < UPGRADES.lucky.chance(s.up.lucky)) t++;
-      tiers.push(Math.min(t, s.maxTier));
-    }
+    if (this.energyOn()) s.energy = Math.max(0, s.energy - 1);
+    const t = Math.min(s.maxTier, this.dropTier() + (s.boosts.block > 0 ? 2 : 0));
     const drops = [];
-    for (const t of tiers) {
-      const empty = this.emptyCells();
-      if (t === 'chest') {
-        if (!empty.length) continue; // the chest just waits for next time
-        const cell = this.placeFor(0);
-        s.board[cell] = { chest: 1 };
-        drops.push({ cell, chest: true });
-        continue;
-      }
-      if (!empty.length) {
-        const k = 'b' + t;
-        s.store[k] = (s.store[k] || 0) + 1;
-        drops.push({ stored: true, t });
-        continue;
-      }
-      const cell = this.placeFor(t);
-      s.board[cell] = { t };
-      drops.push({ cell, t });
+    const cell = this.randomEmpty();
+    if (cell >= 0) { s.board[cell] = { chest: 'wood', t }; drops.push({ cell, chest: 'wood', t }); }
+    else { this.addInv('b' + t); drops.push({ stored: true, t }); this.discover(t); }
+    if (s.treasureT >= treasureEvery() && s.level >= 2) {
+      const c2 = this.randomEmpty();
+      if (c2 >= 0) { s.treasureT = 0; s.board[c2] = { chest: 'gold' }; drops.push({ cell: c2, chest: 'gold' }); }
     }
-    this.emit('break', { auto, drops, superSwing });
-    for (const d of drops) if (d.t) this.discover(d.t);
-    return { broke: true, drops, superSwing };
+    s.monsterIn--;
+    this.emit('break', { drops });
+    if (s.monsterIn <= 0 && !s.monster) this.spawnMonster();
+    return { broke: true, drops };
+  }
+
+  // Tap a chest on the board to open it.
+  openChest(i) {
+    const s = this.s, c = s.board[i];
+    if (!c || !c.chest) return null;
+    s.stats.opened++;
+    if (c.chest === 'wood') {
+      s.board[i] = { t: c.t };
+      this.emit('open', { i, t: c.t });
+      this.discover(c.t);
+      return { t: c.t };
+    }
+    // A golden treasure chest: coins, bricks, maybe emeralds, a material and a block.
+    const gold = Math.max(1500 * s.level, Math.round(this.gps() * 60));
+    const bricks = 3 + s.level;
+    const gems = this.rand() < 0.3 ? 1 : 0;
+    s.gold += gold; s.bricks += bricks; s.gems += gems;
+    const mats = ['m:planks', 'm:stick', 'm:string', 'm:iron'];
+    const mat = mats[Math.floor(this.rand() * Math.min(mats.length, 2 + Math.floor(s.level / 3)))];
+    const nMat = mat === 'm:planks' ? 4 : mat === 'm:iron' ? 1 : 2;
+    this.addInv(mat, nMat);
+    const t = Math.min(s.maxTier, this.dropTier() + 1);
+    s.board[i] = { t };
+    this.emit('treasure', { i, gold, bricks, gems, mat, nMat, t });
+    this.discover(t);
+    return { gold, bricks, gems, mat, t };
+  }
+
+  // ------------------------------------------------------------- monsters
+  spawnMonster(id) {
+    const s = this.s;
+    if (s.monster) return false;
+    if (!id) {
+      const open = Object.keys(MONSTERS).filter((k) => MONSTERS[k].unlock <= s.level);
+      id = s.stats.kills === 0 ? 'grumble' : open[Math.floor(this.rand() * open.length)];
+    }
+    const hp = monsterHp(id, s.level);
+    s.monster = { id, hp, max: hp };
+    s.monsterIn = MONSTER_EVERY[0] + Math.floor(this.rand() * (MONSTER_EVERY[1] - MONSTER_EVERY[0] + 1));
+    this.emit('monster', { id, hp });
+    return true;
+  }
+  hitMonster() {
+    const s = this.s, m = s.monster;
+    if (!m) return { none: true };
+    const dmg = this.attack() * (s.boosts.damage > 0 ? 2 : 1);
+    m.hp = Math.max(0, m.hp - dmg);
+    this.emit('hitMonster', { id: m.id, dmg, hp: m.hp, max: m.max });
+    if (m.hp > 0) return { hitMonster: true, dmg };
+    return this.defeatMonster();
+  }
+  defeatMonster() {
+    const s = this.s, m = s.monster;
+    const def = MONSTERS[m.id];
+    s.monster = null;
+    s.mineHp = this.tapsPerBlock();
+    const first = s.stats.kills === 0;
+    s.stats.kills++;
+    s.stats.killBy[m.id] = (s.stats.killBy[m.id] || 0) + 1;
+    const coins = Math.round(monsterCoins(m.id, s.level) * (s.equip.orb ? ORB_GOLD : 1));
+    s.gold += coins;
+    const loot = [];
+    const give = (k, n = 1) => { this.addInv(k, n); loot.push({ k, n }); };
+    if (first) give('g:stone_pick');
+    if (m.id === 'gloop' && this.rand() < 0.25) { s.gems++; loot.push({ k: 'gems', n: 1 }); }
+    if (m.id === 'grumble' && !first && this.rand() < 0.2) give('m:iron');
+    if (m.id === 'webby') give('m:string', 2);
+    if (m.id === 'rocky') { give('m:iron'); if (this.rand() < 0.5) give('m:gold'); }
+    if (m.id === 'magma') { give('m:gold', 2); if (this.rand() < 0.3) give('m:diamond'); s.gems += 2; loot.push({ k: 'gems', n: 2 }); }
+    this.emit('kill', { id: m.id, coins, loot, first });
+    this.addXP(def.xp);
+    return { killed: true, coins, loot };
   }
 
   // ------------------------------------------------------------ the board
@@ -242,53 +323,46 @@ export class Game {
     if (a === b || !A || A.chest || !this.isOpen(b)) return { none: true };
     if (!B) { s.board[b] = A; s.board[a] = null; this.emit('move', { a, b }); return { moved: true }; }
     if (B.chest) return { none: true };
-    if (A.boom && B.t) return this.boomOn(a, b);
-    if (B.boom && A.t) { s.board[a] = B; s.board[b] = A; this.emit('swap', { a, b }); return { swapped: true }; }
-    if (A.t && A.t === B.t) return this.merge(a, b);
+    if (A.t === B.t) return this.merge(a, b);
     s.board[a] = B; s.board[b] = A;
     this.emit('swap', { a, b });
     return { swapped: true };
   }
-
   canMerge(a, b) {
     const A = this.s.board[a], B = this.s.board[b];
-    return !!(A && B && A.t && A.t === B.t && A.t < MAX_TIER && a !== b);
+    return !!(A && B && !A.chest && !B.chest && A.t && A.t === B.t && A.t < MAX_TIER && a !== b);
   }
-
   merge(a, b) {
     const s = this.s;
-    if (!this.canMerge(a, b)) {
-      this.emit('deny', { reason: 'max' });
-      return { none: true };
-    }
+    if (!this.canMerge(a, b)) { this.emit('deny', { reason: 'max' }); return { none: true }; }
     const t = s.board[b].t + 1;
     s.board[a] = null;
     s.board[b] = { t };
     s.stats.merges++;
-    if (s.rush < RUSH_FULL) s.rush++;
-    const xp = mergeXP(t);
+    s.bricks += 1;
     let gem = 0;
     const every = wellEvery(this.villageLv('well'));
     if (every) { s.wellN++; if (s.wellN >= every) { s.wellN = 0; gem = 1; s.gems += 1; } }
-    this.emit('merge', { a, b, t, xp, gem });
+    const opened = !s.villageOpen && s.stats.merges >= VILLAGE_MERGES;
+    if (opened) s.villageOpen = 1;
+    this.emit('merge', { a, b, t, xp: MERGE_XP, gem });
     this.discover(t);
-    this.addXP(xp);
+    this.addXP(MERGE_XP);
+    if (opened) this.emit('villageOpen', {});
     return { merged: true, t };
   }
-
   discover(t) {
     const s = this.s;
     if (s.seen[t]) return;
     s.seen[t] = 1;
     const oldCave = caveFor(s.maxTier);
     if (t > s.maxTier) s.maxTier = t;
-    if (t >= 3) s.gems += 1; // every new block found gives a gem
+    if (t >= 3) s.gems += 1;
     this.emit('discover', { t, gem: t >= 3 ? 1 : 0 });
     if (t === MAX_TIER && !s.won) { s.won = 1; this.emit('win', {}); }
     const nc = caveFor(s.maxTier);
     if (nc !== oldCave) this.emit('cave', { cave: nc });
   }
-
   addXP(n) {
     const s = this.s;
     s.xp += n;
@@ -296,369 +370,310 @@ export class Game {
       s.xp -= xpNeeded(s.level);
       const before = openCells(s.level);
       s.level++;
-      const reward = Math.max(50, Math.round(this.baseGps() * 30));
-      s.gold += reward;
-      s.gems += 1;
+      const reward = levelReward(s.level);
+      s.gold += reward; s.gems += 1;
       this.emit('levelup', { level: s.level, newCells: openCells(s.level) - before, reward, gems: 1 });
     }
   }
 
-  // Tap a treasure chest on the board.
-  openChest(i) {
-    const s = this.s, c = s.board[i];
-    if (!c || !c.chest) return null;
-    s.board[i] = null;
-    s.stats.chests++;
-    const gold = Math.max(100, Math.round(this.baseGps() * this.goldMult() * 45));
-    const bricks = 2 + Math.floor(this.rand() * 4) + Math.floor(s.level / 3);
-    const gems = this.rand() < 0.15 ? 1 : 0;
-    s.gold += gold; s.bricks += bricks; s.gems += gems;
-    const blocks = [];
-    const nb = 2 + (this.rand() < 0.4 ? 1 : 0);
-    const boom = this.rand() < 0.25;
-    for (let k = 0; k < nb + (boom ? 1 : 0); k++) {
-      const empty = this.emptyCells();
-      const isBoom = boom && k === nb;
-      const t = Math.min(s.maxTier, this.dropTier() + 1 + (this.rand() < 0.3 ? 1 : 0));
-      if (!empty.length) {
-        if (!isBoom) { s.store['b' + t] = (s.store['b' + t] || 0) + 1; blocks.push({ stored: true, t }); }
-        else { s.booms++; blocks.push({ stored: true, boom: true }); }
-        continue;
-      }
-      const cell = k === 0 ? i : this.placeFor(isBoom ? 0 : t);
-      if (isBoom) { s.board[cell] = { boom: 1 }; blocks.push({ cell, boom: true }); continue; }
-      s.board[cell] = { t };
-      blocks.push({ cell, t });
-    }
-    this.emit('chest', { i, gold, bricks, gems, blocks });
-    for (const b of blocks) if (b.t) this.discover(b.t);
-    return { gold, bricks, gems, blocks };
-  }
-
-  // ------------------------------------------------- storage chest & furnace
+  // ------------------------------------------------- the storage chest
   storeBlock(i) {
     const s = this.s, c = s.board[i];
-    if (!c || !(c.t || c.boom)) return false;
-    if (c.boom) s.booms++;
-    else s.store['b' + c.t] = (s.store['b' + c.t] || 0) + 1;
+    if (!c || !c.t || c.chest) return false;
+    this.addInv('b' + c.t);
     s.board[i] = null;
-    s.stats.stored++;
-    this.emit('store', { i, t: c.t, boom: !!c.boom });
+    this.emit('store', { i, t: c.t });
     return true;
   }
-
-  // Put a stored block (or a Boom Block, t === 'boom') back on the board.
+  // Put a stored block back on the board.
   unstore(t) {
-    const s = this.s, isBoom = t === 'boom', k = 'b' + t;
-    if (isBoom ? !s.booms : !s.store[k]) return -1;
-    const empty = this.emptyCells();
-    if (!empty.length) { this.emit('deny', { reason: 'full' }); return -1; }
-    const cell = this.placeFor(isBoom ? 0 : t);
-    if (isBoom) s.booms--;
-    else { s.store[k]--; if (!s.store[k]) delete s.store[k]; }
-    s.board[cell] = t === 'boom' ? { boom: 1 } : { t };
+    const s = this.s, k = 'b' + t;
+    if (!this.have(k)) return -1;
+    const cell = this.randomEmpty();
+    if (cell < 0) { this.emit('deny', { reason: 'full' }); return -1; }
+    this.takeInv(k);
+    s.board[cell] = { t };
     this.emit('unstore', { cell, t });
     return cell;
   }
 
+  // ------------------------------------------------------- the workbench
+  // Place one item from the storage chest onto grid square i.
+  gridPut(i, key) {
+    const s = this.s;
+    if (i < 0 || i > 8 || !key || !this.have(key)) return false;
+    if (key.startsWith('g:')) { this.emit('deny', { reason: 'notmaterial' }); return false; }
+    if (s.grid[i]) this.addInv(s.grid[i]);
+    this.takeInv(key);
+    s.grid[i] = key;
+    this.emit('grid', { i, key });
+    return true;
+  }
+  gridTake(i) {
+    const s = this.s;
+    if (!s.grid[i]) return false;
+    this.addInv(s.grid[i]);
+    s.grid[i] = null;
+    this.emit('grid', { i, key: null });
+    return true;
+  }
+  gridClear() { for (let i = 0; i < 9; i++) if (this.s.grid[i]) { this.addInv(this.s.grid[i]); this.s.grid[i] = null; } }
+  // Which recipe (if any) is laid out on the grid right now?
+  gridRecipe() {
+    const g = this.s.grid;
+    let r0 = 3, r1 = -1, c0 = 3, c1 = -1;
+    for (let i = 0; i < 9; i++) if (g[i]) { const r = Math.floor(i / 3), c = i % 3; r0 = Math.min(r0, r); r1 = Math.max(r1, r); c0 = Math.min(c0, c); c1 = Math.max(c1, c); }
+    if (r1 < 0) return null;
+    for (const rec of RECIPES) {
+      const pat = rec.pattern, w = Math.max(...pat.map((row) => row.length)), h = pat.length;
+      // try every placement of the pattern inside the 3x3
+      for (let dr = 0; dr + h <= 3; dr++) for (let dc = 0; dc + w <= 3; dc++) {
+        let ok = true;
+        for (let r = 0; r < 3 && ok; r++) for (let c = 0; c < 3 && ok; c++) {
+          const pr = r - dr, pc = c - dc;
+          const ch = pr >= 0 && pr < h && pc >= 0 && pc < w ? (pat[pr][pc] || ' ') : ' ';
+          const want = ch === ' ' ? null : rec.key[ch];
+          if ((g[r * 3 + c] || null) !== want) ok = false;
+        }
+        if (ok) return rec;
+      }
+    }
+    return null;
+  }
+  craft() {
+    const s = this.s, rec = this.gridRecipe();
+    if (!rec) { this.emit('deny', { reason: 'norecipe' }); return null; }
+    s.grid = Array(9).fill(null);
+    this.addInv(rec.out, rec.n);
+    s.stats.crafts++;
+    s.stats.craftBy[rec.id] = (s.stats.craftBy[rec.id] || 0) + 1;
+    if (/_(helmet|chest|legs|boots)$/.test(rec.id)) s.stats.armorCrafted++;
+    this.emit('craft', { recipe: rec });
+    return rec;
+  }
+  // Helper: lay out a recipe's pattern from the chest (returns false if short).
+  canFill(rec) {
+    const need = {};
+    for (const row of rec.pattern) for (const ch of row) if (ch !== ' ') need[rec.key[ch]] = (need[rec.key[ch]] || 0) + 1;
+    const have = Object.assign({}, this.s.inv);
+    for (const k of this.s.grid) if (k) have[k] = (have[k] || 0) + 1;
+    for (const k in need) if ((have[k] || 0) < need[k]) return false;
+    return true;
+  }
+  fillRecipe(id) {
+    const rec = RECIPES.find((r) => r.id === id);
+    if (!rec || !this.canFill(rec)) { this.emit('deny', { reason: 'cost' }); return false; }
+    this.gridClear();
+    const w = Math.max(...rec.pattern.map((r) => r.length));
+    const dc = w === 1 ? 1 : 0, dr = rec.pattern.length === 1 ? 1 : 0;
+    rec.pattern.forEach((row, r) => [...row].forEach((ch, c) => { if (ch !== ' ') this.gridPut((r + dr) * 3 + c + dc, rec.key[ch]); }));
+    return true;
+  }
+
+  // ----------------------------------------------------------- the hero
+  equip(gearId) {
+    const s = this.s, g = GEAR[gearId];
+    if (!g || !this.takeInv('g:' + gearId)) return false;
+    const prev = s.equip[g.slot];
+    if (prev) this.addInv('g:' + prev);
+    s.equip[g.slot] = gearId;
+    s.stats.equipBy[g.slot] = (s.stats.equipBy[g.slot] || 0) + 1;
+    if (g.slot === 'pick') s.mineHp = Math.min(s.mineHp, this.tapsPerBlock());
+    if (s.energy > this.energyMax()) s.energy = this.energyMax();
+    this.emit('equip', { slot: g.slot, id: gearId });
+    return true;
+  }
+  unequip(slot) {
+    const s = this.s, id = s.equip[slot];
+    if (!id) return false;
+    s.equip[slot] = null;
+    this.addInv('g:' + id);
+    if (slot === 'pick') s.mineHp = Math.min(s.mineHp, this.tapsPerBlock()) || this.tapsPerBlock();
+    if (s.energy > this.energyMax()) s.energy = this.energyMax();
+    this.emit('equip', { slot, id: null });
+    return true;
+  }
+  buySkin(id) {
+    const s = this.s, sk = SKINS.find((x) => x.id === id);
+    if (!sk) return false;
+    if (!s.skins[id]) {
+      if (s.gems < sk.gems) { this.emit('deny', { reason: 'gems' }); return false; }
+      s.gems -= sk.gems; s.skins[id] = 1;
+    }
+    s.skin = id;
+    this.emit('skin', { id });
+    return true;
+  }
+
+  // ------------------------------------------------------------ the furnace
   furnaceSlots() { return 3; }
-  smeltSecs(t) {
-    const base = 2 + t * 0.6;
-    return Math.max(1, base * Math.pow(0.82, this.villageLv('forge')));
+  smeltSecs(t) { return Math.max(1, SMELT[t].secs * Math.pow(0.82, this.villageLv('forge'))); }
+  // Coal for fuel comes from the chest first, then from the board.
+  takeFuel() {
+    if (this.takeInv('b' + FUEL_TIER)) return true;
+    const i = this.s.board.findIndex((c) => c && !c.chest && c.t === FUEL_TIER);
+    if (i >= 0) { this.s.board[i] = null; this.emit('fuelFromBoard', { i }); return true; }
+    return false;
   }
-  smeltResult(t) {
-    for (const id in INGOTS) if (INGOTS[id].from === t) return { ingot: id, bricks: INGOTS[id].bricks };
-    return { bricks: Math.max(1, Math.round(Math.pow(1.35, t - 1))) };
-  }
-  // Your two best kinds of block are too precious to melt.
-  canSmelt(t) { return !!t && t < this.s.maxTier - 1; }
-  // Put a block from the board into the furnace.
   smeltFromBoard(i) {
     const s = this.s, c = s.board[i];
-    if (!c || !c.t) return false;
-    if (!this.canSmelt(c.t)) { this.emit('deny', { reason: 'precious', i }); return false; }
+    if (!c || !c.t || c.chest) return false;
+    if (!SMELT[c.t]) { this.emit('deny', { reason: 'notore', i }); return false; }
     if (s.furnace.length >= this.furnaceSlots()) { this.emit('deny', { reason: 'furnace' }); return false; }
     s.board[i] = null;
+    if (!this.takeFuel()) { s.board[i] = c; this.emit('deny', { reason: 'nofuel', i }); return false; }
     const secs = this.smeltSecs(c.t);
     s.furnace.push({ t: c.t, left: secs, total: secs });
     this.emit('smeltStart', { i, t: c.t });
     return true;
   }
-  smeltFromStore(t) {
-    const s = this.s, k = 'b' + t;
-    if (!s.store[k]) return false;
-    if (!this.canSmelt(t)) { this.emit('deny', { reason: 'precious' }); return false; }
+  smeltFromInv(t) {
+    const s = this.s;
+    if (!SMELT[t] || !this.have('b' + t)) return false;
     if (s.furnace.length >= this.furnaceSlots()) { this.emit('deny', { reason: 'furnace' }); return false; }
-    s.store[k]--; if (!s.store[k]) delete s.store[k];
+    this.takeInv('b' + t);
+    if (!this.takeFuel()) { this.addInv('b' + t); this.emit('deny', { reason: 'nofuel' }); return false; }
     const secs = this.smeltSecs(t);
     s.furnace.push({ t, left: secs, total: secs });
     this.emit('smeltStart', { t });
     return true;
   }
-
-  // Changed your mind? Take a block back out of the furnace (to the board,
-  // or the chest if the board is full).
   unsmelt(k) {
     const s = this.s, f = s.furnace[k];
-    if (!f) return -1;
+    if (!f) return false;
     s.furnace.splice(k, 1);
-    const cell = this.placeFor(f.t);
-    if (cell >= 0) s.board[cell] = { t: f.t };
-    else s.store['b' + f.t] = (s.store['b' + f.t] || 0) + 1;
-    this.emit('unsmelt', { t: f.t, cell });
-    return cell;
-  }
-
-  // ---------------------------------------------------------- spending
-  // How many of an ingredient you have: bars live in the chest; blocks count
-  // whether they're in the chest OR on the board (friendlier for little kids).
-  have(k) {
-    let n = this.s.store[k] || 0;
-    if (k[0] === 'b') { const t = Number(k.slice(1)); for (const c of this.s.board) if (c && c.t === t) n++; }
-    return n;
-  }
-  // Use up ingredients: from the chest first, then from the board.
-  spend(k, n) {
-    const s = this.s;
-    const fromStore = Math.min(n, s.store[k] || 0);
-    if (fromStore) { s.store[k] -= fromStore; if (!s.store[k]) delete s.store[k]; }
-    let left = n - fromStore;
-    if (left > 0 && k[0] === 'b') {
-      const t = Number(k.slice(1));
-      for (let i = 0; i < N_CELLS && left > 0; i++) if (s.board[i] && s.board[i].t === t) { s.board[i] = null; left--; }
-    }
-  }
-  canAffordNeed(need) {
-    for (const k in need) if (this.have(k) < need[k]) return false;
-    return true;
-  }
-  craftPickaxe() {
-    const s = this.s, next = s.pick + 1, r = PICK_RECIPES[next];
-    if (!r) return false;
-    if (s.gold < r.gold || !this.canAffordNeed(r.need)) { this.emit('deny', { reason: 'cost' }); return false; }
-    s.gold -= r.gold;
-    for (const k in r.need) this.spend(k, r.need[k]);
-    s.pick = next;
-    s.mineHp = Math.min(s.mineHp, PICKAXES[next].taps);
-    this.emit('pickaxe', { pick: next });
+    this.addInv('b' + f.t);
+    this.addInv('b' + FUEL_TIER); // the coal comes back too
+    this.emit('unsmelt', { t: f.t });
     return true;
   }
 
-  // Dig Deeper only helps once your best block is far enough ahead.
-  depthUseful() { return depthNeed(this.s.up.depth) <= MAX_TIER && this.s.maxTier >= depthNeed(this.s.up.depth); }
-  depthMaxed() { return this.s.up.depth >= UPGRADES.depth.max || depthNeed(this.s.up.depth) > MAX_TIER; }
-  upgradeCost(id) { return UPGRADES[id].cost(this.s.up[id]); }
-  canUpgrade(id) {
-    const u = UPGRADES[id], lv = this.s.up[id];
-    if (lv >= u.max) return false;
-    if (id === 'depth' && !this.depthUseful()) return false;
-    return this.s.gold >= u.cost(lv);
-  }
-  upgrade(id) {
-    if (!this.canUpgrade(id)) { this.emit('deny', { reason: 'cost' }); return false; }
-    this.s.gold -= this.upgradeCost(id);
-    this.s.up[id]++;
-    this.emit('upgrade', { id, lv: this.s.up[id] });
+  // ------------------------------------------------------------- spending
+  boosterPrice() { return boosterPrice(this.baseGps(), this.s.level); }
+  buyBooster(id) {
+    const s = this.s, b = BOOSTERS[id], price = this.boosterPrice();
+    if (!b) return false;
+    if (s.gold < price) { this.emit('deny', { reason: 'cost' }); return false; }
+    s.gold -= price;
+    s.boosts[id] += b.secs;
+    this.emit('booster', { id, secs: s.boosts[id], price });
     return true;
   }
-
-  buildingCost(b) { return b.cost(this.villageLv(b.id)); }
-  canBuild(b) {
-    return this.villageLv(b.id) < b.max && this.s.level >= (b.unlock || 1) && this.s.bricks >= this.buildingCost(b);
-  }
-  build(id) {
-    const b = BUILDINGS.find((x) => x.id === id);
-    if (!b || !this.canBuild(b)) { this.emit('deny', { reason: 'cost' }); return false; }
-    this.s.bricks -= this.buildingCost(b);
-    this.s.village[id] = this.villageLv(id) + 1;
-    this.emit('build', { id, lv: this.s.village[id] });
-    return true;
-  }
-  buildingsBuilt() { return BUILDINGS.filter((b) => this.villageLv(b.id) > 0).length; }
-
-  shopTiers() {
-    const top = Math.max(1, this.s.maxTier - DROP_GAP);
-    const out = [];
-    for (let t = 1; t <= top; t++) out.push(t);
-    return out;
-  }
+  shopTiers() { const out = []; for (let t = 1; t <= Math.max(1, this.s.maxTier - DROP_GAP); t++) out.push(t); return out; }
+  shopPrice(t) { return blockValue(t); }
   buyBlock(t) {
     const s = this.s;
     if (t > Math.max(1, s.maxTier - DROP_GAP)) return -1;
-    const price = shopPrice(t);
-    const empty = this.emptyCells();
-    if (!empty.length) { this.emit('deny', { reason: 'full' }); return -1; }
+    const price = this.shopPrice(t), cell = this.randomEmpty();
+    if (cell < 0) { this.emit('deny', { reason: 'full' }); return -1; }
     if (s.gold < price) { this.emit('deny', { reason: 'cost' }); return -1; }
     s.gold -= price;
-    const cell = this.placeFor(t);
     s.board[cell] = { t };
     this.emit('buy', { cell, t, price });
     return cell;
   }
 
-  usePower(id) {
-    const s = this.s, p = POWERS[id];
-    if (!p || s.gems < p.gems) { this.emit('deny', { reason: 'gems' }); return false; }
-    if (id === 'magic' && !this.mergeablePairs().length) { this.emit('deny', { reason: 'nopairs' }); return false; }
-    if (id === 'boom' && !this.emptyCells().length) { this.emit('deny', { reason: 'full' }); return false; }
-    s.gems -= p.gems;
-    if (id === 'magic') this.magicMerge();
-    if (id === 'boom') {
-      const e = this.emptyCells();
-      const cell = this.placeFor(0);
-      s.board[cell] = { boom: 1 };
-      this.emit('buy', { cell, boom: true });
-    }
+  // --------------------------------------------------------------- village
+  buildingCost(b) { return b.cost(this.villageLv(b.id)); }
+  buildingGate(b) {
+    if (!this.s.villageOpen) return 'closed';
+    if (this.villageLv(b.id) >= b.max) return 'max';
+    if (b.unlock && this.s.level < b.unlock) return 'level';
+    if (b.id === 'shaft' && this.s.maxTier < shaftNeed(this.villageLv('shaft'))) return 'deeper';
+    return null;
+  }
+  canBuild(b) { return !this.buildingGate(b) && this.s.bricks >= this.buildingCost(b); }
+  build(id) {
+    const b = BUILDINGS.find((x) => x.id === id);
+    if (!b || !this.canBuild(b)) { this.emit('deny', { reason: 'cost' }); return false; }
+    this.s.bricks -= this.buildingCost(b);
+    this.s.village[id] = this.villageLv(id) + 1;
+    this.s.stats.builds++;
+    this.emit('build', { id, lv: this.s.village[id] });
     return true;
   }
 
-  // A Boom Block dropped on a block makes it one step bigger. It works on
-  // small and middle blocks (the same ones the shop sells) — perfect for a
-  // leftover block that has no twin.
-  boomMax() { return Math.max(1, this.s.maxTier - DROP_GAP); }
-  canBoom(t) { return !!t && t <= this.boomMax() && t < MAX_TIER; }
-  boomOn(a, b) {
-    const s = this.s, B = s.board[b];
-    if (!B || !this.canBoom(B.t)) { this.emit('deny', { reason: 'toobig', i: b }); return { none: true }; }
-    s.board[a] = null;
-    s.board[b] = { t: B.t + 1 };
-    s.stats.booms++;
-    this.emit('boom', { a, b, t: B.t + 1 });
-    this.discover(B.t + 1);
-    return { boomed: true };
-  }
-
-  // The Gold Rush jar: full after RUSH_FULL merges, tap for double gold.
-  rushReady() { return this.s.rush >= RUSH_FULL; }
-  startRush() {
+  // ---------------------------------------------------------------- quests
+  metric(m) {
     const s = this.s;
-    if (!this.rushReady()) { this.emit('deny', { reason: 'rush' }); return false; }
-    s.rush = 0;
-    s.boostLeft += RUSH_SECS;
-    s.stats.rushes++;
-    this.emit('rush', { secs: s.boostLeft });
-    return true;
+    if (m === 'tier') return s.maxTier;
+    if (m === 'level') return s.level;
+    if (m === 'armorWorn') return this.armorWorn();
+    if (m.startsWith('craft:')) return s.stats.craftBy[m.slice(6)] || 0;
+    if (m.startsWith('kill:')) return s.stats.killBy[m.slice(5)] || 0;
+    if (m.startsWith('equip:')) return s.stats.equipBy[m.slice(6)] || 0;
+    return s.stats[m] || 0;
   }
-
-  // All pairs that could merge right now (for hints and Magic Merge).
-  mergeablePairs() {
-    const byTier = {};
-    this.s.board.forEach((c, i) => { if (c && c.t && c.t < MAX_TIER) (byTier[c.t] = byTier[c.t] || []).push(i); });
-    const pairs = [];
-    for (const t in byTier) { const l = byTier[t]; for (let k = 0; k + 1 < l.length; k += 2) pairs.push([l[k], l[k + 1]]); }
-    return pairs;
+  questList(tab) {
+    const list = tab === 't' ? TASKS : tab === 'a' ? ACHIEVEMENTS : HUNT;
+    return list.map((q, i) => ({ i, q, have: Math.min(q.n, this.metric(q.metric)), ready: this.metric(q.metric) >= q.n, done: !!this.s.claimed[tab][i] }));
   }
-
-  magicMerge() {
-    const steps = [];
-    for (let guard = 0; guard < 100; guard++) {
-      const pairs = this.mergeablePairs();
-      if (!pairs.length) break;
-      // merge the smallest blocks first so chains cascade upwards
-      pairs.sort((p, q) => this.s.board[p[0]].t - this.s.board[q[0]].t);
-      const [a, b] = pairs[0];
-      steps.push([a, b]);
-      this.merge(a, b);
-    }
-    this.emit('magic', { steps });
+  activeTasks() { return this.questList('t').filter((x) => !x.done).slice(0, 3); }
+  readyCount(tab) {
+    if (tab === 't') return this.activeTasks().filter((x) => x.ready).length;
+    return this.questList(tab).filter((x) => x.ready && !x.done).length;
   }
-
-  // ------------------------------------------------------------- quests
-  questMetric(q) {
-    const s = this.s;
-    switch (q.metric) {
-      case 'tier': return s.maxTier;
-      case 'level': return s.level;
-      case 'pick': return s.pick;
-      case 'helper': return s.up.helper;
-      case 'build': return this.buildingsBuilt();
-      case 'castle': return this.villageLv('castle');
-      case 'hut': return this.villageLv('hut');
-      default: return s.stats[q.metric] || 0;
-    }
-  }
-  activeQuests() {
-    const out = [];
-    for (let i = 0; i < QUESTS.length && out.length < 3; i++) {
-      if (this.s.claimed[i]) continue;
-      out.push({ i, q: QUESTS[i], have: Math.min(QUESTS[i].n, this.questMetric(QUESTS[i])), ready: this.questMetric(QUESTS[i]) >= QUESTS[i].n });
-    }
-    return out;
-  }
-  readyQuests() { return this.activeQuests().filter((a) => a.ready).length; }
-  claimQuest(i) {
-    const q = QUESTS[i];
-    if (!q || this.s.claimed[i] || this.questMetric(q) < q.n) return false;
-    this.s.claimed[i] = 1;
+  readyQuests() { return this.readyCount('t') + this.readyCount('a') + this.readyCount('h'); }
+  claim(tab, i) {
+    const list = tab === 't' ? TASKS : tab === 'a' ? ACHIEVEMENTS : HUNT;
+    const q = list[i];
+    if (!q || this.s.claimed[tab][i] || this.metric(q.metric) < q.n) return false;
+    if (tab === 't' && !this.activeTasks().some((x) => x.i === i)) return false;
+    this.s.claimed[tab][i] = 1;
     const r = q.reward;
     this.s.gold += r.gold || 0; this.s.bricks += r.bricks || 0; this.s.gems += r.gems || 0;
-    this.emit('quest', { i, reward: r });
+    this.emit('quest', { tab, i, reward: r });
     return true;
   }
 
-  // ---------------------------------------------------------------- time
+  // ------------------------------------------------------------------ time
   tick(dt) {
     const s = this.s;
     if (dt <= 0) return;
     s.gold += this.gps() * dt;
-    s.chestT += dt;
-    if (s.boostLeft > 0) s.boostLeft = Math.max(0, s.boostLeft - dt);
-    // energy trickles back
+    s.treasureT += dt;
+    for (const k in s.boosts) if (s.boosts[k] > 0) s.boosts[k] = Math.max(0, s.boosts[k] - dt);
     if (s.energy < this.energyMax()) {
       s.energyT += dt;
       const r = this.energyRegenSecs();
       while (s.energyT >= r && s.energy < this.energyMax()) { s.energyT -= r; s.energy++; }
       if (s.energy >= this.energyMax()) s.energyT = 0;
     } else s.energyT = 0;
-    // the mole helper
-    const iv = this.helperInterval();
-    if (iv > 0) {
-      s.helperT += dt;
-      if (s.helperT >= iv) {
-        s.helperT = Math.min(s.helperT - iv, iv);
-        this.tapMine(true);
-      }
-    }
-    // the furnace works on the first item in the queue
     if (s.furnace.length) {
       const f = s.furnace[0];
       f.left -= dt;
       if (f.left <= 0) {
         s.furnace.shift();
         s.stats.smelts++;
-        const r = this.smeltResult(f.t);
-        r.bricks = Math.round(r.bricks * (1 + 0.25 * this.villageLv('bakery')));
-        s.bricks += r.bricks;
-        if (r.ingot) { const k = 'i:' + r.ingot; s.store[k] = (s.store[k] || 0) + 1; }
-        this.emit('smelted', { t: f.t, ingot: r.ingot, bricks: r.bricks });
+        const out = SMELT[f.t].out;
+        this.addInv(out);
+        this.emit('smelted', { t: f.t, out });
       }
     }
   }
 
-  // Gold earned while the app was closed (capped, never pressures you).
+  // Gold earned while the app was closed (half speed, one fixed cap).
   applyOffline(now) {
     const s = this.s;
     if (!s.lastSeen) { s.lastSeen = now; return 0; }
     const away = Math.max(0, (now - s.lastSeen) / 1000);
     s.lastSeen = now;
-    // energy refills while away, too
     if (s.energy < this.energyMax()) s.energy = Math.min(this.energyMax(), s.energy + Math.floor(away / this.energyRegenSecs()));
     if (away < 300) return 0;
     const secs = Math.min(away, offlineCapSecs());
-    const g = OFFLINE_RATE * this.baseGps() * (1 + 0.1 * this.villageLv('hut')) * (1 + 0.25 * this.villageLv('castle')) * (s.iap.pass ? 2 : 1) * secs;
+    const g = OFFLINE_RATE * this.baseGps() * (1 + 0.1 * this.villageLv('hut')) * (1 + 0.25 * this.villageLv('castle'))
+      * (s.iap.pass ? 2 : 1) * (s.equip.orb ? ORB_GOLD : 1) * secs;
     s.gold += g;
     return g;
   }
 
   // ------------------------------------------------------- pretend store
-  // Would the pretend card be declined? (the grown-ups can set a card limit)
   declineReason(price) {
     const lim = this.s.settings && this.s.settings.cardLimit;
     if (lim && this.s.cardSpent + price > lim + 1e-9) return 'limit';
     return null;
   }
   owns(id) { const it = storeItem(id); return !!(it && it.once && (it.pass ? this.s.iap.pass : it.unlimited ? this.s.iap.unlimited : false)); }
-  // Called after a successful pretend checkout: hand over what was bought.
   grant(id, last4, now) {
     const s = this.s, it = storeItem(id);
     if (!it || this.owns(id) || this.declineReason(it.price)) return false;
@@ -671,33 +686,27 @@ export class Game {
     if (it.bricks) { s.bricks += it.bricks; got.bricks = it.bricks; }
     if (it.refill) this.refillEnergy();
     if (it.unlimited) { s.iap.unlimited = 1; s.energy = this.energyMax(); }
-    if (it.rush) s.boostLeft += it.rush;
+    if (it.rush) s.boosts.gold += it.rush;
     if (it.pass) { s.iap.pass = 1; s.gems += 10; got.gems = 10; s.energy = Math.max(s.energy, this.energyMax()); }
     if (it.chest) Object.assign(got, this.storeChest(it.chest));
     this.emit('purchased', { item: it, got });
     for (const b of got.blocks) if (b.t) this.discover(b.t);
     return got;
   }
-  // A bought chest: blocks a little bigger than the mine gives, plus treats.
-  // Blocks never go past your best block (so no discoveries are skipped).
   storeChest(kind) {
     const s = this.s, mega = kind === 'mega';
-    const gold = Math.max(200, Math.round(this.baseGps() * this.goldMult() * (mega ? 300 : 60)));
+    const gold = Math.max(2000 * s.level, Math.round(this.gps() * (mega ? 300 : 60)));
     const gems = mega ? 25 : 5, bricks = mega ? 40 : 8;
     s.gold += gold; s.gems += gems; s.bricks += bricks;
     const blocks = [];
-    const n = mega ? 6 : 3;
-    for (let k = 0; k < n; k++) {
+    for (let k = 0; k < (mega ? 6 : 3); k++) {
       const t = Math.min(s.maxTier, this.dropTier() + (mega ? 2 : 1) + (this.rand() < 0.5 ? 1 : 0));
-      const cell = this.placeFor(t);
-      if (cell < 0) { s.store['b' + t] = (s.store['b' + t] || 0) + 1; blocks.push({ stored: true, t }); continue; }
+      const cell = this.randomEmpty();
+      if (cell < 0) { this.addInv('b' + t); blocks.push({ stored: true, t }); continue; }
       s.board[cell] = { t };
       blocks.push({ cell, t });
     }
-    if (mega) {
-      const cell = this.placeFor(0);
-      if (cell >= 0) { s.board[cell] = { boom: 1 }; blocks.push({ cell, boom: true }); } else { s.booms++; blocks.push({ stored: true, boom: true }); }
-    }
+    if (mega) { this.addInv('m:iron', 2); this.addInv('m:string', 3); }
     return { gold, gems, bricks, blocks };
   }
 

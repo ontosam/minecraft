@@ -710,3 +710,585 @@ export function tileColors(kind) {
   cache.set(key, out);
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Adventure art: materials, weapons/armor, crafting items, the five friendly
+// monsters, Pip the guide and the dress-up hero. All original 16px sprites in
+// the same chunky outlined style as the icons above.
+// ---------------------------------------------------------------------------
+
+// [main, dark] for each crafting material (tool heads, blades, armor).
+export const MAT_COLORS = {
+  wood: [0xc99a5b, 0x8a6a3a],
+  stone: [0xb9b9c2, 0x6a6a72],
+  iron: [0xe6e6ee, 0x9a9aa6],
+  gold: [0xf6c935, 0xd99a1e],
+  diamond: [0x59d6e8, 0x2f9fb8],
+};
+
+function mixHex(a, b, t) {
+  const ch = (s) => Math.round(((a >> s) & 255) * (1 - t) + ((b >> s) & 255) * t);
+  return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+}
+
+// Four shades of a material: L(ight), M(ain), N (mid) and D(ark).
+function matShades(mat) {
+  const [m, d] = MAT_COLORS[mat] || MAT_COLORS.iron;
+  return { L: mixHex(m, 0xffffff, 0.5), M: m, N: mixHex(m, d, 0.5), D: d };
+}
+
+// Extra palette colours for the new sprites. L/M/N/D are "material" slots
+// (iron by default) that the URL helpers below recolour.
+Object.assign(PAL, matShades('iron'), {
+  a: 0xc8782e, A: 0x8f4f1c, // rusty orange (Grumble's helmet)
+  z: 0xa8bc94, Z: 0x75896a, // grey-green skin (Grumble)
+  q: 0x7a5c9e, Q: 0x4f3a6e, j: 0xa58cc8, // fuzzy purple (Webby)
+  m: 0xf08a7a, // rosy nose / cheeks
+  H: 0xd9a27a, // skin shadow
+  i: 0xcdc9d6, I: 0x9d99a8, // soft greys (beard, string)
+  x: 0xb8f4fb, // pale cyan (diamond facets)
+  O: 0xf0601e, P: 0xc8341e, X: 0x7a2418, // lava orange / red / crust
+  J: 0xdcc2ff, // pale violet glow
+});
+
+Object.assign(ICONS, {
+  sword: [
+    '.............kkk',
+    '............kLMk',
+    '...........kLMDk',
+    '..........kLMDk.',
+    '.........kLMDk..',
+    '........kLMDk...',
+    '....k..kLMDk....',
+    '...ktkkLMDk.....',
+    '...kBtLMDk......',
+    '....kBtkk.......',
+    '...ktBBtk.......',
+    '.kktbkkBtk......',
+    'kLNbk..kk.......',
+    'kNDk............',
+    '.kk.............',
+    '................',
+  ],
+  helmet: [
+    '................',
+    '................',
+    '.....kkkkkk.....',
+    '...kkLLMMMMkk...',
+    '..kLLMMMMMMMNk..',
+    '..kLMMMMMMMMNk..',
+    '.kLMMMMMMMMMMNk.',
+    '.kMMMMMMMMMMMNk.',
+    '.kDLDDDDDDDDLDk.',
+    '.kMNkkkkkkkkMDk.',
+    '.kMNk......kMDk.',
+    '.kMNk......kMDk.',
+    '.kNDk......kNDk.',
+    '..kk........kk..',
+    '................',
+    '................',
+  ],
+  chestplate: [
+    '................',
+    '.kkkkk....kkkkk.',
+    'kLLMMNk..kMMMNDk',
+    'kLMMMMNkkNMMMMDk',
+    'kLMMMMMMMMMMMMDk',
+    'kkkLMMMMMMMMNkkk',
+    '..kLMMMMMMMMNk..',
+    '..kLMMMMMMMMNk..',
+    '..kDDDDDDDDDDk..',
+    '..kLMMMMMMMMNk..',
+    '..kLMMMMMMMMNk..',
+    '..kDDDDDDDDDDk..',
+    '..kLMMMMMMMMNk..',
+    '..kNNNNNNNNNNk..',
+    '..kkkkkkkkkkkk..',
+    '................',
+  ],
+  leggings: [
+    '................',
+    '................',
+    '..kkkkkkkkkkkk..',
+    '..kLLMMMMMMMNk..',
+    '..kDDDDLDDDDDk..',
+    '..kLMMMMMMMMNk..',
+    '..kLMMMkkMMMNk..',
+    '..kLMMNkkLMMNk..',
+    '..kLMMNkkLMMNk..',
+    '..kLMMNkkLMMNk..',
+    '..kLMMNkkLMMNk..',
+    '..kLMMNkkLMMNk..',
+    '..kDDDDkkDDDDk..',
+    '..kkkkkkkkkkkk..',
+    '................',
+    '................',
+  ],
+  boots: [
+    '................',
+    '................',
+    '................',
+    '................',
+    '.kkkkk...kkkkk..',
+    '.kLLMk...kLLMk..',
+    '.kDDDk...kDDDk..',
+    '.kLMNk...kLMNk..',
+    '.kLMNk...kLMNk..',
+    '.kLMMkk..kLMMkk.',
+    '.kLMMMNk.kLMMMNk',
+    '.kDDDDDk.kDDDDDk',
+    '.kkkkkkk.kkkkkkk',
+    '................',
+    '................',
+    '................',
+  ],
+  stick: [
+    '................',
+    '............kk..',
+    '...........ktbk.',
+    '..........ktbk..',
+    '.........ktbk...',
+    '........ktBk....',
+    '.......ktbkkk...',
+    '......ktbkgek...',
+    '.....ktbk.kk....',
+    '....ktbk........',
+    '...kBbk.........',
+    '..ktbk..........',
+    '.ktbk...........',
+    'ktbk............',
+    '.kk.............',
+    '................',
+  ],
+  string: [
+    '................',
+    '................',
+    '.....kkkkk......',
+    '...kkwwwWikk....',
+    '..kwwiwwwiWik...',
+    '..kwiwwwiWWik...',
+    '.kwwwwwiWWWWik..',
+    '.kwiwwiWWWiWik..',
+    '.kiwwiWWWiWWIk..',
+    '.kWWiWWWiWWIIk..',
+    '..kiWWWiWWIIk...',
+    '..kWWWiWWIIIkk..',
+    '...kkIIIIIkkWWk.',
+    '.....kkkkk..kkWk',
+    '..............kk',
+    '................',
+  ],
+  bow: [
+    '................',
+    '....kkk.........',
+    '....kWtkk.......',
+    '....kW.ktkk.....',
+    '....kW...ktk....',
+    '....kW....ktk...',
+    '....kW....ktbk..',
+    '....kW.....kbk..',
+    '....kW....kBBBk.',
+    '....kW....kBBBk.',
+    '....kW.....kbk..',
+    '....kW....ktbk..',
+    '....kW....ktk...',
+    '....kW...ktk....',
+    '....kW.ktkk.....',
+    '....kkkkk.......',
+  ],
+  orb: [
+    '............k...',
+    '...........kwk..',
+    '..........kwYwk.',
+    '.....kkkkkkkwk..',
+    '...kkJJvvvvkk...',
+    '..kJwwJvvvvvVk..',
+    '..kJwJvvvvvvVk..',
+    '.kJvvvvJJvvvVVk.',
+    '.kvvvvJwJJvvVVk.',
+    '.kvvvvJJJJvvVVk.',
+    '.kvvvvvJJvvVVVk.',
+    '..kvvvvvvvvVVk..',
+    '..kVvvvvvVVVVk..',
+    '...kkVVVVVVkk...',
+    '.....kkkkkk.....',
+    '................',
+  ],
+  diamond: [
+    '................',
+    '................',
+    '................',
+    '....kkkkkkkk....',
+    '...kxwxxcxxcCk..',
+    '..kxwxxcxcxxcCk.',
+    '.kkkkkkkkkkkkkk.',
+    '..kcxccccccCCk..',
+    '...kcxcccccCk...',
+    '....kcxcccCk....',
+    '.....kcxcCk.....',
+    '......kcCk......',
+    '.......kk.......',
+    '................',
+    '................',
+    '................',
+  ],
+  uparrow: [
+    '................',
+    '.......kk.......',
+    '......kegk......',
+    '.....keegGk.....',
+    '....keeggGGk....',
+    '...keeegggGGk...',
+    '..keeeggggGGGk..',
+    '.keeegggggGGGGk.',
+    '.kkkkeeggGGkkkk.',
+    '....keeggGGk....',
+    '....keeggGGk....',
+    '....keeggGGk....',
+    '....keeggGGk....',
+    '....kGGGGGGk....',
+    '....kkkkkkkk....',
+    '................',
+  ],
+  gloop: [
+    '................',
+    '................',
+    '...kkkkkkkkkk...',
+    '..kweeeeeeeegk..',
+    '.kwewweeeewwgGk.',
+    '.kewwkkggwwwwGk.',
+    '.kewwkkggwkkwGk.',
+    '.kggwwggggkkgGk.',
+    '.kgmggggggggmGk.',
+    '.kggkkkkkkkkGGk.',
+    '.kggkRRRRRRkGGk.',
+    '.kggGkRppRkGGGk.',
+    '.kGGGGkppkGGGGk.',
+    '.kGGGGGkkGGGGGk.',
+    '..kGkkkkkkkkGk..',
+    '...k........k...',
+  ],
+  grumble: [
+    '................',
+    '.....kkkkkk.....',
+    '...kkAakYYkakk..',
+    '..kAAakkYkaaak..',
+    '..kaaaakkaaaAk..',
+    '.kAAAAAAAAAAAAk.',
+    '..kzZZZzzZZZzk..',
+    'kzkzkkkzzkkkzkzk',
+    'kzkzwkwZZwkwzkzk',
+    '.kkzzzzZZzzzzkk.',
+    '..kzzkkkkkkzzk..',
+    '..kzkzzwzzzkzk..',
+    '.kukkzzzzzzkkuk.',
+    'kuuukkkkkkkkUuuk',
+    'kuuzuuuUuuzuuUuk',
+    'kkzkkkkkkkkkzkkk',
+  ],
+  webby: [
+    '......k..k......',
+    '......kkkk......',
+    '....kkjjqqkk....',
+    '...kjjqqqqqqk...',
+    'k..kwwwqqwwwk..k',
+    '.qqkwkwqqwkwkqq.',
+    '...kwkwqqwkwk...',
+    'kqqkwwwqqwwwkqqk',
+    '...kmqkqqkqmk...',
+    '.qqkqqqkkqqqkqq.',
+    'k..kQqqqqqqQk..k',
+    '....kQQQQQQk....',
+    '...q.kkkkkk.q...',
+    '..k..........k..',
+    '................',
+    '................',
+  ],
+  rocky: [
+    '......ege.......',
+    '.....kkgkkk.....',
+    '....kgeggegk....',
+    '...kgggGggGGk...',
+    '...klgGslgGSk...',
+    '...klsssslsSk...',
+    '.kkknYnssnYnkkk.',
+    'klsknYnssnYnksSk',
+    'kgsklssssssgkgSk',
+    'ksSklksssskGkSSk',
+    '.kkklskkkksSkkk.',
+    '...kSgGsssSSk...',
+    '....kSSSSSSk....',
+    '...kSSk..kSSk...',
+    '...kkkk..kkkk...',
+    '................',
+  ],
+  magma: [
+    '.........kk.....',
+    '..kk....kYk..k..',
+    '.kYk.....k..kFk.',
+    '..k.kkkkkk...k..',
+    '...kFYYFFffk....',
+    '..kFYYFffffOk...',
+    '.kFYwkffffkfOk..',
+    '.kFfkkfffkfkOk..',
+    'kffffffffffffOk.',
+    'kfkfffkkkkkfkOOk',
+    'kffkkkpppkkkfOPk',
+    'kfOOfkkkkkfOOPPk',
+    '.kOOOOOOOOOOPPk.',
+    '.kPPXPPPPPXPPPk.',
+    '..kkkkkkkkkkkk..',
+    '................',
+  ],
+  pip: [
+    '......kkkk......',
+    '....kkyFFykk....',
+    '...kyyFwwFyyk...',
+    '..kyYyyFFyyyok..',
+    '..kyyyyyyyyyok..',
+    '.kooooooooooook.',
+    '..khWWWhhWWWhk..',
+    '..khikhhhhkihk..',
+    '.kHmhhhmmhhhmHk.',
+    '.kWWWWmmmmWWWWk.',
+    '.kWWWWkppkWWWWk.',
+    '.kiWWWWWWWWWWik.',
+    'kuukWWWWWWWWkuuk',
+    'kuyukiWWWWikuyuk',
+    'kuuuukkiikkuuuUk',
+    'kkkkkkkkkkkkkkkk',
+  ],
+});
+
+const ARMOR = ['helmet', 'chestplate', 'leggings', 'boots'];
+
+// A sword whose blade is the given material ('wood'..'diamond').
+export function swordURL(mat, size = 96) { return iconURL('sword', size, matShades(mat)); }
+
+// The pickaxe icon with its head in the given material.
+export function pickURL(mat, size = 96) {
+  const s = matShades(mat);
+  return iconURL('pickaxe', size, { l: s.L, s: s.M, S: s.D });
+}
+
+// One armor piece ('helmet' | 'chestplate' | 'leggings' | 'boots') in a material.
+export function armorURL(piece, mat, size = 96) {
+  return iconURL(ARMOR.includes(piece) ? piece : 'chestplate', size, matShades(mat));
+}
+
+// Crafting materials and special items.
+export function itemURL(id, size = 96) {
+  switch (id) {
+    case 'planks': return tileURL('planks', size);
+    case 'iron': return barURL('iron', size);
+    case 'gold': return barURL('gold', size);
+    case 'stick': case 'string': case 'bow': case 'orb': case 'diamond': return iconURL(id, size);
+    default: return tileURL('mystery', size);
+  }
+}
+
+// Bright green emeralds: the game's special currency.
+export function emeraldURL(size = 96) { return iconURL('gem', size, { c: 0x2fd06a, C: 0x1a8a44, w: 0xc8ffd8 }); }
+
+const MONSTERS = ['gloop', 'grumble', 'webby', 'rocky', 'magma'];
+// The five friendly-goofy monsters.
+export function monsterURL(id, size = 96) { return MONSTERS.includes(id) ? iconURL(id, size) : tileURL('mystery', size); }
+
+// Pip, the old miner who shows the way.
+export function guideURL(size = 96) { return iconURL('pip', size); }
+
+// ---------------------------------------------------------------------------
+// The hero: a full-body kid miner (16 wide x 24 tall) dressed in whatever gear
+// Ezra has equipped. Every part has its own letters, so armor recolours only
+// its own piece and tools/back items never clash with the body:
+//   body  k outline, H/J hair, h skin, E eyes, r blush, m mouth,
+//         T/Q/t shirt (main/light/dark), b belt, P/p trousers, O/o shoes
+//   helmet 1-4, chest seam N, knee L, ninja band R, royal trim Y
+//   held weapon 5/6/7 (light/main/dark), back pickaxe x/y/z
+//   wood c/d/e, bow string S, orb g/v/V + glint w
+// ---------------------------------------------------------------------------
+const HERO_BODY = [
+  '................',
+  '....kkkkkkkk....',
+  '...kHHHHHHHHk...',
+  '...kHHHHHHHJk...',
+  '...kHHHhHHhHk...',
+  '...kHhhhhhhJk...',
+  '...khhEhhEhhk...',
+  '...khhEhhEhhk...',
+  '...khrhmmhrhk...',
+  '....kkkkkkkk....',
+  '..kTTTTTTTTTTk..',
+  '..kTkQTTTTtkTk..',
+  '..kTkQTTTTtkTk..',
+  '..khkQTTTTtkhk..',
+  '..khkTTTTTtkhk..',
+  '..kkkbbbbbbkkk..',
+  '....kPPPPPpk....',
+  '....kPPPPPpk....',
+  '....kPPkkPpk....',
+  '....kPPkkPpk....',
+  '....kPpkkPpk....',
+  '...kOOOkkOOOk...',
+  '...koookkoook...',
+  '...kkkkkkkkkk...',
+];
+
+// Helmet drawn over the hair ('.' = leave the body pixel alone).
+const HERO_HELMET = [
+  '....kkkkkkkk....',
+  '...k11222222k...',
+  '..k1122222223k..',
+  '..k1222222223k..',
+  '..k4414444144k..',
+  '..k2k......k3k..',
+  '..k4k......k4k..',
+  '..kkk......kkk..',
+];
+
+// Sword in the right hand (stamp's top-left sits at x=12, y=4).
+const HERO_SWORD = [
+  '..k.',
+  '.k5k',
+  '.k5k',
+  '.k6k',
+  '.k6k',
+  '.k6k',
+  '.k7k',
+  '.ddd',
+  '.kck',
+  'hhck',
+  'kkck',
+  '.k7k',
+  '..k.',
+];
+
+// Pickaxe in the right hand when there's no sword (top-left at x=11, y=4).
+const HERO_PICK_HAND = [
+  '.kkk.',
+  'k556k',
+  '6kck7',
+  'kkckk',
+  '.kck.',
+  '.kck.',
+  '.kck.',
+  '.kck.',
+  '.kck.',
+  'hhck.',
+  '.kck.',
+  '.kck.',
+  '.kdk.',
+  '..k..',
+];
+
+// With a sword in hand, the pickaxe stands beside the kid's right foot.
+const HERO_PICK_REST = [
+  '.kkk.',
+  'kxxyk',
+  'ykdkz',
+  'kkdkk',
+  '.kdk.',
+  '.kdk.',
+  '..k..',
+];
+
+const HERO_SKINS = {
+  classic: { H: 0x6b4423, J: 0x4a2d16, T: 0x4a7fe0, Q: 0x7aa8ff, t: 0x3058b0, b: 0x5e3b1c, P: 0x3a3f5c, p: 0x262a40, O: 0x7a4a24, o: 0x4e2e14 },
+  explorer: { H: 0x8a5a2e, J: 0x5e3b1c, T: 0x4fa84a, Q: 0x8cd07a, t: 0x2f7a35, b: 0x6b4423, P: 0xc8b07a, p: 0x9a8452, O: 0x6b4423, o: 0x4a2d16 },
+  ninja: { H: 0x24222c, J: 0x121118, T: 0x34323e, Q: 0x55526a, t: 0x1c1b22, b: 0xe0403a, P: 0x34323e, p: 0x1c1b22, O: 0x24222c, o: 0x121118 },
+  royal: { H: 0xe0b040, J: 0xb08420, T: 0x8a4ae0, Q: 0xb58cf0, t: 0x5e2ea8, b: 0xf6c935, P: 0x4a3070, p: 0x2e1c4a, O: 0x7a4a24, o: 0x4e2e14 },
+};
+const HERO_BASE = {
+  k: 0x1e1a24, h: 0xf2c8a0, E: 0x1e1a24, r: 0xf4a090, m: 0xa0503c,
+  R: 0xe0403a, Y: 0xf6c935, c: 0x8a5a2e, d: 0x5e3b1c, e: 0xc99a5b, S: 0xf3eee6,
+  g: 0xdcc2ff, v: 0x9a6ae0, V: 0x6a40b0, w: 0xffffff,
+};
+
+// Paint a small sprite (array of strings) into a char grid at (ox, oy).
+function stamp(grid, rows, ox, oy) {
+  for (let y = 0; y < rows.length; y++) for (let x = 0; x < rows[y].length; x++) {
+    const ch = rows[y][x], gx = x + ox, gy = y + oy;
+    if (ch !== '.' && gx >= 0 && gx < 16 && gy >= 0 && gy < 24) grid[gy][gx] = ch;
+  }
+}
+
+// gear = { helmet, chest, legs, boots, sword, pick, bow, orb, skin }
+// Armor/tool values are 'wood'|'stone'|'iron'|'gold'|'diamond' or null;
+// bow/orb are booleans; skin is 'classic'|'explorer'|'ninja'|'royal'.
+// Returns a PNG data URL `size` wide and size*1.5 tall.
+export function heroURL(gear = {}, size = 192) {
+  const g = gear || {};
+  const key = 'hero:' + JSON.stringify(g) + ':' + size;
+  if (cache.has(key)) return cache.get(key);
+  const col = Object.assign({}, HERO_BASE, HERO_SKINS[g.skin] || HERO_SKINS.classic);
+  const shade = (mat) => (mat ? matShades(mat) : null); // unknown names fall back to iron
+  const grid = Array.from({ length: 24 }, () => Array(16).fill('.'));
+
+  // Holding something in the right hand? Nudge the kid 1px left to make room.
+  const held = g.sword || g.pick;
+  const bx = held ? -1 : 0;
+
+  // --- worn on the back (drawn first; the body covers most of it)
+  if (g.bow) {
+    stamp(grid, [
+      '..k.',
+      '.kek',
+      'kek.',
+      'ek..',
+      'ek..',
+      'dk..',
+      'dk..',
+      'ek..',
+      'ekS.',
+      'ekS.',
+      'ekS.',
+      'kekS',
+      '.kek',
+      '..k.',
+    ], 0, 8);
+  }
+  const restPick = !!(g.pick && g.sword);
+
+  // --- the kid
+  stamp(grid, HERO_BODY, bx, 0);
+  if (g.skin === 'ninja' && !g.helmet) stamp(grid, ['...kRRRRRRRRkR', '............kR'], bx, 4);
+  if (g.skin === 'royal' && !g.chest) stamp(grid, ['...YYYYYYYYYY...'], bx, 10);
+  if (g.helmet) stamp(grid, HERO_HELMET, bx, 0);
+  if (g.chest) stamp(grid, ['.....NNNNNN.....'], bx, 12);
+  if (g.legs) stamp(grid, ['.....L...L......'], bx, 18);
+  if (g.boots) stamp(grid, ['.....OO..OO.....'], bx, 20);
+
+  // --- held in the right hand
+  if (g.sword) stamp(grid, HERO_SWORD, 12, 4);
+  else if (g.pick) stamp(grid, HERO_PICK_HAND, 11, 4);
+  if (restPick) stamp(grid, HERO_PICK_REST, 11, 17);
+  if (g.orb) {
+    if (held) { stamp(grid, ['.kk.', 'kgvk', 'kvVk', '.kk.'], 12, 0); stamp(grid, ['w'], 11, 0); }
+    else { stamp(grid, ['.kk.', 'kgvk', 'kvVk', '.kk.'], 12, 6); stamp(grid, ['w'], 15, 5); }
+  }
+
+  // --- colours: armor recolours just its own piece
+  const hs = shade(g.helmet), cs = shade(g.chest), ls = shade(g.legs), bs = shade(g.boots);
+  if (hs) Object.assign(col, { 1: hs.L, 2: hs.M, 3: hs.N, 4: hs.D });
+  if (cs) Object.assign(col, { T: cs.M, Q: cs.L, t: cs.D, N: cs.N });
+  if (ls) Object.assign(col, { P: ls.M, p: ls.D, L: ls.L });
+  if (bs) Object.assign(col, { O: bs.M, o: bs.D });
+  const ws = shade(g.sword || g.pick);
+  if (ws) Object.assign(col, { 5: ws.L, 6: ws.M, 7: ws.D });
+  if (restPick) { const ps = shade(g.pick); Object.assign(col, { x: ps.L, y: ps.M, z: ps.D }); }
+
+  const src = document.createElement('canvas');
+  src.width = 16; src.height = 24;
+  const ctx = src.getContext('2d');
+  for (let y = 0; y < 24; y++) for (let x = 0; x < 16; x++) {
+    const c = col[grid[y][x]];
+    if (c !== undefined) px(ctx, x, y, rgb(c));
+  }
+  const out = document.createElement('canvas');
+  out.width = size; out.height = Math.round(size * 1.5);
+  const octx = out.getContext('2d');
+  octx.imageSmoothingEnabled = false;
+  octx.drawImage(src, 0, 0, out.width, out.height);
+  cache.set(key, out.toDataURL());
+  return cache.get(key);
+}
