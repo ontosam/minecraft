@@ -27,14 +27,15 @@
       <div class="hud-row">
         <button id="btn-settings" class="round" aria-label="Settings"></button>
         <div class="pill gold" id="pill-gold"><img alt=""><b id="gold">0</b><small id="gps">+0/s</small></div>
-        <div class="pill bricks" id="pill-bricks"><img alt=""><b id="bricks">0</b></div>
-        <div class="pill gems" id="pill-gems"><img alt=""><b id="gems">0</b></div>
+        <div class="pill bricks" id="pill-bricks"><img alt=""><b id="bricks">0</b><span class="plus">+</span></div>
+        <div class="pill gems" id="pill-gems"><img alt=""><b id="gems">0</b><span class="plus">+</span></div>
         <button id="btn-rush" aria-label="Gold Rush"><span class="ring"></span><img alt=""><b>x2</b><small id="rush-time"></small></button>
       </div>
       <div class="hud-row level-row">
         <div id="lvl-badge"><small>LVL</small><b id="lvl">1</b></div>
         <div id="xpbar"><div id="xpfill"></div><span id="xptext">0 / 10</span></div>
         <div id="cave-name"></div>
+        <button id="btn-pass" aria-label="Super Miner Pass"></button>
       </div>
       <button id="goal" aria-label="Next goal"><img id="goal-img" alt=""><span id="goal-text"></span><span id="goal-prog"><i></i></span><b id="goal-claim">Collect!</b></button>
     </header>
@@ -56,7 +57,7 @@
           <span id="mine-taps"></span>
           <img id="mine-pick" alt="">
         </button>
-        <div id="spark" title="Spark bar: fills as you mine"><img alt=""><div id="sparkbar"><i></i></div></div>
+        <div id="energy"><img alt=""><div id="energybar"><i></i><span id="energy-num"></span></div><button id="energy-plus" aria-label="Get energy">+</button></div>
       </div>
       <div id="stations-b" class="stations"></div>
       </div>
@@ -92,6 +93,21 @@
       <div id="cel-text"></div>
       <div id="cel-extra"></div>
       <div id="cel-buttons"><button id="cel-ok">Yay!</button></div>
+    </div>
+  </div>
+
+  <!-- Pretend checkout: a toy "game card" (numbers starting 0000). Nothing is
+       charged, saved or sent anywhere. -->
+  <div id="checkout" class="hidden" role="dialog">
+    <div class="co-box">
+      <div class="co-head"><span>Checkout</span><button id="co-close" aria-label="Cancel">✕</button></div>
+      <div class="co-item"><img id="co-img" alt=""><div class="co-info"><b id="co-name"></b><small id="co-what"></small></div><b id="co-price"></b></div>
+      <div class="co-card"><div class="co-chip"></div><div id="co-digits"></div><small>GAME CARD</small></div>
+      <div id="co-msg">Type the number on your card</div>
+      <div id="co-pad"></div>
+      <button id="co-buy">Buy</button>
+      <div id="co-busy"><div class="spinner"></div><b>Processing…</b></div>
+      <div id="co-done"><div class="tick">✓</div><b>Purchase complete!</b><small>Thank you!</small></div>
     </div>
   </div>
 

@@ -118,6 +118,15 @@ export class Sound {
         break;
       case 'smelt': this.crunch(0.25, 220, 0.12); this.tone(300, 0.2, 'sine', 0.06, 380); break;
       case 'craft': this.crunch(0.06, 1200, 0.18); this.tone(880, 0.1, 'triangle', 0.1, 0, 0.06); break;
+      case 'key': this.tone(900 + Math.random() * 80, 0.04, 'square', 0.04); break;
+      case 'process': [0, 0.35, 0.7, 1.05].forEach((d) => this.tone(700, 0.05, 'sine', 0.06, 0, d)); break;
+      case 'kaching': // a cheerful cash-register "ka-ching"
+        this.crunch(0.05, 2500, 0.15);
+        this.tone(1568, 0.08, 'square', 0.06, 0, 0.04);
+        this.tone(2093, 0.35, 'triangle', 0.12, 0, 0.1);
+        this.tone(2637, 0.3, 'sine', 0.08, 0, 0.16);
+        break;
+      case 'empty': this.tone(330, 0.12, 'triangle', 0.1, 200); this.tone(220, 0.2, 'triangle', 0.08, 140, 0.1); break;
     }
   }
 }

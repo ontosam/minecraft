@@ -11,6 +11,8 @@ let seed = 12345;
 const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
 const g = new Game(null, { rand });
 const s = g.s;
+// ENERGY=1 plays with the energy limit on and never "buys" (the robot waits).
+s.settings = { energy: !!process.env.ENERGY };
 const fmt = (n) => n >= 1e9 ? (n / 1e9).toFixed(1) + 'B' : n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'k' : Math.round(n) + '';
 const mm = (t) => `${Math.floor(t / 3600)}h${String(Math.floor(t / 60) % 60).padStart(2, '0')}m`;
 const log = [];

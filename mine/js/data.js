@@ -216,3 +216,37 @@ export const QUESTS = [
 // coming back tomorrow.
 export const OFFLINE_RATE = 0.5;
 export function offlineCapSecs() { return 12 * 3600; }
+
+// --- Pretend store ----------------------------------------------------------
+// Everything here is make-believe: prices are shown in pretend dollars and the
+// checkout only accepts a toy "game card" whose number starts with 0000.
+// Nothing is ever charged, saved or sent anywhere.
+export const CARD_PREFIX = '0000';
+export const CARD_DIGITS = 16;
+
+// Energy: every block you break uses 1. It refills by itself over time
+// (grown-ups can switch it off in the grown-ups corner).
+export const ENERGY = { max: 60, regenSecs: 20, passMax: 90, passRegenSecs: 12, gemRefill: 5 };
+
+export const STORE_TABS = [
+  { id: 'gems', name: 'Gems' },
+  { id: 'energy', name: 'Energy' },
+  { id: 'boost', name: 'Boosts' },
+  { id: 'chests', name: 'Chests' },
+  { id: 'pass', name: 'Pass' },
+];
+export const STORE = [
+  { id: 'gems20', tab: 'gems', name: 'Handful of Gems', gems: 20, price: 0.99 },
+  { id: 'gems120', tab: 'gems', name: 'Bag of Gems', gems: 120, price: 4.99, tag: 'POPULAR' },
+  { id: 'gems300', tab: 'gems', name: 'Chest of Gems', gems: 300, price: 9.99, tag: 'BEST VALUE' },
+  { id: 'gems800', tab: 'gems', name: 'Mountain of Gems', gems: 800, price: 19.99, tag: 'MEGA' },
+  { id: 'bricks200', tab: 'gems', name: 'Pile of Bricks', bricks: 200, price: 1.99 },
+  { id: 'energy', tab: 'energy', name: 'Energy Refill', refill: true, price: 0.99 },
+  { id: 'unlimited', tab: 'energy', name: 'Unlimited Energy', unlimited: true, price: 9.99, once: true, tag: 'FOREVER' },
+  { id: 'rush5', tab: 'boost', name: 'Gold Rush x2', rush: 300, price: 0.99 },
+  { id: 'rush30', tab: 'boost', name: 'Mega Gold Rush x2', rush: 1800, price: 2.99, tag: '30 MIN' },
+  { id: 'mystery', tab: 'chests', name: 'Mystery Chest', chest: 'small', price: 0.99 },
+  { id: 'mega', tab: 'chests', name: 'Mega Chest', chest: 'mega', price: 4.99, tag: 'RARE' },
+  { id: 'pass', tab: 'pass', name: 'Super Miner Pass', pass: true, price: 4.99, once: true },
+];
+export function storeItem(id) { return STORE.find((x) => x.id === id); }

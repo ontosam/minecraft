@@ -225,8 +225,64 @@ const grey = await J(`(() => { const b = document.querySelector('#panel-body .bu
 if (grey) { await p.tap(grey.x, grey.y); await p.sleep(200); ok(await E(`document.getElementById('toast').classList.contains('show')`), 'tapping a grey button explains why'); }
 await E(`__mine.closePanel()`);
 
+console.log('15c. Pretend store + game card');
+await E(`(() => { __mine.dismiss(); __mine.closePanel(); const g = __mine.game, s = g.s; s.gems = 1; s.purchases = []; s.cardSpent = 0; s.iap = {}; s.settings.cardLimit = 0; s.settings.energy = true; s.energy = 30; })()`);
+await p.sleep(300);
+const typeCard = async (num) => { for (const d of num) { const k = await J(`(() => { const b = [...document.querySelectorAll('#co-pad button')].find(b => b.textContent === '${d}'); const r = b.getBoundingClientRect(); return {x: r.left + r.width/2, y: r.top + r.height/2}; })()`); await p.tap(k.x, k.y, 15); } };
+await p.sleep(200);
+const gp = await center('#pill-gems');
+await p.tap(gp.x, gp.y); await p.sleep(400);
+ok(await E(`document.getElementById('panel-title').textContent === 'Gem Store'`), 'tapping the gems + opens the Gem Store');
+let pr = await center('#panel-body .row .price');
+await p.tap(pr.x, pr.y); await p.sleep(400);
+ok(await E(`!document.getElementById('checkout').classList.contains('hidden')`), 'tapping a price opens checkout');
+await typeCard('4111111111111111');
+let buy = await center('#co-buy');
+await p.tap(buy.x, buy.y); await p.sleep(300);
+ok((await J(`__mine.game.s.gems`)) === 1 && (await E(`document.getElementById('co-msg').textContent`)).includes('declined'), 'a real-looking card number is declined (no gems)');
+await typeCard('0000000012345678');
+await p.tap(buy.x, buy.y); await p.sleep(400);
+ok(await E(`document.getElementById('checkout').classList.contains('busy')`), 'shows Processing…');
+await p.sleep(1800);
+ok((await J(`__mine.game.s.gems`)) === 21, 'a 0000 game card buys 20 gems');
+const hist = await J(`__mine.game.s.purchases`);
+ok(hist.length === 1 && hist[0].last4 === '5678' && !JSON.stringify(await J('__mine.game.s')).includes('000000001234'), 'only the last 4 digits are kept');
+await p.sleep(1400);
+ok(await E(`document.getElementById('checkout').classList.contains('hidden')`), 'checkout closes after the purchase');
+// card limit
+await E(`(() => { __mine.game.s.settings.cardLimit = 10; __mine.game.s.cardSpent = 9.5; })()`);
+await E(`__mine.openCheckout('gems20')`); await p.sleep(450);
+await typeCard('0000111122223333');
+buy = await center('#co-buy');
+await p.tap(buy.x, buy.y); await p.sleep(300);
+ok((await E(`document.getElementById('co-msg').textContent`)).includes('not enough money'), 'the grown-ups card limit declines politely');
+await E(`(() => { const c = document.getElementById('co-close'); c.click(); __mine.game.s.settings.cardLimit = 0; })()`);
+await E(`__mine.closePanel()`); await p.sleep(200);
+// out of energy -> refill through checkout
+await E(`(() => { __mine.dismiss(); __mine.game.s.energy = 0; __mine.game.s.mineHp = 3; })()`); await p.sleep(200);
+await p.tap(mine.x, mine.y); await p.sleep(600);
+ok(await E(`document.getElementById('cel-title').textContent === 'OUT OF ENERGY!'`), 'out of energy shows the refill prompt');
+ok((await J(`__mine.game.s.mineHp`)) === 3, 'a tap with no energy does nothing to the block');
+await p.sleep(450);
+const refill = await center('#cel-ok');
+await p.tap(refill.x, refill.y); await p.sleep(500);
+ok(await E(`!document.getElementById('checkout').classList.contains('hidden')`), 'Refill opens checkout');
+await typeCard('0000000000000001');
+buy = await center('#co-buy');
+await p.tap(buy.x, buy.y); await p.sleep(2200);
+ok((await J(`__mine.game.s.energy`)) >= 60, 'energy refilled after the pretend purchase');
+await p.sleep(1300);
+// pass, unlimited, mystery chest (rules only)
+await E(`(() => { const g = __mine.game; g.grant('pass', '0001', Date.now()); g.grant('unlimited', '0001', Date.now()); g.grant('mystery', '0001', Date.now()); __mine.dismiss(); })()`);
+await p.sleep(300);
+ok(await E(`document.getElementById('btn-pass').classList.contains('owned')`), 'Super Miner Pass shows the gold badge');
+ok(!(await E(`__mine.game.energyOn()`)) && (await E(`document.getElementById('energy-num').textContent`)) === '∞', 'Unlimited Energy shows ∞');
+ok((await J(`__mine.game.s.purchases.length`)) === 5, 'purchase history has every pretend purchase');
+await E(`__mine.openPanel('parent')`); await p.sleep(200);
+await E(`__mine.closePanel()`);
+
 console.log('15. Every panel renders');
-for (const id of ['workshop', 'furnace', 'shop', 'village', 'quests', 'book', 'chest']) {
+for (const id of ['workshop', 'furnace', 'shop', 'village', 'quests', 'book', 'chest', 'store']) {
   await E(`__mine.openPanel('${id}')`); await p.sleep(150);
   ok(await E(`document.getElementById('panel-body').children.length > 0`), `${id} panel has content`);
   await p.shot(`${SHOTS}/15-${id}.png`);

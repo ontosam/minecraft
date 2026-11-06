@@ -89,9 +89,15 @@ pass. Details and rationale in CLAUDE.md.
 pick **⛏️ Ezra's Mine** in the 🌍 Worlds menu)
 
 An original tap-and-merge mining game in the same style as the mobile games
-Ezra likes — but with **nothing to buy, no ads, no energy limits, and nothing
-designed to keep him hooked**. Tap the big block to dig; drag two matching
-blocks together to make a bigger one (20 to discover, Dirt → Star Block);
-blocks earn gold for better pickaxes, a mole helper called Digby, a furnace and
-a little village. Words can be read aloud. **Grown-ups:** tap ⚙️ and hold the
-circle for 3 seconds for sound, read-aloud and an optional break reminder.
+Ezra likes. Tap the big block to dig; drag two matching blocks together to make
+a bigger one (20 to discover, Dirt → Star Block); blocks earn gold for better
+pickaxes, a mole helper called Digby, a furnace and a little village.
+
+**The store is pretend.** Gem packs, energy refills, chests and a Super Miner
+Pass have pretend prices; checkout asks for a "game card" number and only
+accepts 16 digits starting **0000** (anything else is declined). No real money
+is involved and the number is never saved or sent anywhere.
+
+**Grown-ups:** tap ⚙️, hold the circle for 3 seconds and answer the sum. There
+you can turn the energy limit on/off, set a pretend card limit, see every
+pretend purchase, set a break reminder, and change sound / read-aloud.

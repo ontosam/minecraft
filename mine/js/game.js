@@ -7,7 +7,15 @@ import {
   PICKAXES, PICK_RECIPES, UPGRADES, INGOTS, BUILDINGS, shopPrice, POWERS,
   chestEvery, QUESTS, offlineCapSecs, OFFLINE_RATE, caveFor, DROP_GAP, depthNeed,
   SPARK_FULL, RUSH_FULL, RUSH_SECS, wellEvery,
+  ENERGY, CARD_PREFIX, CARD_DIGITS, storeItem,
 } from './data.js';
+
+// A pretend game card is valid when it is exactly 16 digits starting 0000.
+// (No real card number starts with 0000, so a real one is always declined.)
+export function validateCard(digits) {
+  const d = String(digits || '').replace(/\D/g, '');
+  return d.length === CARD_DIGITS && d.startsWith(CARD_PREFIX);
+}
 
 export const SAVE_KEY = 'ezramine.save.v1';
 export const N_CELLS = COLS * ROWS;
@@ -42,6 +50,11 @@ export function freshState() {
     rush: 0,                            // fills as you merge -> Gold Rush
     wellN: 0,                           // merges counted toward the next well gem
     won: 0,
+    energy: ENERGY.max,                 // breaking a block uses 1; refills over time
+    energyT: 0,
+    iap: {},                            // pretend-store unlocks: { unlimited, pass }
+    purchases: [],                      // pretend purchase history { id, price, t, last4 }
+    cardSpent: 0,                       // pretend dollars spent (for the optional card limit)
     booms: 0,                           // Boom Blocks kept in the chest
     quest: 0,                           // index of the first quest not yet claimed
     claimed: {},                        // quest index -> 1
@@ -68,6 +81,10 @@ export class Game {
     if (this.s.store && this.s.store.boom) { this.s.booms = (this.s.booms || 0) + this.s.store.boom; delete this.s.store.boom; }
     for (const k of Object.keys(this.s.store || {})) if (!/^(b\d+|i:\w+)$/.test(k) || !(this.s.store[k] > 0)) delete this.s.store[k];
     if (typeof this.s.booms !== 'number' || !(this.s.booms >= 0)) this.s.booms = 0;
+    if (!this.s.iap || typeof this.s.iap !== 'object') this.s.iap = {};
+    if (!Array.isArray(this.s.purchases)) this.s.purchases = [];
+    if (typeof this.s.energy !== 'number' || !(this.s.energy >= 0)) this.s.energy = ENERGY.max;
+    if (!(this.s.cardSpent >= 0)) this.s.cardSpent = 0;
     this.rand = opts.rand || Math.random;
     this.on = opts.on || (() => {});
   }
@@ -78,7 +95,21 @@ export class Game {
   get pickaxe() { return PICKAXES[this.s.pick]; }
   villageLv(id) { return this.s.village[id] || 0; }
   goldMult() {
-    return (1 + 0.1 * this.villageLv('hut')) * (1 + 0.25 * this.villageLv('castle')) * (this.s.boostLeft > 0 ? 2 : 1);
+    return (1 + 0.1 * this.villageLv('hut')) * (1 + 0.25 * this.villageLv('castle')) * (this.s.boostLeft > 0 ? 2 : 1) * (this.s.iap.pass ? 2 : 1);
+  }
+
+  // ------------------------------------------------------------- energy
+  energyOn() { return !(this.s.settings && this.s.settings.energy === false) && !this.s.iap.unlimited; }
+  energyMax() { return this.s.iap.pass ? ENERGY.passMax : ENERGY.max; }
+  energyRegenSecs() { return this.s.iap.pass ? ENERGY.passRegenSecs : ENERGY.regenSecs; }
+  secsToNextEnergy() { return Math.max(0, this.energyRegenSecs() - this.s.energyT); }
+  refillEnergy() { this.s.energy = Math.max(this.s.energy, this.energyMax()); this.s.energyT = 0; this.emit('energy', { full: true }); }
+  refillWithGems() {
+    const s = this.s;
+    if (s.gems < ENERGY.gemRefill) { this.emit('deny', { reason: 'gems' }); return false; }
+    s.gems -= ENERGY.gemRefill;
+    this.refillEnergy();
+    return true;
   }
   isOpen(i) { return UNLOCK_ORDER.indexOf(i) < openCells(this.s.level); }
   unlockLevel(i) { // level at which cell i opens
@@ -151,6 +182,7 @@ export class Game {
   tapMine(auto = false) {
     const s = this.s;
     if (auto && !this.emptyCells().length) return { full: true }; // the mole waits politely
+    if (this.energyOn() && s.energy < 1) { if (!auto) this.emit('noEnergy', {}); return { noEnergy: true }; }
     if (!auto) s.stats.taps++;
     s.mineHp -= 1;
     this.emit('hit', { auto, hp: s.mineHp, max: this.pickaxe.taps });
@@ -158,6 +190,7 @@ export class Game {
     // Block breaks!
     s.mineHp = this.pickaxe.taps;
     s.stats.mined++;
+    if (this.energyOn()) s.energy = Math.max(0, s.energy - 1);
     this.addXP(MINE_XP);
     const superSwing = s.spark >= SPARK_FULL;
     if (superSwing) { s.spark = 0; s.stats.supers++; } else s.spark++;
@@ -567,6 +600,13 @@ export class Game {
     s.gold += this.gps() * dt;
     s.chestT += dt;
     if (s.boostLeft > 0) s.boostLeft = Math.max(0, s.boostLeft - dt);
+    // energy trickles back
+    if (s.energy < this.energyMax()) {
+      s.energyT += dt;
+      const r = this.energyRegenSecs();
+      while (s.energyT >= r && s.energy < this.energyMax()) { s.energyT -= r; s.energy++; }
+      if (s.energy >= this.energyMax()) s.energyT = 0;
+    } else s.energyT = 0;
     // the mole helper
     const iv = this.helperInterval();
     if (iv > 0) {
@@ -598,11 +638,63 @@ export class Game {
     if (!s.lastSeen) { s.lastSeen = now; return 0; }
     const away = Math.max(0, (now - s.lastSeen) / 1000);
     s.lastSeen = now;
+    // energy refills while away, too
+    if (s.energy < this.energyMax()) s.energy = Math.min(this.energyMax(), s.energy + Math.floor(away / this.energyRegenSecs()));
     if (away < 300) return 0;
     const secs = Math.min(away, offlineCapSecs());
     const g = OFFLINE_RATE * this.baseGps() * (1 + 0.1 * this.villageLv('hut')) * (1 + 0.25 * this.villageLv('castle')) * secs;
     s.gold += g;
     return g;
+  }
+
+  // ------------------------------------------------------- pretend store
+  // Would the pretend card be declined? (the grown-ups can set a card limit)
+  declineReason(price) {
+    const lim = this.s.settings && this.s.settings.cardLimit;
+    if (lim && this.s.cardSpent + price > lim + 1e-9) return 'limit';
+    return null;
+  }
+  owns(id) { const it = storeItem(id); return !!(it && it.once && (it.pass ? this.s.iap.pass : it.unlimited ? this.s.iap.unlimited : false)); }
+  // Called after a successful pretend checkout: hand over what was bought.
+  grant(id, last4, now) {
+    const s = this.s, it = storeItem(id);
+    if (!it || this.owns(id) || this.declineReason(it.price)) return false;
+    s.purchases.push({ id, name: it.name, price: it.price, t: now || 0, last4: String(last4 || '').slice(-4) });
+    if (s.purchases.length > 200) s.purchases.splice(0, s.purchases.length - 200);
+    s.cardSpent = Math.round((s.cardSpent + it.price) * 100) / 100;
+    const got = { id, gems: 0, bricks: 0, gold: 0, blocks: [] };
+    if (it.gems) { s.gems += it.gems; got.gems = it.gems; }
+    if (it.bricks) { s.bricks += it.bricks; got.bricks = it.bricks; }
+    if (it.refill) this.refillEnergy();
+    if (it.unlimited) { s.iap.unlimited = 1; s.energy = this.energyMax(); }
+    if (it.rush) s.boostLeft += it.rush;
+    if (it.pass) { s.iap.pass = 1; s.gems += 10; got.gems = 10; s.energy = Math.max(s.energy, this.energyMax()); }
+    if (it.chest) Object.assign(got, this.storeChest(it.chest));
+    this.emit('purchased', { item: it, got });
+    for (const b of got.blocks) if (b.t) this.discover(b.t);
+    return got;
+  }
+  // A bought chest: blocks a little bigger than the mine gives, plus treats.
+  // Blocks never go past your best block (so no discoveries are skipped).
+  storeChest(kind) {
+    const s = this.s, mega = kind === 'mega';
+    const gold = Math.max(200, Math.round(this.baseGps() * this.goldMult() * (mega ? 300 : 60)));
+    const gems = mega ? 25 : 5, bricks = mega ? 40 : 8;
+    s.gold += gold; s.gems += gems; s.bricks += bricks;
+    const blocks = [];
+    const n = mega ? 6 : 3;
+    for (let k = 0; k < n; k++) {
+      const t = Math.min(s.maxTier, this.dropTier() + (mega ? 2 : 1) + (this.rand() < 0.5 ? 1 : 0));
+      const cell = this.placeFor(t);
+      if (cell < 0) { s.store['b' + t] = (s.store['b' + t] || 0) + 1; blocks.push({ stored: true, t }); continue; }
+      s.board[cell] = { t };
+      blocks.push({ cell, t });
+    }
+    if (mega) {
+      const cell = this.placeFor(0);
+      if (cell >= 0) { s.board[cell] = { boom: 1 }; blocks.push({ cell, boom: true }); } else { s.booms++; blocks.push({ stored: true, boom: true }); }
+    }
+    return { gold, gems, bricks, blocks };
   }
 
   serialize(now) {

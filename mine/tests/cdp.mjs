@@ -11,6 +11,10 @@ export async function launch({ width = 820, height = 1180, mobile = true, touch 
     '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
     '--autoplay-policy=no-user-gesture-required', '--hide-scrollbars', 'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
+  // Never leave a browser running if the test script crashes or exits early.
+  const kill = () => { try { proc.kill('SIGKILL'); } catch {} };
+  process.once('exit', kill);
+  process.once('uncaughtException', (e) => { kill(); console.error(e); process.exit(1); });
   let wsUrl;
   for (let i = 0; i < 100 && !wsUrl; i++) {
     await new Promise((r) => setTimeout(r, 100));

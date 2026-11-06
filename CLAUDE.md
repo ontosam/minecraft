@@ -1703,6 +1703,51 @@ back. Zero changes to the Blocks game otherwise.
   and mine discoveries unlocking blocks in Ezra's Blocks (same origin →
   shared localStorage).
 
+## Status (session 48b) — 🛒 Ezra's Mine: the pretend store + toy game card
+Dad loved the mine and asked to make it feel like the real thing: **"for paid
+items… he actually enters a card number to tap buy… not a real card but any 16
+digit if the first 4 digits are 0000. I gave him a game card that starts with
+0000-0000. Keep the addictive aspects that drove him toward buying."** (His
+call as the parent; I flagged once that card-entry + an energy squeeze is the
+exact loop that drove the asks, and added grown-ups controls so he stays in
+charge.) Same branch, mirrored to `main`.
+- **Checkout (`#checkout`, main.js `openCheckout`/`coKey`/`coBuy`):** a
+  generic, original "Checkout" sheet (no real payment brand) with the item, a
+  pretend card graphic that fills in as he types, a **big on-screen keypad**
+  (laptop keys work too), "Buy for $X" → **Processing…** (1.6 s) → **Purchase
+  complete! ✓** + a ka-ching. `validateCard` (game.js) accepts only **16 digits
+  starting `0000`** (`CARD_PREFIX`); any other number → "Card declined" (no
+  real card number starts 0000). **The number is never saved or sent** — the
+  digits are cleared on decline/buy and only the **last 4** go into
+  `s.purchases`.
+- **Store (`PANELS.store`, tabs Gems/Energy/Boosts/Chests/Pass;
+  `STORE` in data.js, pretend $):** gem packs (20/120/300/800 = $0.99–$19.99,
+  POPULAR/BEST VALUE ribbons), Pile of Bricks, Energy Refill, **Unlimited
+  Energy** (one-time), Gold Rush x2 (5/30 min), Mystery/Mega Chests (blocks
+  never above your best tier, so no discoveries are skipped), **Super Miner
+  Pass** (one-time: x2 gold forever, more/faster energy, +10 gems, gold HUD
+  badge). Entry points: **"+" on the gem & brick pills**, the **⭐ PASS badge**
+  (HUD row 2, where the original's paid badge sat), the energy "+", the Shop
+  station, the Gold Rush jar when not full, and the OUT OF ENERGY card.
+  `game.grant(id,last4,now)` applies items (refuses one-time repeats and
+  anything over the card limit).
+- **Energy (`ENERGY` in data.js):** every broken block uses 1 (mole too); max
+  60 (pass 90), +1 per 20 s (pass 12 s), refills while away. Tapping with 0
+  → **OUT OF ENERGY!** card: Refill $0.99 / Use 5 💜 / Wait. Replaces the
+  old Spark *bar* (the Super Swing still happens silently every 11th break).
+  Sim: energy on & never buying → Star Block ~11 h vs ~4 h without the limit
+  (`ENERGY=1 node mine/tests/sim.mjs 24 1.5 1.8`).
+- **Grown-ups corner additions:** **Energy limit On/Off**, **Pretend card limit**
+  (None/$10/$25/$50 → "Card declined — not enough money left on this card"),
+  pretend-money-spent + Reset, and a **🧾 purchase history** (item, time,
+  price, ••last4). Break reminder etc. unchanged.
+- **Fixes found while testing:** secondary buttons on pop-up cards were tiny
+  (now big); the 0.4 s tap-grace guard now uses `stopImmediatePropagation`
+  and the backdrop/checkout close also honours it; the CDP driver now kills its
+  browser if a test crashes (stray browsers were starving the CPU).
+  **e2e: 103 checks** (+15 store/energy: decline, buy, last-4-only, limit,
+  out-of-energy → refill checkout, unlimited ∞, pass badge, history).
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept
