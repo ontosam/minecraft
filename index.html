@@ -28,21 +28,54 @@
   <div id="ui">
     <div id="crosshair"></div>
 
+    <!-- Buttons grouped by what they do (each .tg cluster has a small gap, with a
+         bigger gap between clusters) so the bar reads as tidy groups, not a jumble. -->
     <div id="topbar">
-      <button id="btn-home" class="mini" title="Go home">🏠</button>
-      <button id="btn-goals" class="mini" title="Goals">⭐0</button>
-      <button id="btn-mine" class="mini" title="Ezra's Mine">⛏️</button>
+      <div class="tg">
+        <button id="btn-home" class="mini" title="Go home">🏠</button>
+        <button id="btn-worlds" class="mini" title="Go to a world">🌍</button>
+      </div>
+      <div class="tg">
+        <button id="btn-goals" class="mini" title="Goals">⭐0</button>
+        <button id="btn-adventure" class="mini" title="Adventure with friends">📖</button>
+        <button id="btn-quest" class="mini" title="The Great Quest" style="display:none">📜</button>
+      </div>
+      <div class="tg">
+        <button id="btn-view" class="mini" title="Switch view (zoom)">🔍</button>
+        <button id="btn-fly" class="mini" title="Fly">🕊️</button>
+        <button id="btn-night" class="mini" title="Day / Night">🌙</button>
+      </div>
+      <div class="tg">
+        <button id="btn-char" class="mini" title="Choose your character">🙂</button>
+        <button id="btn-buildkit" class="mini" title="Build something big">🏗️</button>
+        <button id="btn-fish" class="mini" title="Go fishing (near water)">🎣</button>
+        <button id="btn-flint" class="mini" title="Flint & steel — make a portal">🔥</button>
+      </div>
+      <div class="tg" id="tg-vehicles">
+        <button id="btn-ride" class="mini" title="Ride your pony" style="display:none">🐴</button>
+        <button id="btn-rover" class="mini" title="Drive the Space Rover" style="display:none">🛸</button>
+        <button id="btn-rocket" class="mini" title="Launch the rocket!" style="display:none">🚀</button>
+        <button id="btn-dragon" class="mini" title="Fly your dragon" style="display:none">🐉</button>
+      </div>
       <button id="btn-blocks" title="Pick a block"></button>
     </div>
 
+    <div id="hearts-bar"></div>
+    <div id="dreamgoal" style="display:none"></div>
+    <button id="gem-bar" title="Treasure shop"></button>
+    <div id="inv-bar" style="display:none"></div>
+
     <div id="actions">
-      <button id="btn-pet" class="act pet"><span>🐾</span><b>Pet</b></button>
       <button id="btn-jump" class="act jump"><span>⬆️</span><b>Jump</b></button>
       <button id="btn-dig" class="act dig"><span>⛏️</span><b>Dig</b></button>
       <button id="btn-build" class="act build"><span>🧱</span><b>Build</b></button>
     </div>
 
     <div id="goaltoast"></div>
+    <div id="hurt-flash"></div>
+    <div id="bobber"></div>
+    <div id="ridesigns"></div>
+    <div id="dreammarkers"></div>
   </div>
 
   <div id="picker" class="hidden">
@@ -56,8 +89,167 @@
     <div class="picker-panel">
       <div class="picker-head"><span id="goals-title">My Goals</span><button id="goals-close">✕</button></div>
       <div id="goals-body"></div>
+      <button id="btn-reset">🔄 Start this world fresh…</button>
     </div>
   </div>
+
+  <div id="shop" class="hidden">
+    <div class="picker-panel">
+      <div class="picker-head"><span>💎 Treasure Shop</span><button id="shop-close">✕</button></div>
+      <div id="shop-gems"></div>
+      <div id="shop-body"></div>
+    </div>
+  </div>
+
+  <div id="craft" class="hidden">
+    <div class="picker-panel">
+      <div class="picker-head"><span>🛠️ Make Tools & Armor</span><button id="craft-close">✕</button></div>
+      <div id="craft-inv"></div>
+      <div id="craft-body"></div>
+    </div>
+  </div>
+
+  <div id="furnace" class="hidden">
+    <div class="picker-panel">
+      <div class="picker-head"><span>🔥 Furnace</span><button id="furnace-close">✕</button></div>
+      <div id="furnace-inv"></div>
+      <div id="furnace-body"></div>
+    </div>
+  </div>
+
+  <div id="quest2" class="hidden">
+    <div class="picker-panel">
+      <div class="picker-head"><span>📜 Journey to the Deep</span><button id="quest2-close">✕</button></div>
+      <div id="quest2-msg"></div>
+      <div id="quest2-body"></div>
+    </div>
+  </div>
+
+  <div id="confirm" class="hidden">
+    <div class="picker-panel confirm-panel">
+      <div id="confirm-msg"></div>
+      <div class="confirm-row">
+        <button id="confirm-no">No, keep it</button>
+        <button id="confirm-yes" class="danger-btn">Yes, start fresh</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="buildmenu" class="hidden">
+    <div class="picker-panel">
+      <div class="picker-head"><span>Build something big! 🏗️</span><button id="buildmenu-close">✕</button></div>
+      <div id="buildmenu-body"></div>
+    </div>
+  </div>
+
+  <div id="placebar" class="hidden">
+    <div id="place-label"></div>
+    <div class="place-btns">
+      <button id="place-ok" class="happy-btn">✅ Build here!</button>
+      <button id="place-cancel">✖ Cancel</button>
+    </div>
+  </div>
+
+  <div id="worldmenu" class="hidden">
+    <div class="picker-panel">
+      <div class="picker-head"><span>Go to a world! 🌍</span><button id="worldmenu-close">✕</button></div>
+      <div id="worldmenu-body"></div>
+    </div>
+  </div>
+
+  <div id="ride" class="hidden">
+    <div class="picker-panel confirm-panel">
+      <div id="ride-title" class="adv-name"></div>
+      <div id="ride-msg" class="adv-text"></div>
+      <div class="confirm-row"><button id="ride-yes" class="happy-btn">Ride! 🎟️</button><button id="ride-no">Not now</button></div>
+    </div>
+  </div>
+
+  <div id="portalmenu" class="hidden">
+    <div class="picker-panel">
+      <div class="picker-head"><span>Where to? 🔥</span><button id="portalmenu-close">✕</button></div>
+      <div id="portalmenu-body"></div>
+    </div>
+  </div>
+
+  <div id="ridemenu" class="hidden">
+    <div class="picker-panel">
+      <div class="picker-head"><span>🎟️ Pick a ride!</span><button id="ridemenu-close">✕</button></div>
+      <div id="ridemenu-body"></div>
+    </div>
+  </div>
+
+  <div id="popcorn" class="hidden">
+    <div class="picker-panel">
+      <div class="picker-head"><span>🍿 Yummy treats!</span><button id="popcorn-close">✕</button></div>
+      <div id="popcorn-body"></div>
+    </div>
+  </div>
+
+  <div id="adventure" class="hidden">
+    <div class="picker-panel confirm-panel">
+      <div id="adv-body"></div>
+      <div class="confirm-row"><button id="adv-ok" class="happy-btn">Okay!</button></div>
+    </div>
+  </div>
+
+  <div id="quest" class="hidden">
+    <div class="picker-panel confirm-panel">
+      <div id="quest-msg"></div>
+      <div class="confirm-row"><button id="quest-ok" class="happy-btn">Okay!</button></div>
+    </div>
+  </div>
+
+  <div id="astro" class="hidden">
+    <div class="picker-panel confirm-panel">
+      <div id="astro-msg"></div>
+      <div class="confirm-row"><button id="astro-ok" class="happy-btn">Okay!</button></div>
+    </div>
+  </div>
+
+  <div id="dream" class="hidden">
+    <div class="picker-panel confirm-panel">
+      <div id="dream-msg"></div>
+      <div class="confirm-row"><button id="dream-ok" class="happy-btn">Okay!</button></div>
+    </div>
+  </div>
+
+  <div id="puzzle" class="hidden">
+    <div class="picker-panel confirm-panel">
+      <div id="puzzle-msg">🧩 Color Puzzle!</div>
+      <div id="puzzle-pad">
+        <button class="pz" data-c="0"></button>
+        <button class="pz" data-c="1"></button>
+        <button class="pz" data-c="2"></button>
+        <button class="pz" data-c="3"></button>
+      </div>
+      <div class="confirm-row"><button id="puzzle-close">Bye! 👋</button></div>
+    </div>
+  </div>
+
+  <div id="chars" class="hidden">
+    <div class="picker-panel">
+      <div class="picker-head"><span>Who do you want to be?</span><button id="chars-close">✕</button></div>
+      <div id="chars-body"></div>
+    </div>
+  </div>
+
+  <div id="steve" class="hidden">
+    <div class="picker-panel">
+      <div class="picker-head"><span>🍗 Steve's Lava Chicken</span><button id="steve-close">✕</button></div>
+      <div id="steve-body"></div>
+    </div>
+  </div>
+
+  <div id="math" class="hidden">
+    <div class="picker-panel confirm-panel">
+      <div id="math-q"></div>
+      <div id="math-opts"></div>
+      <div class="confirm-row"><button id="math-close">Bye! 👋</button></div>
+    </div>
+  </div>
+
+  <canvas id="minimap"></canvas>
 
   <div id="hearts"></div>
 

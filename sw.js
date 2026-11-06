@@ -1,13 +1,15 @@
 // Offline service worker for Ezra's Blocks and Ezra's Mine (/mine/).
 // Bump CACHE to push an update.
-const CACHE = 'ezrablocks-v2';
+const CACHE = 'ezrablocks-v48';
 const CORE = [
   '', 'index.html', 'styles.css', 'manifest.webmanifest',
-  'js/main.js', 'js/math.js', 'js/gfx.js', 'js/world.js',
+  'js/main.js', 'js/math.js', 'js/gfx.js', 'js/world.js', 'js/worlds.js',
   'js/player.js', 'js/input.js', 'js/audio.js', 'js/animals.js',
-  'js/character.js', 'js/goals.js',
+  'js/creepers.js', 'js/nethermobs.js', 'js/zombies.js', 'js/spiders.js',
+  'js/skeletons.js', 'js/villagers.js', 'js/dragon.js', 'js/secretworld.js',
+  'js/aliencops.js', 'js/astronaut.js', 'js/rover.js', 'js/dragonmount.js', 'js/rocketship.js', 'js/spacerace.js', 'js/legodreamzz.js', 'js/goals.js', 'js/character.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
-  // Ezra's Mine
+  // Ezra's Mine (the tap-and-merge game)
   'mine/', 'mine/index.html', 'mine/mine.css', 'mine/manifest.webmanifest',
   'mine/js/main.js', 'mine/js/game.js', 'mine/js/data.js', 'mine/js/art.js',
   'mine/js/sound.js', 'mine/js/fmt.js',
@@ -40,12 +42,10 @@ self.addEventListener('fetch', (e) => {
         caches.open(CACHE).then((c) => c.put(req, copy));
       }
       return res;
-    }).catch(() => caches.match(req, { ignoreSearch: true }).then((hit) => {
+    }).catch(() => caches.match(req).then((hit) => {
       if (hit) return hit;
-      if (req.mode === 'navigate') {
-        // Offline and not cached: open whichever game the link was for.
-        return caches.match(new URL(req.url).pathname.includes('/mine/') ? 'mine/index.html' : 'index.html');
-      }
+      // Offline and not cached: open whichever game the link was for.
+      if (req.mode === 'navigate') return caches.match(new URL(req.url).pathname.includes('/mine/') ? 'mine/index.html' : 'index.html');
     }))
   );
 });

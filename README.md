@@ -1,19 +1,23 @@
-# Ezra's Blocks 🧱 + Ezra's Mine ⛏️
-
-Two gentle games made for a 6-year-old:
-**[Ezra's Blocks](https://ontosam.github.io/minecraft/)** (a 3D block world)
-and **[Ezra's Mine](https://ontosam.github.io/minecraft/mine/)** (a tap-and-merge
-mining game — see the bottom of this page).
+# Ezra's Blocks 🧱
 
 A gentle, **third-person** Minecraft-style world made for a 6-year-old. It looks
 and feels like Minecraft, but it's calmer and built to be easy to navigate:
 
 - 🧒 You see **your character** from behind; the camera follows on its own, so
   you always know where you are.
-- 🌞 Always daytime — **no monsters, nothing scary, and you can't "die."**
+- 🌞 Always daytime — **nothing scary and you can't "die."**
 - 🧱 **Build & dig** by tapping where you want — ~30 kinds of blocks
   (grass, stone, wood, gold, diamond, glass, a pumpkin, colours, and more).
 - 🐷 **Cute animals** to walk up to and **pet** (they can follow you).
+- 🛡️ **Protect your house** from a *friendly* creeper: it wanders up and nibbles
+  a block with a little "uh-oh" — **tap it and it poofs harmlessly**, and your
+  blocks always come back. Earns ⭐ for defending. (It never hurts your kid.)
+- ⛏️ **Dig for treasure:** hidden **gold and diamond** are buried in the ground —
+  dig them up for a sparkle and a ⭐.
+- 🌀 **Earn your way to the Nether:** complete a few **goals** (⭐4) and a dormant
+  portal **opens** with a celebration. Step through (a little **map** helps you
+  find it) into a whole new fiery world, home to **friendly ghasts and blazes** —
+  floaty creatures that are fun to find and pet and never hurt anyone.
 - ⭐ **Goals** that earn stars and get a little harder over time, so there's
   always a next thing to do.
 - 💾 **Auto-saves** on the device and picks up right where he left off.
@@ -36,16 +40,23 @@ real app (and so progress is saved durably).
 - **Walk:** drag the **left** side of the screen. The camera follows behind.
   (Backing up is a gentle step-back.)
 - **Look around:** drag the **right** side.
-- **Build / Dig:** **press the spot** you want — a light outline (build) or glow
-  (dig) shows where — then **lift your finger**. The **Build** / **Dig** buttons
-  pick the tool (the active one has a gold ring) and also act right in front.
+- **Build / Dig:** just **tap the spot** you want. The **Build** / **Dig**
+  buttons pick the tool (the active one has a gold ring) and also act right in
+  front.
+- **Switch view:** tap **🔍 / 🗺️** (top bar) to zoom the camera in close or back
+  out to the wide overview — wide is the default so you can see where you are.
+- **Find the Nether:** a small **map** (top-right corner) shows a purple 🌀
+  marker — walk onto the glowing purple **portal** to travel to the Nether (and
+  back through the portal there).
 - **Pick a block:** tap the **block button** (top-left) to open the picker.
 - **Pet an animal:** walk up and tap **Pet** 🐾.
+- **Bonk a creeper:** if a green creeper strolls up to nibble your blocks, **tap
+  it** — it poofs harmlessly and your blocks pop back (and you earn a ⭐).
 - **Jump:** the **Jump** button (he also auto-hops small steps). **Goals:** ⭐.
   **Go home:** 🏠.
 
 **On a laptop:** **W A S D / arrow keys** to move, **drag the mouse** to look,
-**hover** to preview and **click** to build/dig.
+and **click** to build/dig.
 
 ## 👨‍👩‍👧 For grown-ups
 Runs entirely on the device, offline-capable, no ads/purchases/chat. Creations
@@ -64,35 +75,23 @@ node scripts/make-icons.mjs # regenerate the PWA icons
 ```
 
 ## 🗺️ What's next
-A friendly **"protect your house" creeper** (slow, never hurts him — real stakes
-without the scary part), **giants**, **villagers with quests**, more goal
-challenges, and a graphics/atmosphere pass. Details and rationale in CLAUDE.md.
+The friendly **creeper** and the **Nether** (portal, minimap, ghasts + blazes)
+are now in (see above). Next up: **giants** (big friendly creatures to find and
+pet), **villagers with quests**, more goal challenges, and a graphics/atmosphere
+pass. Details and rationale in CLAUDE.md.
 
 
 ---
 
-# ⛏️ Ezra's Mine
+## ⛏️ Ezra's Mine (a second game)
 
-**https://ontosam.github.io/minecraft/mine/** (Share → Add to Home Screen)
+**https://ontosam.github.io/minecraft/mine/** (Share → Add to Home Screen, or
+pick **⛏️ Ezra's Mine** in the 🌍 Worlds menu)
 
 An original tap-and-merge mining game in the same style as the mobile games
-Ezra likes — but with **nothing to buy, no ads, no energy limits, and no
-tricks to keep him hooked**. Everything is earned by playing.
-
-- ⛏️ **Tap the big block** to dig. A new block pops onto the board.
-- 🤝 **Drag two matching blocks together** (or tap one, then its twin) to
-  merge them into a bigger block — 20 to discover, from Dirt to the Star Block.
-- 🪙 Every block on the board **earns gold**. Spend it on better pickaxes,
-  a mole helper called Digby, and bigger blocks from the mine.
-- 🔥 The **Furnace** melts blocks into bricks 🧱 and shiny ores into metal
-  bars. Bricks build a little **Village** that helps you.
-- 📖 **Quests** always show what to try next; the **Blocks** book shows every
-  block you've found. Words can be **read aloud**.
-- ⚡ The yellow bar under the big block *fills up* as you dig — when it's full
-  you get a Super Swing. The **x2 Gold Rush** fills up as you merge.
-- 💾 Saves automatically. Gold keeps trickling in (a little) while away.
-
-**For grown-ups:** tap the ⚙️ and **hold the circle for 3 seconds** to open
-settings: sound, read-aloud, numbers on blocks, an optional **break reminder**
-(default 30 minutes — a friendly "time for a break?" card, never a lock), and
-"start over".
+Ezra likes — but with **nothing to buy, no ads, no energy limits, and nothing
+designed to keep him hooked**. Tap the big block to dig; drag two matching
+blocks together to make a bigger one (20 to discover, Dirt → Star Block);
+blocks earn gold for better pickaxes, a mole helper called Digby, a furnace and
+a little village. Words can be read aloud. **Grown-ups:** tap ⚙️ and hold the
+circle for 3 seconds for sound, read-aloud and an optional break reminder.

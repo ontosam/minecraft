@@ -3,9 +3,14 @@
 
 import { GLMesh, getUV, TILE } from './gfx.js';
 
-export const SX = 64, SY = 32, SZ = 64;   // world size in blocks
+export const SX = 96, SY = 48, SZ = 96;   // world size in blocks (taller now — a real underground)
 export const CHUNK = 16;                   // chunk footprint (CHUNK x CHUNK x SY)
 const CXN = SX / CHUNK, CZN = SZ / CHUNK;  // chunks per axis
+// Overworld surface sits high so there's a real, deep underground to mine down
+// through (caves, layered ore, the Deep Vault) — like Minecraft, not a thin crust.
+export const GROUND = 26;
+// The beach lagoon (overworld): centre, radius, and water surface height.
+const BEACH = { x: 18, z: 44, r: 10, waterY: GROUND - 2 };
 
 // Block ids
 export const B = {
@@ -16,10 +21,40 @@ export const B = {
   COBBLE: 22, STONE_BRICK: 23, SNOW: 24, ICE: 25, GRAVEL: 26,
   BIRCH_LOG: 27, BIRCH_PLANKS: 28, DARK_PLANKS: 29, GOLD: 30,
   DIAMOND: 31, BOOKSHELF: 32, GLOWSTONE: 33, PUMPKIN: 34, OBSIDIAN: 35,
+  NETHERRACK: 36, PORTAL: 37, LAVA: 38,
+  DOOR: 39, DOOR_OPEN: 40, TNT: 41, RAINBOW: 42,
+  LEVER: 43, LEVER_ON: 44, REDSTONE: 45, REDLAMP: 46, REDLAMP_ON: 47, SLIME: 48,
+  SAPLING: 49, MEGA_TNT: 50, SANDSTONE: 51, END_STONE: 52,
+  BED_FOOT: 53, BED_HEAD: 54, BARRIER: 55, LANTERN: 56,
+  IRON_BLOCK: 57, GOLD_BLOCK: 58, DIAMOND_BLOCK: 59, EMERALD_BLOCK: 60, LAPIS_BLOCK: 61,
+  REDSTONE_BLOCK: 62, COAL_BLOCK: 63, AMETHYST: 64,
+  DEEPSLATE: 65, GRANITE: 66, ANDESITE: 67, DIORITE: 68, QUARTZ: 69, PRISMARINE: 70, SEA_LANTERN: 71,
+  MOSS: 72, MUSHROOM_RED: 73, MUSHROOM_BROWN: 74, CACTUS: 75, MUD: 76,
+  NETHER_BRICK: 77, MAGMA: 78,
+  MELON: 79, HAY: 80, NOTE_BLOCK: 81, SPONGE: 82,
+  LEGO_RED: 83, LEGO_ORANGE: 84, LEGO_YELLOW: 85, LEGO_GREEN: 86, LEGO_BLUE: 87, LEGO_CYAN: 88,
+  LEGO_PURPLE: 89, LEGO_PINK: 90, LEGO_WHITE: 91, LEGO_BLACK: 92, LEGO_BROWN: 93, LEGO_LIME: 94,
+  // session 31: a big block batch (95-114) + a Creative ✨ group (115-125).
+  CRAFTING: 95, FURNACE: 96, CHEST: 97, CHERRY_PLANKS: 98, CHERRY_LEAVES: 99, BAMBOO: 100,
+  CRIMSON_PLANKS: 101, WARPED_PLANKS: 102, SOUL_SAND: 103, BONE_BLOCK: 104, COPPER: 105, COPPER_OX: 106,
+  SCULK: 107, BLACKSTONE: 108, SMOOTH_STONE: 109, PACKED_ICE: 110, HONEY: 111, TARGET: 112,
+  TERRACOTTA: 113, MOSSY_BRICK: 114,
+  NEON_PINK: 115, NEON_GREEN: 116, NEON_BLUE: 117, NEON_ORANGE: 118, NEON_PURPLE: 119,
+  CLOUD: 120, STARRY: 121, CHECKER: 122, CANDY: 123, CHROME: 124, GLOW_CRYSTAL: 125,
+  // session 34: space blocks (126-131) — rocky moon stuff, shiny metal, glowy
+  // plasma, gem ore, and a sticky alien goo that's hard to walk across.
+  MOON_ROCK: 126, SPACE_METAL: 127, ALIEN_GOO: 128, METEOR: 129, PLASMA: 130, CRYSTAL_ORE: 131,
+  PILLOW: 132,                 // a soft cushion you can tap to lie down on
+  PUZZLE: 133,                 // a colorful cube — tap for a color-memory mini-game
+  COAL_ORE: 134, IRON_ORE: 135, // session 38: mine these for crafting materials
+  RELIC: 136,                   // session 40: the legendary treasure in the Deep Vault
+  TORCH: 137,                   // session 42: a placeable light to brighten dark caves
 };
 
 const W = [1, 1, 1]; // white tint for textured blocks
 function colored(tile, tint, ui) { return { tiles: { top: tile, side: tile, bottom: tile }, tint, ui }; }
+// A textured block tinted a colour (e.g. Lego bricks: neutral studded tiles × tint).
+function tinted(top, side, bottom, tint, ui) { return { tiles: { top, side, bottom }, tint, ui }; }
 function nat(tile, ui) { return { tiles: { top: tile, side: tile, bottom: tile }, tint: W, ui }; }
 function nat3(top, side, bottom, ui) { return { tiles: { top, side, bottom }, tint: W, ui }; }
 
@@ -31,12 +66,12 @@ export const BLOCKS = {
   [B.STONE]: { tiles: { top: TILE.STONE, side: TILE.STONE, bottom: TILE.STONE }, tint: W, ui: '#8f8f97' },
   [B.SAND]: { tiles: { top: TILE.SAND, side: TILE.SAND, bottom: TILE.SAND }, tint: W, ui: '#e4d6a0' },
   [B.LOG]: { tiles: { top: TILE.LOG_TOP, side: TILE.LOG_SIDE, bottom: TILE.LOG_TOP }, tint: W, ui: '#9c7142' },
-  [B.LEAVES]: { tiles: { top: TILE.LEAVES, side: TILE.LEAVES, bottom: TILE.LEAVES }, tint: W, ui: '#4f9a3a' },
+  [B.LEAVES]: { tiles: { top: TILE.LEAVES, side: TILE.LEAVES, bottom: TILE.LEAVES }, tint: W, ui: '#4f9a3a', seethrough: true },
   [B.PLANKS]: { tiles: { top: TILE.PLANKS, side: TILE.PLANKS, bottom: TILE.PLANKS }, tint: W, ui: '#c99a5b' },
-  [B.WATER]: { tiles: { top: TILE.WATER, side: TILE.WATER, bottom: TILE.WATER }, tint: W, ui: '#3a86d6' },
+  [B.WATER]: { tiles: { top: TILE.WATER, side: TILE.WATER, bottom: TILE.WATER }, tint: W, ui: '#3a86d6', passable: true },
   [B.BEDROCK]: { tiles: { top: TILE.BEDROCK, side: TILE.BEDROCK, bottom: TILE.BEDROCK }, tint: W, ui: '#4a4a52', indestructible: true },
   [B.BRICK]: { tiles: { top: TILE.BRICK, side: TILE.BRICK, bottom: TILE.BRICK }, tint: W, ui: '#b05a44' },
-  [B.GLASS]: { tiles: { top: TILE.GLASS, side: TILE.GLASS, bottom: TILE.GLASS }, tint: W, ui: '#bfe6f2' },
+  [B.GLASS]: { tiles: { top: TILE.GLASS, side: TILE.GLASS, bottom: TILE.GLASS }, tint: W, ui: '#bfe6f2', seethrough: true },
   [B.RED]: colored(TILE.NEUTRAL, [0.85, 0.22, 0.22], '#d83838'),
   [B.ORANGE]: colored(TILE.NEUTRAL, [0.95, 0.55, 0.15], '#f28c26'),
   [B.YELLOW]: colored(TILE.NEUTRAL, [0.97, 0.85, 0.2], '#f7d934'),
@@ -58,19 +93,149 @@ export const BLOCKS = {
   [B.DARK_PLANKS]: nat(TILE.DARK_PLANKS, '#4f3a22'),
   [B.GOLD]: nat(TILE.GOLD, '#f2c63a'),
   [B.DIAMOND]: nat(TILE.DIAMOND, '#59d6c8'),
+  [B.COAL_ORE]: nat(TILE.COAL_ORE, '#3a3a42'),
+  [B.IRON_ORE]: nat(TILE.IRON_ORE, '#c9a06a'),
+  [B.RELIC]: nat(TILE.RELIC, '#c98cff'),
+  [B.TORCH]: nat(TILE.TORCH, '#ffb43a'),
   [B.BOOKSHELF]: nat3(TILE.PLANKS, TILE.BOOKSHELF, TILE.PLANKS, '#9a6b3a'),
   [B.GLOWSTONE]: nat(TILE.GLOWSTONE, '#e8c24a'),
   [B.PUMPKIN]: nat3(TILE.PUMPKIN_TOP, TILE.PUMPKIN_SIDE, TILE.PUMPKIN_TOP, '#e07b1e'),
   [B.OBSIDIAN]: nat(TILE.OBSIDIAN, '#241a33'),
+  [B.NETHERRACK]: nat(TILE.NETHERRACK, '#7a2e2e'),
+  [B.LAVA]: nat(TILE.LAVA, '#e8702a'),
+  // The portal swirl: you walk *through* it (passable) and it can't be dug, so
+  // the gateway can't be accidentally destroyed and leave anyone stuck.
+  [B.PORTAL]: { tiles: { top: TILE.NETHER_PORTAL, side: TILE.NETHER_PORTAL, bottom: TILE.NETHER_PORTAL }, tint: W, ui: '#9959d9', indestructible: true, passable: true },
+  [B.DOOR]: nat(TILE.DOOR, '#8a5a2a'),
+  [B.DOOR_OPEN]: { tiles: { top: TILE.DOOR_OPEN, side: TILE.DOOR_OPEN, bottom: TILE.DOOR_OPEN }, tint: W, ui: '#5e3c1c', passable: true },
+  [B.TNT]: nat3(TILE.TNT_TOP, TILE.TNT_SIDE, TILE.TNT_TOP, '#c0392b'),
+  [B.RAINBOW]: nat(TILE.RAINBOW, '#ff66cc'),
+  [B.LEVER]: nat(TILE.LEVER, '#8a8a90'),
+  [B.LEVER_ON]: nat(TILE.LEVER_ON, '#b8544c'),
+  [B.REDSTONE]: nat(TILE.REDSTONE, '#a8362c'),
+  [B.REDLAMP]: nat(TILE.REDLAMP, '#7a6038'),
+  [B.REDLAMP_ON]: nat(TILE.REDLAMP_ON, '#f2c24a'),
+  [B.SLIME]: nat(TILE.SLIME, '#6fcf6a'),
+  // A sapling is a walk-through plant that grows into a tree after a while.
+  [B.SAPLING]: { tiles: { top: TILE.SAPLING, side: TILE.SAPLING, bottom: TILE.SAPLING }, tint: W, ui: '#5bbf3a', passable: true },
+  [B.MEGA_TNT]: nat3(TILE.MEGA_TNT_TOP, TILE.MEGA_TNT_SIDE, TILE.MEGA_TNT_TOP, '#8e1b12'),
+  [B.SANDSTONE]: nat(TILE.SANDSTONE, '#e6d8a8'),
+  [B.END_STONE]: nat(TILE.END_STONE, '#e6e6b0'),
+  [B.BED_FOOT]: nat3(TILE.BED_FOOT, TILE.BED_SIDE, TILE.PLANKS, '#c23a3a'),
+  [B.BED_HEAD]: nat3(TILE.BED_HEAD, TILE.BED_SIDE, TILE.PLANKS, '#e2dccb'),
+  [B.BARRIER]: { tiles: { top: TILE.BARRIER, side: TILE.BARRIER, bottom: TILE.BARRIER }, tint: W, ui: '#7be6f0', seethrough: true },
+  [B.LANTERN]: nat(TILE.LANTERN, '#ffe07a'),
+  // Recognizable Minecraft-style blocks (lots of building variety).
+  [B.IRON_BLOCK]: nat(TILE.IRON_BLOCK, '#d8d8de'),
+  [B.GOLD_BLOCK]: nat(TILE.GOLD_BLOCK, '#f2c63a'),
+  [B.DIAMOND_BLOCK]: nat(TILE.DIAMOND_BLOCK, '#57d6c8'),
+  [B.EMERALD_BLOCK]: nat(TILE.EMERALD_BLOCK, '#36c463'),
+  [B.LAPIS_BLOCK]: nat(TILE.LAPIS_BLOCK, '#274bbf'),
+  [B.REDSTONE_BLOCK]: nat(TILE.REDSTONE_BLOCK, '#b01818'),
+  [B.COAL_BLOCK]: nat(TILE.COAL_BLOCK, '#24232a'),
+  [B.AMETHYST]: nat(TILE.AMETHYST, '#9b59d0'),
+  [B.DEEPSLATE]: nat(TILE.DEEPSLATE, '#3a3a42'),
+  [B.GRANITE]: nat(TILE.GRANITE, '#a56b53'),
+  [B.ANDESITE]: nat(TILE.ANDESITE, '#8f8f95'),
+  [B.DIORITE]: nat(TILE.DIORITE, '#dcdce0'),
+  [B.QUARTZ]: nat(TILE.QUARTZ, '#eee9dd'),
+  [B.PRISMARINE]: nat(TILE.PRISMARINE, '#3f8f86'),
+  [B.SEA_LANTERN]: nat(TILE.SEA_LANTERN, '#cfeee6'),
+  [B.MOSS]: nat(TILE.MOSS, '#5a8f3a'),
+  [B.MUSHROOM_RED]: nat(TILE.MUSHROOM_RED, '#c23a32'),
+  [B.MUSHROOM_BROWN]: nat(TILE.MUSHROOM_BROWN, '#8a6a4a'),
+  [B.CACTUS]: nat3(TILE.CACTUS_TOP, TILE.CACTUS_SIDE, TILE.CACTUS_TOP, '#4f9a3a'),
+  [B.MUD]: nat(TILE.MUD, '#4a3a30'),
+  [B.NETHER_BRICK]: nat(TILE.NETHER_BRICK, '#3a1c22'),
+  [B.MAGMA]: nat(TILE.MAGMA, '#a85a2a'),
+  [B.MELON]: nat3(TILE.MELON_TOP, TILE.MELON_SIDE, TILE.MELON_TOP, '#3f7a2e'),
+  [B.HAY]: nat3(TILE.HAY_TOP, TILE.HAY_SIDE, TILE.HAY_TOP, '#d8b23a'),
+  [B.NOTE_BLOCK]: nat(TILE.NOTE_BLOCK, '#8a5a30'),
+  [B.SPONGE]: nat(TILE.SPONGE, '#d8c24a'),
+  // Lego bricks — vivid studded blocks (one neutral tile set, tinted per colour).
+  [B.LEGO_RED]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.86, 0.16, 0.16], '#d62828'),
+  [B.LEGO_ORANGE]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.95, 0.55, 0.12], '#f28c1e'),
+  [B.LEGO_YELLOW]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.98, 0.82, 0.18], '#f7d22e'),
+  [B.LEGO_GREEN]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.30, 0.66, 0.28], '#3fa83f'),
+  [B.LEGO_BLUE]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.18, 0.40, 0.82], '#2e66d6'),
+  [B.LEGO_CYAN]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.20, 0.72, 0.80], '#33bccd'),
+  [B.LEGO_PURPLE]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.55, 0.30, 0.78], '#9050d0'),
+  [B.LEGO_PINK]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.95, 0.55, 0.74], '#f28cbf'),
+  [B.LEGO_WHITE]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.96, 0.96, 0.97], '#f5f5f7'),
+  [B.LEGO_BLACK]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.20, 0.20, 0.23], '#33333a'),
+  [B.LEGO_BROWN]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.55, 0.36, 0.20], '#8a5a32'),
+  [B.LEGO_LIME]: tinted(TILE.LEGO_TOP, TILE.LEGO_SIDE, TILE.LEGO_SIDE, [0.55, 0.80, 0.25], '#8ccc40'),
+  // session 31: more Minecraft blocks
+  [B.CRAFTING]: nat3(TILE.CRAFT_TOP, TILE.CRAFT_SIDE, TILE.PLANKS, '#b98a4e'),
+  [B.FURNACE]: nat(TILE.FURNACE, '#5a5a60'),
+  [B.CHEST]: nat(TILE.CHEST, '#a06a30'),
+  [B.CHERRY_PLANKS]: nat(TILE.CHERRY_PLANKS, '#e0a0b8'),
+  [B.CHERRY_LEAVES]: { tiles: { top: TILE.CHERRY_LEAVES, side: TILE.CHERRY_LEAVES, bottom: TILE.CHERRY_LEAVES }, tint: W, ui: '#f2a8c8', seethrough: true },
+  [B.BAMBOO]: nat(TILE.BAMBOO, '#6a9a3a'),
+  [B.CRIMSON_PLANKS]: nat(TILE.CRIMSON_PLANKS, '#8a3a52'),
+  [B.WARPED_PLANKS]: nat(TILE.WARPED_PLANKS, '#2a8a8a'),
+  [B.SOUL_SAND]: nat(TILE.SOUL_SAND, '#4a3a2e'),
+  [B.BONE_BLOCK]: nat(TILE.BONE_BLOCK, '#e8e4d2'),
+  [B.COPPER]: nat(TILE.COPPER, '#c87a4a'),
+  [B.COPPER_OX]: nat(TILE.COPPER_OX, '#4aa88a'),
+  [B.SCULK]: nat(TILE.SCULK, '#16323a'),
+  [B.BLACKSTONE]: nat(TILE.BLACKSTONE, '#2a2830'),
+  [B.SMOOTH_STONE]: nat(TILE.SMOOTH_STONE, '#a8a8ae'),
+  [B.PACKED_ICE]: nat(TILE.PACKED_ICE, '#8ac0f0'),
+  [B.HONEY]: nat(TILE.HONEY, '#f0a82a'),
+  [B.TARGET]: nat(TILE.TARGET, '#d03030'),
+  [B.TERRACOTTA]: nat(TILE.TERRACOTTA, '#b06848'),
+  [B.MOSSY_BRICK]: nat(TILE.MOSSY_BRICK, '#7a8a5a'),
+  // Creative ✨ group — wild blocks (NEON is one bright tile, tinted per colour).
+  [B.NEON_PINK]: colored(TILE.NEON, [1.0, 0.18, 0.62], '#ff2e9e'),
+  [B.NEON_GREEN]: colored(TILE.NEON, [0.28, 1.0, 0.34], '#3aff55'),
+  [B.NEON_BLUE]: colored(TILE.NEON, [0.24, 0.6, 1.0], '#3a99ff'),
+  [B.NEON_ORANGE]: colored(TILE.NEON, [1.0, 0.55, 0.12], '#ff8c1e'),
+  [B.NEON_PURPLE]: colored(TILE.NEON, [0.72, 0.32, 1.0], '#b850ff'),
+  [B.CLOUD]: nat(TILE.CLOUD, '#eef2ff'),
+  [B.STARRY]: nat(TILE.STARRY, '#1a2450'),
+  [B.CHECKER]: nat(TILE.CHECKER, '#888890'),
+  [B.CANDY]: nat(TILE.CANDY, '#f04a7a'),
+  [B.CHROME]: nat(TILE.CHROME, '#c8ccd8'),
+  [B.GLOW_CRYSTAL]: nat(TILE.GLOW_CRYSTAL, '#3ad8e8'),
+  // Space blocks — for building bases on the moon. ALIEN_GOO is "sticky": you
+  // walk across it slowly (handled in player.js), like honey in Minecraft.
+  [B.MOON_ROCK]: nat(TILE.MOON_ROCK, '#8e8e96'),
+  [B.SPACE_METAL]: nat(TILE.SPACE_METAL, '#5a6580'),
+  [B.ALIEN_GOO]: { tiles: { top: TILE.ALIEN_GOO, side: TILE.ALIEN_GOO, bottom: TILE.ALIEN_GOO }, tint: W, ui: '#3ad04a', sticky: true },
+  [B.METEOR]: nat(TILE.METEOR, '#4a403a'),
+  [B.PLASMA]: nat(TILE.PLASMA, '#7a2ad8'),
+  [B.CRYSTAL_ORE]: nat(TILE.CRYSTAL_ORE, '#33e0d8'),
+  [B.PILLOW]: nat3(TILE.PILLOW_TOP, TILE.PILLOW_SIDE, TILE.PILLOW_SIDE, '#c7cdf0'),
+  [B.PUZZLE]: nat(TILE.PUZZLE, '#e63946'),
 };
 
 // Build blocks grouped into categories for the pop-up picker.
 export const CATEGORIES = [
-  { name: 'Nature', blocks: [B.GRASS, B.DIRT, B.SAND, B.GRAVEL, B.SNOW, B.LOG, B.BIRCH_LOG, B.LEAVES] },
-  { name: 'Stone', blocks: [B.STONE, B.COBBLE, B.STONE_BRICK, B.BRICK, B.OBSIDIAN, B.GLOWSTONE] },
-  { name: 'Wood', blocks: [B.PLANKS, B.BIRCH_PLANKS, B.DARK_PLANKS, B.BOOKSHELF] },
-  { name: 'Shiny', blocks: [B.GOLD, B.DIAMOND, B.ICE, B.GLASS] },
-  { name: 'Fun', blocks: [B.PUMPKIN] },
+  { name: 'Nature', blocks: [B.GRASS, B.DIRT, B.SAND, B.GRAVEL, B.SNOW, B.MOSS, B.MUD, B.SOUL_SAND, B.SAPLING, B.LOG, B.BIRCH_LOG, B.BAMBOO, B.LEAVES, B.CHERRY_LEAVES, B.CACTUS, B.MUSHROOM_RED, B.MUSHROOM_BROWN, B.BONE_BLOCK] },
+  { name: 'Water 🪣', blocks: [B.WATER] },
+  { name: 'House 🏠', blocks: [B.DOOR, B.BED_FOOT, B.PILLOW, B.GLASS, B.LANTERN, B.PLANKS, B.BRICK, B.CRAFTING, B.FURNACE, B.CHEST] },
+  { name: 'Boom 💥', blocks: [B.TNT] },
+  // Tap a lever → it powers redstone wire → wired-up lamps light up.
+  { name: 'Redstone ⚙️', blocks: [B.LEVER, B.REDSTONE, B.REDLAMP, B.TARGET] },
+  { name: 'Stone 🪨', blocks: [B.STONE, B.SMOOTH_STONE, B.COBBLE, B.STONE_BRICK, B.MOSSY_BRICK, B.DEEPSLATE, B.BLACKSTONE, B.GRANITE, B.ANDESITE, B.DIORITE, B.QUARTZ, B.PRISMARINE, B.SANDSTONE, B.TERRACOTTA, B.END_STONE, B.BRICK, B.OBSIDIAN] },
+  { name: 'Shiny 💎', blocks: [B.COAL_ORE, B.IRON_ORE, B.IRON_BLOCK, B.GOLD_BLOCK, B.DIAMOND_BLOCK, B.EMERALD_BLOCK, B.LAPIS_BLOCK, B.REDSTONE_BLOCK, B.COAL_BLOCK, B.COPPER, B.COPPER_OX, B.AMETHYST, B.GOLD, B.DIAMOND, B.ICE, B.PACKED_ICE] },
+  { name: 'Wood', blocks: [B.PLANKS, B.BIRCH_PLANKS, B.DARK_PLANKS, B.CHERRY_PLANKS, B.CRIMSON_PLANKS, B.WARPED_PLANKS, B.BOOKSHELF] },
+  { name: 'Decor 🪑', blocks: [B.MELON, B.HAY, B.HONEY, B.NOTE_BLOCK, B.SPONGE, B.SCULK, B.PUMPKIN, B.GLOWSTONE, B.SEA_LANTERN] },
+  // Lights for brightening dark caves (and cozy rooms at night).
+  { name: 'Light 💡', blocks: [B.TORCH, B.LANTERN, B.GLOWSTONE, B.SEA_LANTERN, B.GLOW_CRYSTAL] },
+  // A special group of wild blocks for crazy builds!
+  { name: 'Creative ✨', blocks: [B.PUZZLE, B.NEON_PINK, B.NEON_GREEN, B.NEON_BLUE, B.NEON_ORANGE, B.NEON_PURPLE, B.GLOW_CRYSTAL, B.STARRY, B.CLOUD, B.CHECKER, B.CANDY, B.CHROME] },
+  // Out-of-this-world blocks for building moon bases (alien goo is sticky!).
+  { name: 'Space 🚀', blocks: [B.MOON_ROCK, B.METEOR, B.SPACE_METAL, B.CRYSTAL_ORE, B.PLASMA, B.ALIEN_GOO, B.STARRY, B.GLOW_CRYSTAL] },
+  { name: 'Fun', blocks: [B.PUMPKIN, B.SLIME, B.BARRIER] },
+  // Shown in the picker only after it's bought in the 💎 shop.
+  { name: 'Special ✨', blocks: [B.RAINBOW], locked: 'rainbow' },
+  // Shown only once the Mega TNT upgrade is bought in the 💎 shop.
+  { name: 'Mega 💣', blocks: [B.MEGA_TNT], locked: 'megatnt' },
+  // Unlocked by buying Lego World in the 💎 shop.
+  { name: 'Lego 🧱', blocks: [B.LEGO_RED, B.LEGO_ORANGE, B.LEGO_YELLOW, B.LEGO_LIME, B.LEGO_GREEN, B.LEGO_CYAN, B.LEGO_BLUE, B.LEGO_PURPLE, B.LEGO_PINK, B.LEGO_WHITE, B.LEGO_BLACK, B.LEGO_BROWN], locked: 'legoworld' },
+  { name: 'Nether 🔥', blocks: [B.NETHERRACK, B.NETHER_BRICK, B.MAGMA, B.LAVA] },
   { name: 'Colours', blocks: [B.RED, B.ORANGE, B.YELLOW, B.GREEN, B.CYAN, B.BLUE, B.PURPLE, B.PINK, B.WHITE, B.BLACK] },
 ];
 
@@ -86,7 +251,26 @@ const FACES = [
   { n: [-1, 0, 0], shade: 0.65, slot: 'side', v: [{ o: [0, 0, 0], uv: [0, 0] }, { o: [0, 0, 1], uv: [1, 0] }, { o: [0, 1, 1], uv: [1, 1] }, { o: [0, 1, 0], uv: [0, 1] }] },
   { n: [1, 0, 0], shade: 0.80, slot: 'side', v: [{ o: [1, 0, 1], uv: [0, 0] }, { o: [1, 0, 0], uv: [1, 0] }, { o: [1, 1, 0], uv: [1, 1] }, { o: [1, 1, 1], uv: [0, 1] }] },
 ];
-const AO_LEVEL = [0.5, 0.7, 0.85, 1.0];
+const AO_LEVEL = [0.62, 0.76, 0.9, 1.0];   // gentle ambient occlusion (softer shadows)
+
+// Block light: how brightly a block glows (0..15), flooding into nearby air with
+// a 1-level falloff per step. Torches/glowstone/lava light up dark caves; lit
+// blocks keep their warm glow even at night (skylight fades, block light doesn't).
+const LIGHT_EMIT = {
+  [B.TORCH]: 14, [B.GLOWSTONE]: 15, [B.SEA_LANTERN]: 15, [B.LANTERN]: 14,
+  [B.LAVA]: 13, [B.REDLAMP_ON]: 14, [B.MAGMA]: 9, [B.GLOW_CRYSTAL]: 13,
+  [B.PLASMA]: 13, [B.RELIC]: 11, [B.NEON_PINK]: 8, [B.NEON_GREEN]: 8,
+  [B.NEON_BLUE]: 8, [B.NEON_ORANGE]: 8, [B.NEON_PURPLE]: 8,
+};
+
+// 3-D Lego studs: four little raised bumps drawn on an exposed Lego top so the
+// bricks read as real Lego instead of flat cubes. Each stud is a tiny box (its
+// top + 4 sides; the bottom sits flush on the brick). Visual only — never in
+// collision — so the kid still stands on a clean cube surface.
+const STUD_CENTERS = [[0.3, 0.3], [0.7, 0.3], [0.3, 0.7], [0.7, 0.7]];
+const STUD_R = 0.16, STUD_H = 0.17;
+let _lightQueue = null;   // shared BFS scratch for computeLight (one world lit at a time)
+export function isLego(id) { return id >= B.LEGO_RED && id <= B.LEGO_LIME; }
 
 function mulberry32(seed) {
   let s = seed >>> 0;
@@ -104,7 +288,9 @@ export class World {
     this.data = new Uint8Array(SX * SY * SZ);
     this.meshes = new Array(CXN * CZN).fill(null);
     this.dirty = new Set();
+    this.placed = new Set();  // packed indices of blocks the *player* placed
     this.spawn = [SX / 2 + 0.5, 12, SZ / 2 + 0.5];
+    this.portals = [];        // gateways: { f:[ox,oy,oz], dest, a:[x,y,z], active }
   }
 
   idx(x, y, z) { return x + z * SX + y * SX * SZ; }
@@ -120,15 +306,22 @@ export class World {
     if (y >= SY) return false;
     if (y < 0) return true;
     if (x < 0 || x >= SX || z < 0 || z >= SZ) return true;
-    return this.data[this.idx(x, y, z)] !== B.AIR;
+    const id = this.data[this.idx(x, y, z)];
+    if (id === B.AIR) return false;
+    const def = BLOCKS[id];
+    return !(def && def.seethrough);     // glass/leaves don't hide what's behind them
   }
 
-  // For physics: borders act as walls.
+  // For physics: borders act as walls. Passable blocks (the portal swirl) are
+  // walk-through so the player can step into the gateway.
   solidAt(x, y, z) {
     if (y < 0) return true;
     if (y >= SY) return false;
     if (x < 0 || x >= SX || z < 0 || z >= SZ) return true;
-    return this.data[this.idx(x, y, z)] !== B.AIR;
+    const id = this.data[this.idx(x, y, z)];
+    if (id === B.AIR) return false;
+    const def = BLOCKS[id];
+    return !(def && def.passable);
   }
 
   heightAt(x, z) {
@@ -150,52 +343,292 @@ export class World {
     if (y < 0 || y >= SY || x < 0 || x >= SX || z < 0 || z >= SZ) return;
     this.data[this.idx(x, y, z)] = id;
     this.markDirty(x, z);
+    this.lightDirty = true;   // any block change can move light (open/close a path)
   }
 
   generate() {
     const rand = mulberry32(1337);
-    const pondX = 16, pondZ = 44, pondR = 6, waterY = 4;
+    this.data.fill(B.AIR);
+    this.placed = new Set();
+    this.portals = [];
+    // Gentle rolling hills of grass on top — but a deep column beneath: grass,
+    // a few dirt, a thick stone layer, then dark deepslate down near bedrock. So
+    // digging straight down is a real descent through ~20+ blocks, like Minecraft.
     for (let x = 0; x < SX; x++) {
       for (let z = 0; z < SZ; z++) {
-        let h = 6 + 1.6 * Math.sin(x * 0.18) + 1.6 * Math.cos(z * 0.16)
-          + 1.3 * Math.sin((x + z) * 0.09);
-        h = Math.round(h);
-        const dPond = Math.hypot(x - pondX, z - pondZ);
-        const nearPond = dPond < pondR;
-        if (nearPond) h = Math.min(h, waterY - 1 + Math.round((dPond / pondR) * 2));
-        h = Math.max(3, Math.min(13, h));
-
+        let h = GROUND + 1.8 * Math.sin(x * 0.18) + 1.8 * Math.cos(z * 0.16)
+          + 1.4 * Math.sin((x + z) * 0.09);
+        h = Math.max(GROUND - 5, Math.min(GROUND + 5, Math.round(h)));
         for (let y = 0; y <= h; y++) {
           let id;
           if (y === 0) id = B.BEDROCK;
-          else if (y === h) id = nearPond && h <= waterY ? B.SAND : B.GRASS;
+          else if (y === h) id = B.GRASS;
           else if (y >= h - 2) id = B.DIRT;
+          else if (y <= 7) id = B.DEEPSLATE;   // the deep, dark layer near bedrock
           else id = B.STONE;
           this.data[this.idx(x, y, z)] = id;
-        }
-        // Fill the pond bowl with water up to waterY; ring it with sand.
-        if (dPond < pondR + 1.5) {
-          for (let y = h + 1; y <= waterY; y++) this.data[this.idx(x, y, z)] = B.WATER;
-          if (this.data[this.idx(x, h, z)] === B.GRASS && dPond < pondR + 1) this.data[this.idx(x, h, z)] = B.SAND;
         }
       }
     }
 
-    // Scatter friendly little trees on grass, away from the pond.
+    // A big sandy beach lagoon to fly over and splash into.
+    this.carveBeach();
+
+    // Caves to explore underground (a separate RNG so trees/treasure stay put).
+    this.carveCaves(mulberry32(0xca7e5));
+    this.carveVault(mulberry32(0x7eaf5));   // the legendary Deep Vault (grand goal)
+
+    // Scatter friendly little trees on grass, away from the beach.
     let trees = 0;
     for (let attempt = 0; attempt < 400 && trees < 16; attempt++) {
       const x = 4 + Math.floor(rand() * (SX - 8));
       const z = 4 + Math.floor(rand() * (SZ - 8));
       const h = this.heightAt(x, z);
       if (this.data[this.idx(x, h, z)] !== B.GRASS) continue;
-      if (Math.hypot(x - pondX, z - pondZ) < pondR + 3) continue;
+      if (Math.hypot(x - BEACH.x, z - BEACH.z) < BEACH.r + 3) continue;
       this.placeTree(x, h + 1, z, rand);
       trees++;
+    }
+
+    // Hidden treasure to discover by digging: gold in the stone band, diamond
+    // kept deep down near bedrock — so the deeper you dig, the better the find.
+    for (let i = 0; i < 30; i++) {
+      const deep = rand() < 0.4;
+      const id = deep ? B.DIAMOND : B.GOLD;
+      const x = 2 + Math.floor(rand() * (SX - 4)), z = 2 + Math.floor(rand() * (SZ - 4));
+      const surf = this.heightAt(x, z);
+      if (surf < 12) continue;
+      const cy = deep ? (1 + Math.floor(rand() * 6))                    // diamond: y1-6 (deepslate)
+                      : (9 + Math.floor(rand() * Math.max(1, surf - 12)));  // gold: mid stone band
+      const n = 1 + Math.floor(rand() * 3);
+      for (let k = 0; k < n; k++) {
+        const bx = x + Math.floor(rand() * 2), by = cy + Math.floor(rand() * 2), bz = z + Math.floor(rand() * 2);
+        const cur = this.get(bx, by, bz);
+        if (cur === B.STONE || cur === B.DEEPSLATE) this.data[this.idx(bx, by, bz)] = id;
+      }
     }
 
     // Spawn on solid ground in the middle.
     const sh = this.heightAt(Math.floor(this.spawn[0]), Math.floor(this.spawn[2]));
     this.spawn[1] = sh + 2;
+  }
+
+  // Scatter coal + iron ore through the natural stone so there's something to
+  // mine for crafting materials. Idempotent: only runs if this world has stone
+  // but no ore yet, so freshly-generated worlds, reset worlds, AND older saves
+  // (loaded before this feature existed) all get some — and once it's seeded and
+  // saved it never runs again. Never replaces a block the player placed.
+  sprinkleOre() {
+    let hasOre = false, hasStone = false;
+    for (let i = 0; i < this.data.length; i++) {
+      const v = this.data[i];
+      if (v === B.COAL_ORE || v === B.IRON_ORE) { hasOre = true; break; }
+      if (v === B.STONE) hasStone = true;
+    }
+    if (hasOre || !hasStone) return;
+    let s = (0x9e3779b1 ^ this.data.length) >>> 0;   // small local RNG (no global state)
+    const rand = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+    // Seed an ore vein. `loFrac..hiFrac` is the depth band (0 = bedrock, 1 =
+    // surface), so coal sits high, iron mid, gold/diamond deep — the deeper you
+    // mine, the better the reward. Veins go into natural stone OR deepslate.
+    const seed = (id, count, loFrac, hiFrac) => {
+      for (let i = 0; i < count; i++) {
+        const x = 2 + Math.floor(rand() * (SX - 4)), z = 2 + Math.floor(rand() * (SZ - 4));
+        const surf = this.heightAt(x, z);
+        if (surf < 6) continue;
+        const lo = Math.max(1, Math.floor(surf * loFrac)), hi = Math.max(lo + 1, Math.floor(surf * hiFrac));
+        const cy = lo + Math.floor(rand() * (hi - lo));
+        const n = 2 + Math.floor(rand() * 4);
+        for (let k = 0; k < n; k++) {
+          const bx = x + (Math.floor(rand() * 3) - 1), by = cy + Math.floor(rand() * 2), bz = z + (Math.floor(rand() * 3) - 1);
+          if (bx < 1 || bx >= SX - 1 || bz < 1 || bz >= SZ - 1 || by < 1 || by >= SY) continue;
+          const key = this.idx(bx, by, bz);
+          const cur = this.get(bx, by, bz);
+          if ((cur === B.STONE || cur === B.DEEPSLATE) && !this.placed.has(key)) this.data[key] = id;
+        }
+      }
+    };
+    seed(B.COAL_ORE, 90, 0.25, 1.0);   // coal: common, upper-to-mid depths
+    seed(B.IRON_ORE, 60, 0.10, 0.65);  // iron: mid depths
+    seed(B.GOLD, 16, 0.05, 0.35);      // gold: deep
+    seed(B.DIAMOND, 14, 0.0, 0.22);    // diamond: the deepest reward — brave the dark caves!
+  }
+
+  // Carve gentle caves into the stone: wandering tunnels + a few caverns + a
+  // handful of surface entrances you can find and climb down. Only ever removes
+  // *natural* stone/dirt/ore (never a block the player placed, never bedrock),
+  // and skips any column near a placed block (`protect`) so builds are safe and
+  // never undermined. New worlds carve freely; existing saves pass `protect`.
+  carveCaves(rand, protect) {
+    protect = protect || new Set();
+    const colKey = (x, z) => x + z * SX;
+    const carveSphere = (cx, cy, cz, r) => {
+      const ri = Math.round(cx), rj = Math.round(cy), rk = Math.round(cz);
+      for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) for (let dz = -r; dz <= r; dz++) {
+        if (dx * dx + dy * dy + dz * dz > r * r + 0.4) continue;
+        const x = ri + dx, y = rj + dy, z = rk + dz;
+        if (x < 1 || x >= SX - 1 || z < 1 || z >= SZ - 1 || y < 1 || y >= SY - 1) continue;  // keep bedrock + edges
+        if (protect.has(colKey(x, z))) continue;
+        const k = this.idx(x, y, z);
+        const id = this.data[k];
+        if ((id === B.STONE || id === B.DIRT || id === B.DEEPSLATE || id === B.COAL_ORE || id === B.IRON_ORE) && !this.placed.has(k)) this.data[k] = B.AIR;
+      }
+    };
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    // Wandering tunnels through the whole deep column — they roam up and down so
+    // a dig at any depth tends to break into one. More + longer now there's room.
+    for (let w = 0; w < 16; w++) {
+      let x = 4 + rand() * (SX - 8), z = 4 + rand() * (SZ - 8);
+      let y = 3 + rand() * (GROUND - 6);                  // start anywhere in the depth
+      let ax = rand() - 0.5, az = rand() - 0.5, ay = (rand() - 0.5) * 0.5;
+      const steps = 55 + (rand() * 60 | 0);
+      for (let s = 0; s < steps; s++) {
+        x = clamp(x + ax, 1, SX - 2); z = clamp(z + az, 1, SZ - 2); y += ay;
+        ax = clamp(ax + (rand() - 0.5) * 0.3, -1, 1); az = clamp(az + (rand() - 0.5) * 0.3, -1, 1);
+        ay = clamp(ay + (rand() - 0.5) * 0.25, -0.5, 0.5);
+        const surf = this.heightAt(Math.round(x), Math.round(z));
+        y = clamp(y, 2, Math.max(2, surf - 2));            // always stay underground
+        carveSphere(x, y, z, 1 + (rand() < 0.35 ? 1 : 0));
+      }
+    }
+    // Bigger open caverns at varied depths — the rooms you light up with torches.
+    for (let c = 0; c < 8; c++) {
+      const cx = 6 + (rand() * (SX - 12) | 0), cz = 6 + (rand() * (SZ - 12) | 0);
+      const surf = this.heightAt(cx, cz);
+      const cy = clamp(3 + (rand() * (surf - 6) | 0), 2, Math.max(2, surf - 3));
+      carveSphere(cx, cy, cz, 2 + (rand() * 3 | 0));
+    }
+    // Surface entrances: a wandering sloped shaft down through open grass, so a
+    // kid can spot the hole and walk/drift down into the deep caves.
+    for (let e = 0; e < 9; e++) {
+      const x0 = 4 + (rand() * (SX - 8) | 0), z0 = 4 + (rand() * (SZ - 8) | 0);
+      if (protect.has(colKey(x0, z0))) continue;
+      const surf = this.heightAt(x0, z0);
+      if (surf < 5 || this.get(x0, surf, z0) !== B.GRASS) continue;   // only open grassy ground
+      let ex = x0, ez = z0;
+      for (let y = surf; y >= 2; y--) {
+        carveSphere(ex, y, ez, 1 + (rand() < 0.3 ? 1 : 0));
+        ex = clamp(ex + (rand() - 0.5) * 0.9, 1, SX - 2);
+        ez = clamp(ez + (rand() - 0.5) * 0.9, 1, SZ - 2);
+      }
+    }
+    // A guaranteed obvious cave mouth a few steps from spawn so a 6-yr-old finds
+    // the caves on his very first wander — a wide pit down into a little cavern.
+    // (Offset from spawn so he never loads standing over the hole.)
+    if (!protect.size) {
+      const sx = clamp((SX >> 1) + 6, 2, SX - 3), sz = clamp((SZ >> 1) + 6, 2, SZ - 3);
+      const surf = this.heightAt(sx, sz);
+      for (let y = surf; y >= 3; y--) carveSphere(sx, y, sz, y > surf - 3 ? 2 : 1);
+      carveSphere(sx, 5, sz, 3);   // a little room at the bottom
+    }
+  }
+
+  // Retroactively add caves to an already-generated world (e.g. an old save that
+  // predates caves) WITHOUT touching builds. Idempotent: samples for existing
+  // underground air and bails if the world already has caves.
+  carveCavesIfNone() {
+    let air = 0, checked = 0;
+    for (let x = 2; x < SX - 2; x += 3) for (let z = 2; z < SZ - 2; z += 3) {
+      const surf = this.heightAt(x, z);
+      for (let y = 2; y < surf - 2; y++) { checked++; if (this.get(x, y, z) === B.AIR) air++; }
+    }
+    if (checked === 0 || air / checked > 0.05) return;     // already has caves (or no underground)
+    const protect = new Set();
+    for (const key of this.placed) {
+      const rem = key % (SX * SZ);
+      const x = rem % SX, z = Math.floor(rem / SX);
+      for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
+        const nx = x + dx, nz = z + dz;
+        if (nx >= 0 && nx < SX && nz >= 0 && nz < SZ) protect.add(nx + nz * SX);
+      }
+    }
+    this.carveCaves(mulberry32(0x5caf3d), protect);
+  }
+
+  // The Deep Vault: an obsidian chamber near bedrock holding the legendary RELIC
+  // (the grand prize you gear up for), with a shaft up to the surface so you can
+  // find it and dig down. Carved once; build-safe (skips placed blocks/columns).
+  carveVault(rand, protect) {
+    protect = protect || new Set();
+    const colKey = (x, z) => x + z * SX;
+    let cx = SX >> 1, cz = SZ >> 1, tries = 0;
+    do {
+      cx = 10 + (rand() * (SX - 20) | 0); cz = 10 + (rand() * (SZ - 20) | 0); tries++;
+    } while (tries < 80 && (protect.has(colKey(cx, cz)) || this.heightAt(cx, cz) < 7 || Math.hypot(cx - this.spawn[0], cz - this.spawn[2]) < 14));
+    const fy = 2;                                  // floor sits just above bedrock
+    for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) for (let dy = 0; dy <= 4; dy++) {
+      const x = cx + dx, y = fy + dy, z = cz + dz;
+      if (x < 1 || x >= SX - 1 || z < 1 || z >= SZ - 1 || y < 1 || y >= SY) continue;
+      const k = this.idx(x, y, z);
+      if (protect.has(colKey(x, z)) || this.placed.has(k)) continue;
+      const wall = dx === -2 || dx === 2 || dz === -2 || dz === 2 || dy === 0 || dy === 4;
+      this.data[k] = wall ? B.OBSIDIAN : B.AIR;
+    }
+    this.data[this.idx(cx, fy + 1, cz)] = B.RELIC;   // the prize, on a little pedestal
+    const surf = this.heightAt(cx, cz);
+    for (let y = fy + 2; y <= surf + 1; y++) for (const [ox, oz] of [[0, 0], [1, 0]]) {
+      const x = cx + ox, z = cz + oz;
+      if (x < 1 || x >= SX - 1 || z < 1 || z >= SZ - 1 || protect.has(colKey(x, z))) continue;
+      const k = this.idx(x, y, z);
+      if (!this.placed.has(k) && this.data[k] !== B.BEDROCK) this.data[k] = B.AIR;
+    }
+    this.vault = [cx, fy + 1, cz];
+  }
+
+  // Find the single RELIC block (set from a fresh carve or after loading a save).
+  findVault() {
+    for (let i = 0; i < this.data.length; i++) if (this.data[i] === B.RELIC) {
+      const rem = i % (SX * SZ);
+      this.vault = [rem % SX, Math.floor(i / (SX * SZ)), Math.floor(rem / SX)];
+      return this.vault;
+    }
+    this.vault = null; return null;
+  }
+
+  // Add a vault to an older save that predates it, without disturbing builds.
+  carveVaultIfNone() {
+    if (this.findVault()) return;
+    const protect = new Set();
+    for (const key of this.placed) {
+      const rem = key % (SX * SZ); const x = rem % SX, z = Math.floor(rem / SX);
+      for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) { const nx = x + dx, nz = z + dz; if (nx >= 0 && nx < SX && nz >= 0 && nz < SZ) protect.add(nx + nz * SX); }
+    }
+    this.carveVault(mulberry32(0x7eaf5), protect);
+  }
+
+  // Carve a gentle sandy lagoon: a bowl of water rimmed by a sand beach. Used
+  // both for fresh worlds and (safely) to add a beach to older saved worlds.
+  carveBeach() {
+    const { x: bx, z: bz, r: br, waterY } = BEACH;
+    const x0 = Math.max(1, bx - br - 3), x1 = Math.min(SX - 2, bx + br + 3);
+    const z0 = Math.max(1, bz - br - 3), z1 = Math.min(SZ - 2, bz + br + 3);
+    for (let x = x0; x <= x1; x++) {
+      for (let z = z0; z <= z1; z++) {
+        const d = Math.hypot(x - bx, z - bz);
+        if (d >= br + 2.5) continue;
+        const top = this.heightAt(x, z);
+        const floor = Math.max(1, Math.min(top, (waterY - 3) + Math.round((d / br) * 3)));
+        for (let y = floor + 1; y < SY; y++) {
+          if (this.data[this.idx(x, y, z)] !== B.AIR) this.data[this.idx(x, y, z)] = B.AIR;
+        }
+        this.data[this.idx(x, floor, z)] = B.SAND;        // sandy bottom + beach
+        for (let y = floor + 1; y <= waterY; y++) this.data[this.idx(x, y, z)] = B.WATER;
+        this.markDirty(x, z);
+      }
+    }
+  }
+
+  // Add the beach to a loaded world only if the player hasn't built in that
+  // spot — so we never disturb anything Ezra made.
+  carveBeachIfClear() {
+    const { x: bx, z: bz, r: br } = BEACH;
+    for (const key of this.placed) {
+      const col = key % (SX * SZ);
+      const px = col % SX, pz = Math.floor(col / SX);
+      if (Math.hypot(px - bx, pz - bz) < br + 3) return false;
+    }
+    this.carveBeach();
+    return true;
   }
 
   placeTree(x, y, z, rand) {
@@ -213,6 +646,538 @@ export class World {
       }
     }
     this.data[this.idx(x, top + 1, z)] = B.LEAVES;
+  }
+
+  // A reddish Nether world: netherrack ground with scattered glowstone (light)
+  // and small lava patches (glow). Open-topped and bright so it's never gloomy.
+  generateNether() {
+    this.data.fill(B.AIR);
+    this.placed = new Set();
+    const rand = mulberry32(4242);
+    for (let x = 0; x < SX; x++) {
+      for (let z = 0; z < SZ; z++) {
+        let h = 5 + Math.round(1.5 * Math.sin(x * 0.2) + 1.5 * Math.cos(z * 0.18) + 1.2 * Math.sin((x + z) * 0.1));
+        h = Math.max(3, Math.min(11, h));
+        for (let y = 0; y <= h; y++) this.data[this.idx(x, y, z)] = (y === 0) ? B.BEDROCK : B.NETHERRACK;
+      }
+    }
+    for (let i = 0; i < 60; i++) {
+      const x = 3 + Math.floor(rand() * (SX - 6)), z = 3 + Math.floor(rand() * (SZ - 6));
+      const h = this.heightAt(x, z);
+      if (rand() < 0.5) this.data[this.idx(x, h + 1, z)] = B.GLOWSTONE;
+      else this.data[this.idx(x, h, z)] = B.LAVA;
+    }
+    // A little buried treasure down here too.
+    for (let i = 0; i < 14; i++) {
+      const id = rand() < 0.6 ? B.GOLD : B.DIAMOND;
+      const x = 2 + Math.floor(rand() * (SX - 4)), z = 2 + Math.floor(rand() * (SZ - 4));
+      const surf = this.heightAt(x, z);
+      if (surf < 3) continue;
+      const cy = 1 + Math.floor(rand() * (surf - 1));
+      if (this.get(x, cy, z) === B.NETHERRACK) this.data[this.idx(x, cy, z)] = id;
+    }
+    this.spawn = [SX / 2 + 0.5, 12, SZ / 2 + 0.5];
+    this.spawn[1] = this.heightAt(Math.floor(this.spawn[0]), Math.floor(this.spawn[2])) + 2;
+  }
+
+  // A shiny Gold World: golden hills over sand, glowstone lamps + diamond
+  // outcrops, and loads of buried treasure to dig up.
+  generateGold() {
+    this.data.fill(B.AIR);
+    this.placed = new Set();
+    this.portals = [];
+    const rand = mulberry32(7777);
+    for (let x = 0; x < SX; x++) {
+      for (let z = 0; z < SZ; z++) {
+        let h = 6 + Math.round(1.4 * Math.sin(x * 0.16) + 1.4 * Math.cos(z * 0.15) + 1.1 * Math.sin((x + z) * 0.08));
+        h = Math.max(3, Math.min(12, h));
+        for (let y = 0; y <= h; y++) {
+          let id;
+          if (y === 0) id = B.BEDROCK;
+          else if (y === h) id = B.GOLD;
+          else if (y >= h - 2) id = B.SAND;
+          else id = B.STONE;
+          this.data[this.idx(x, y, z)] = id;
+        }
+      }
+    }
+    for (let i = 0; i < 70; i++) {                 // glowstone lamps + diamond outcrops
+      const x = 2 + Math.floor(rand() * (SX - 4)), z = 2 + Math.floor(rand() * (SZ - 4));
+      const h = this.heightAt(x, z);
+      this.data[this.idx(x, h + 1, z)] = rand() < 0.5 ? B.GLOWSTONE : B.DIAMOND;
+    }
+    for (let i = 0; i < 60; i++) {                 // lots of buried treasure
+      const id = rand() < 0.5 ? B.GOLD : B.DIAMOND;
+      const x = 2 + Math.floor(rand() * (SX - 4)), z = 2 + Math.floor(rand() * (SZ - 4));
+      const surf = this.heightAt(x, z);
+      if (surf < 4) continue;
+      const cy = 1 + Math.floor(rand() * (surf - 2));
+      if (this.get(x, cy, z) === B.STONE) this.data[this.idx(x, cy, z)] = id;
+    }
+    this.spawn = [SX / 2 + 0.5, 12, SZ / 2 + 0.5];
+    this.spawn[1] = this.heightAt(Math.floor(this.spawn[0]), Math.floor(this.spawn[2])) + 2;
+  }
+
+  // A cosy Ant World: brown dirt + gravel ground with little dirt anthills and
+  // tunnel mouths — home to friendly ants you can pet.
+  generateAnt() {
+    this.data.fill(B.AIR);
+    this.placed = new Set();
+    this.portals = [];
+    const rand = mulberry32(5151);
+    for (let x = 0; x < SX; x++) {
+      for (let z = 0; z < SZ; z++) {
+        let h = 6 + Math.round(1.2 * Math.sin(x * 0.14) + 1.2 * Math.cos(z * 0.13));
+        h = Math.max(4, Math.min(11, h));
+        for (let y = 0; y <= h; y++) {
+          let id;
+          if (y === 0) id = B.BEDROCK;
+          else if (y === h) id = rand() < 0.2 ? B.SAND : B.DIRT;
+          else if (y >= h - 3) id = B.DIRT;
+          else id = rand() < 0.3 ? B.GRAVEL : B.STONE;
+          this.data[this.idx(x, y, z)] = id;
+        }
+      }
+    }
+    for (let i = 0; i < 16; i++) {                 // little dirt anthills with a hole on top
+      const x = 4 + Math.floor(rand() * (SX - 8)), z = 4 + Math.floor(rand() * (SZ - 8));
+      const h = this.heightAt(x, z);
+      const r = 1 + Math.floor(rand() * 2);
+      for (let dy = 1; dy <= r + 1; dy++) for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
+        if (Math.abs(dx) + Math.abs(dz) > (r + 1 - dy) + 1) continue;
+        const lx = x + dx, lz = z + dz;
+        if (lx > 0 && lx < SX && lz > 0 && lz < SZ) this.data[this.idx(lx, h + dy, lz)] = B.DIRT;
+      }
+      this.data[this.idx(x, h + 1, z)] = B.AIR;     // tunnel mouth
+    }
+    for (let i = 0; i < 18; i++) {                 // a little treasure underground
+      const id = rand() < 0.6 ? B.GOLD : B.DIAMOND;
+      const x = 2 + Math.floor(rand() * (SX - 4)), z = 2 + Math.floor(rand() * (SZ - 4));
+      const surf = this.heightAt(x, z);
+      if (surf < 4) continue;
+      const cy = 1 + Math.floor(rand() * (surf - 2));
+      if (this.get(x, cy, z) === B.STONE) this.data[this.idx(x, cy, z)] = id;
+    }
+    this.spawn = [SX / 2 + 0.5, 12, SZ / 2 + 0.5];
+    this.spawn[1] = this.heightAt(Math.floor(this.spawn[0]), Math.floor(this.spawn[2])) + 2;
+  }
+
+  // A rocky TNT World: piles of TNT and stone towers, just waiting to be blown up.
+  generateTnt() {
+    this.data.fill(B.AIR);
+    this.placed = new Set();
+    this.portals = [];
+    const rand = mulberry32(9090);
+    for (let x = 0; x < SX; x++) {
+      for (let z = 0; z < SZ; z++) {
+        let h = 5 + Math.round(1.0 * Math.sin(x * 0.15) + 1.0 * Math.cos(z * 0.14));
+        h = Math.max(3, Math.min(9, h));
+        for (let y = 0; y <= h; y++) this.data[this.idx(x, y, z)] = (y === 0) ? B.BEDROCK : B.STONE;
+      }
+    }
+    for (let i = 0; i < 44; i++) {                  // scattered TNT piles
+      const x = 3 + Math.floor(rand() * (SX - 6)), z = 3 + Math.floor(rand() * (SZ - 6));
+      const h = this.heightAt(x, z), pile = 1 + Math.floor(rand() * 3);
+      for (let k = 0; k < pile; k++) this.data[this.idx(x, h + 1 + k, z)] = B.TNT;
+    }
+    for (let i = 0; i < 22; i++) {                  // stone towers (with a little TNT inside)
+      const x = 3 + Math.floor(rand() * (SX - 6)), z = 3 + Math.floor(rand() * (SZ - 6));
+      const h = this.heightAt(x, z), th = 2 + Math.floor(rand() * 4);
+      for (let k = 1; k <= th; k++) this.data[this.idx(x, h + k, z)] = (rand() < 0.3) ? B.TNT : B.STONE;
+    }
+    this.spawn = [SX / 2 + 0.5, 12, SZ / 2 + 0.5];
+    this.spawn[1] = this.heightAt(Math.floor(this.spawn[0]), Math.floor(this.spawn[2])) + 2;
+  }
+
+  // A dreamy Sky World: grassy islands floating in a bright sky, with trees,
+  // glowstone lanterns, buried treasure, and soft clouds. Made for flying.
+  generateSky() {
+    this.data.fill(B.AIR);
+    this.placed = new Set();
+    this.portals = [];
+    const rand = mulberry32(2024);
+    const cxC = Math.floor(SX / 2), czC = Math.floor(SZ / 2);
+    // Build one floating island: a grassy disc that narrows as it goes down.
+    const island = (cx, cz, r, ty) => {
+      for (let dy = 0; dy < 6; dy++) {
+        const rr = r - dy * 1.2;
+        const y = ty - dy;
+        if (rr < 0.6 || y < 1) break;
+        for (let x = Math.max(1, Math.floor(cx - rr)); x <= Math.min(SX - 2, Math.ceil(cx + rr)); x++) {
+          for (let z = Math.max(1, Math.floor(cz - rr)); z <= Math.min(SZ - 2, Math.ceil(cz + rr)); z++) {
+            if (Math.hypot(x - cx, z - cz) > rr) continue;
+            this.data[this.idx(x, y, z)] = dy === 0 ? B.GRASS : (dy <= 2 ? B.DIRT : B.STONE);
+          }
+        }
+      }
+    };
+    // A big central island so spawn + the home portal sit on solid ground.
+    island(cxC, czC, 8, 10);
+    for (let i = 0; i < 16; i++) {
+      const cx = 6 + Math.floor(rand() * (SX - 12)), cz = 6 + Math.floor(rand() * (SZ - 12));
+      if (Math.hypot(cx - cxC, cz - czC) < 12) continue;        // keep the centre clear
+      island(cx, cz, 3 + Math.floor(rand() * 4), 7 + Math.floor(rand() * 9));
+    }
+    // Friendly trees on the grassy tops.
+    let trees = 0;
+    for (let attempt = 0; attempt < 300 && trees < 10; attempt++) {
+      const x = 3 + Math.floor(rand() * (SX - 6)), z = 3 + Math.floor(rand() * (SZ - 6));
+      const h = this.heightAt(x, z);
+      if (h > 0 && this.get(x, h, z) === B.GRASS) { this.placeTree(x, h + 1, z, rand); trees++; }
+    }
+    // Glowstone lanterns + a little buried treasure to dig up.
+    for (let i = 0; i < 40; i++) {
+      const x = 2 + Math.floor(rand() * (SX - 4)), z = 2 + Math.floor(rand() * (SZ - 4));
+      const h = this.heightAt(x, z);
+      if (h < 1) continue;
+      if (rand() < 0.4) this.data[this.idx(x, h + 1, z)] = B.GLOWSTONE;
+      else { const cy = Math.max(1, h - 1 - Math.floor(rand() * 2)); const cur = this.get(x, cy, z); if (cur === B.STONE || cur === B.DIRT) this.data[this.idx(x, cy, z)] = rand() < 0.5 ? B.GOLD : B.DIAMOND; }
+    }
+    // Soft clouds drifting up high (kept clear of the centre/spawn).
+    for (let i = 0; i < 26; i++) {
+      const x = 2 + Math.floor(rand() * (SX - 4)), z = 2 + Math.floor(rand() * (SZ - 4)), y = 16 + Math.floor(rand() * 4);
+      if (Math.hypot(x - cxC, z - czC) < 12) continue;
+      this.data[this.idx(x, y, z)] = B.SNOW;
+      if (x + 1 < SX) this.data[this.idx(x + 1, y, z)] = B.SNOW;
+      if (z + 1 < SZ) this.data[this.idx(x, y, z + 1)] = B.SNOW;
+    }
+    this.spawn = [cxC + 0.5, 12, czC + 0.5];
+    this.spawn[1] = this.heightAt(cxC, czC) + 2;
+  }
+
+  // The End: a pale End-stone island floating in a dark sky, ringed by obsidian
+  // pillars topped with glowing End Crystals — home to the friendly dragon.
+  // The crystal spots are stored so the Dragon manager can put a crystal on each.
+  generateEnd() {
+    const rand = mulberry32(7777);
+    this.data.fill(B.AIR);
+    this.placed = new Set();
+    this.portals = [];
+    this.crystalSpots = [];
+    const cxC = Math.floor(SX / 2), czC = Math.floor(SZ / 2), top = 9;
+    // One big flat-topped End-stone island in the middle.
+    for (let dy = 0; dy < 7; dy++) {
+      const rr = 16 - dy * 1.6, y = top - dy;
+      if (rr < 1 || y < 1) break;
+      for (let x = Math.max(1, Math.floor(cxC - rr)); x <= Math.min(SX - 2, Math.ceil(cxC + rr)); x++)
+        for (let z = Math.max(1, Math.floor(czC - rr)); z <= Math.min(SZ - 2, Math.ceil(czC + rr)); z++)
+          if (Math.hypot(x - cxC, z - czC) <= rr) this.data[this.idx(x, y, z)] = B.END_STONE;
+    }
+    // A ring of obsidian pillars, each topped with an End Crystal.
+    const pillars = 6, ringR = 12;
+    for (let i = 0; i < pillars; i++) {
+      const a = (i / pillars) * Math.PI * 2;
+      const px = Math.round(cxC + Math.cos(a) * ringR), pz = Math.round(czC + Math.sin(a) * ringR);
+      const ph = top + 4 + (i % 3);                    // varied pillar heights
+      for (let y = top + 1; y <= ph; y++) this.data[this.idx(px, y, pz)] = B.OBSIDIAN;
+      this.crystalSpots.push([px, ph + 2, pz]);        // crystal floats just above the pillar
+    }
+    this.spawn = [cxC + 0.5, top + 2, czC + 0.5];
+  }
+
+  // Lego World: a big flat green Lego baseplate (studded) under a bright sky —
+  // a clean Lego table to build vivid brick creations on.
+  generateLego() {
+    this.data.fill(B.AIR);
+    this.placed = new Set();
+    this.portals = [];
+    const base = 6;
+    for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) {
+      this.data[this.idx(x, 0, z)] = B.BEDROCK;
+      for (let y = 1; y < base; y++) this.data[this.idx(x, y, z)] = B.LEGO_GREEN;
+      this.data[this.idx(x, base, z)] = B.LEGO_GREEN;     // studded top = the baseplate
+    }
+    const put = (x, y, z, id) => { if (x >= 0 && x < SX && z >= 0 && z < SZ) this.data[this.idx(x, base + y, z)] = id; };
+    // A cheerful rainbow staircase — shows off the 3-D studs at every height.
+    const rainbow = [B.LEGO_RED, B.LEGO_ORANGE, B.LEGO_YELLOW, B.LEGO_LIME, B.LEGO_GREEN, B.LEGO_CYAN, B.LEGO_BLUE, B.LEGO_PURPLE];
+    for (let i = 0; i < rainbow.length; i++) for (let y = 1; y <= i + 1; y++) put(44, y, 38 + i, rainbow[i]);
+    // A little brick pyramid to spark ideas.
+    for (let y = 1; y <= 3; y++) for (let dx = -(3 - y); dx <= 3 - y; dx++) for (let dz = -(3 - y); dz <= 3 - y; dz++) put(20 + dx, y, 20 + dz, B.LEGO_PINK);
+    // A couple of sample brick stacks (not added to `placed`).
+    for (const [x, z, id] of [[16, 44, B.LEGO_CYAN], [40, 22, B.LEGO_WHITE]]) for (let y = 1; y <= 3; y++) put(x, y, z, id);
+    this.spawn = [SX / 2 + 0.5, base + 2, SZ / 2 + 0.5];
+  }
+
+  // The Build World: a big, clean, perfectly-flat grass plain — wide open and
+  // calm, made for building anything. (Larger feel via the open flatness.)
+  generateBuild() {
+    this.data.fill(B.AIR);
+    this.placed = new Set();
+    this.portals = [];
+    const base = 6;
+    for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) {
+      this.data[this.idx(x, 0, z)] = B.BEDROCK;
+      for (let y = 1; y < base; y++) this.data[this.idx(x, y, z)] = B.DIRT;
+      this.data[this.idx(x, base, z)] = B.GRASS;
+    }
+    this.spawn = [SX / 2 + 0.5, base + 2, SZ / 2 + 0.5];
+  }
+
+  // Space World (the big 100💎 reward): floating asteroids in a starry void.
+  // Low gravity (set in main) means you bounce sky-high between the islands.
+  generateSpace() {
+    this.data.fill(B.AIR);
+    this.placed = new Set();
+    this.portals = [];
+    this.blackHoles = [];                       // where the hidden void pits are
+    const rand = mulberry32(7777);
+    const cxC = Math.floor(SX / 2), czC = Math.floor(SZ / 2);
+    const G = 8;                                 // base moon surface level
+    // A big, drivable cratered moon surface covering the whole world — wide-open
+    // room for the Space Rover. Gentle rolling height keeps it interesting but
+    // smooth enough to zoom across.
+    const hgt = (x, z) => G + Math.round((Math.sin(x * 0.16) * Math.cos(z * 0.15) + Math.sin((x + z) * 0.08) * 0.7) * 1.6);
+    for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) {
+      const h = hgt(x, z);
+      this.data[this.idx(x, 0, z)] = B.BEDROCK;
+      for (let y = 1; y <= h; y++) this.data[this.idx(x, y, z)] = (y >= h - 1) ? B.MOON_ROCK : B.DEEPSLATE;
+    }
+    // Craters: shallow round dips pressed into the surface, away from spawn.
+    for (let i = 0; i < 28; i++) {
+      const cx = 4 + (rand() * (SX - 8) | 0), cz = 4 + (rand() * (SZ - 8) | 0);
+      if (Math.hypot(cx - cxC, cz - czC) < 8) continue;
+      const r = 2 + (rand() * 3 | 0);
+      for (let x = cx - r; x <= cx + r; x++) for (let z = cz - r; z <= cz + r; z++) {
+        if (x < 1 || z < 1 || x >= SX - 1 || z >= SZ - 1) continue;
+        const d = Math.hypot(x - cx, z - cz); if (d > r) continue;
+        const depth = Math.round((1 - d / r) * 2);
+        for (let k = 0; k < depth; k++) { const top = this.heightAt(x, z); if (top > 1) this.data[this.idx(x, top, z)] = B.AIR; }
+        const nt = this.heightAt(x, z);
+        if (nt > 0) this.data[this.idx(x, nt, z)] = (rand() < 0.06) ? B.CRYSTAL_ORE : B.MOON_ROCK;
+      }
+    }
+    // Scatter meteor boulders, sticky alien-goo puddles, gem ore + glow stones.
+    for (let i = 0; i < 70; i++) {
+      const x = 2 + (rand() * (SX - 4) | 0), z = 2 + (rand() * (SZ - 4) | 0);
+      if (Math.hypot(x - cxC, z - czC) < 6) continue;
+      const h = this.heightAt(x, z) + 1; if (h < 2) continue;
+      const r = rand();
+      if (r < 0.16) { this.data[this.idx(x, h, z)] = B.METEOR; this.data[this.idx(x, h + 1, z)] = B.METEOR; }
+      else if (r < 0.32) this.data[this.idx(x, h, z)] = B.ALIEN_GOO;
+      else if (r < 0.50) this.data[this.idx(x, h, z)] = B.GLOW_CRYSTAL;   // pure decor/light (not minable 💎)
+    }
+    // Buried crystal veins inside the moon — drive around, dig down, and mine
+    // them for 💎 (a reason to explore the big moon with the rover).
+    for (let i = 0; i < 12; i++) {
+      const cx = 6 + (rand() * (SX - 12) | 0), cz = 6 + (rand() * (SZ - 12) | 0);
+      const top = this.heightAt(cx, cz); if (top < 4) continue;
+      const n = 3 + (rand() * 4 | 0);
+      for (let k = 0; k < n; k++) {
+        const x = cx + ((rand() * 3 | 0) - 1), z = cz + ((rand() * 3 | 0) - 1);
+        const y = top - 1 - (rand() * 3 | 0);
+        if (y > 1 && this.get(x, y, z) !== B.AIR && this.get(x, y, z) !== B.BEDROCK) this.data[this.idx(x, y, z)] = B.CRYSTAL_ORE;
+      }
+    }
+    // Black holes: dark round pits punched straight through the moon into the
+    // void. Hard to spot while you zoom around — fall in and *whoosh*, you pop
+    // safely back to the launch pad (handled in main). A little space adventure!
+    for (let i = 0; i < 7; i++) {
+      const cx = 8 + (rand() * (SX - 16) | 0), cz = 8 + (rand() * (SZ - 16) | 0);
+      if (Math.hypot(cx - cxC, cz - czC) < 13) continue;     // never right at spawn
+      const r = 2 + (rand() * 1.4 | 0);
+      for (let x = cx - r - 1; x <= cx + r + 1; x++) for (let z = cz - r - 1; z <= cz + r + 1; z++) {
+        if (x < 1 || z < 1 || x >= SX - 1 || z >= SZ - 1) continue;
+        const d = Math.hypot(x - cx, z - cz);
+        if (d <= r) { for (let y = 0; y < SY; y++) this.data[this.idx(x, y, z)] = B.AIR; }       // open shaft to the void
+        else if (d <= r + 1) { const top = this.heightAt(x, z); if (top > 0) this.data[this.idx(x, top, z)] = B.BLACKSTONE; }  // subtle dark rim
+      }
+      this.blackHoles.push([cx, cz, r]);
+    }
+    // Floating asteroid islands above the moon — bounce up (low gravity!) to explore.
+    const island = (cx, cz, r, ty, topId) => {
+      for (let dy = 0; dy < 4; dy++) {
+        const rr = r - dy * 1.1, y = ty - dy;
+        if (rr < 0.6 || y < G + 5) break;
+        for (let x = Math.max(1, Math.floor(cx - rr)); x <= Math.min(SX - 2, Math.ceil(cx + rr)); x++)
+          for (let z = Math.max(1, Math.floor(cz - rr)); z <= Math.min(SZ - 2, Math.ceil(cz + rr)); z++) {
+            if (Math.hypot(x - cx, z - cz) > rr) continue;
+            this.data[this.idx(x, y, z)] = dy === 0 ? topId : B.DEEPSLATE;
+          }
+      }
+    };
+    for (let i = 0; i < 14; i++) {
+      const cx = 6 + (rand() * (SX - 12) | 0), cz = 6 + (rand() * (SZ - 12) | 0);
+      const ty = G + 10 + (rand() * 12 | 0);
+      island(cx, cz, 2 + (rand() * 3 | 0), ty, rand() < 0.4 ? B.STARRY : B.QUARTZ);
+      if (rand() < 0.5 && this.heightAt(cx, cz) > 0) this.data[this.idx(cx, ty + 1, cz)] = B.GLOW_CRYSTAL;
+    }
+    this.spawn = [cxC + 0.5, hgt(cxC, czC) + 2, czC + 0.5];
+  }
+
+  // The Secret World: a bright festive plaza for the fun park. Flat quartz with
+  // cheerful colour rings + glowing lamp posts. The rides (Ferris wheel,
+  // carousel, balloons) are animated meshes drawn above this by SecretPark.
+  generateSecret() {
+    this.data.fill(B.AIR);
+    this.placed = new Set();
+    this.portals = [];
+    const base = 6, cx = SX / 2, cz = SZ / 2;
+    const ring = [B.QUARTZ, B.PINK, B.QUARTZ, B.CYAN, B.QUARTZ, B.YELLOW, B.QUARTZ, B.PURPLE];
+    for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) {
+      this.data[this.idx(x, 0, z)] = B.BEDROCK;
+      for (let y = 1; y < base; y++) this.data[this.idx(x, y, z)] = B.QUARTZ;
+      const d = Math.round(Math.hypot(x - cx, z - cz));
+      this.data[this.idx(x, base, z)] = ring[d % ring.length];   // concentric colour rings
+    }
+    // Glowing lamp posts around the plaza (a pillar topped with a sea lantern).
+    for (const [x, z] of [[10, 10], [54, 10], [10, 54], [54, 54], [32, 8], [32, 56], [8, 32], [56, 32]]) {
+      for (let y = 1; y <= 3; y++) this.data[this.idx(x, base + y, z)] = B.STONE_BRICK;
+      this.data[this.idx(x, base + 4, z)] = B.SEA_LANTERN;
+    }
+    this.spawn = [cx + 0.5, base + 2, cz + 8.5];
+  }
+
+  // Boom! Clear destructible blocks within radius r of (cx,cy,cz). Returns the
+  // positions of any *other* TNT caught in the blast (for chain reactions).
+  explode(cx, cy, cz, r) {
+    const chain = [], r2 = r * r;
+    const y0 = Math.max(1, Math.floor(cy - r)), y1 = Math.min(SY - 1, Math.floor(cy + r));
+    const x0 = Math.max(0, Math.floor(cx - r)), x1 = Math.min(SX - 1, Math.floor(cx + r));
+    const z0 = Math.max(0, Math.floor(cz - r)), z1 = Math.min(SZ - 1, Math.floor(cz + r));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
+      const dx = x + 0.5 - cx, dy = y + 0.5 - cy, dz = z + 0.5 - cz;
+      if (dx * dx + dy * dy + dz * dz > r2) continue;
+      const id = this.get(x, y, z);
+      if (id === B.AIR) continue;
+      const def = BLOCKS[id];
+      if (def && def.indestructible) continue;       // bedrock + portal survive
+      if (this.isPortalBlock(x, y, z)) continue;     // portal frames survive blasts
+      if (id === B.TNT || id === B.MEGA_TNT) { chain.push([x, y, z]); continue; }
+      this.set(x, y, z, B.AIR);
+      this.placed.delete(this.idx(x, y, z));
+    }
+    return chain;
+  }
+
+  // Build a portal: an obsidian frame on a small pad with a step in front. The
+  // swirl interior is filled only when `active` (so it can be a locked reward).
+  // `dest` is the world key this gateway leads to; returns the portal record.
+  addPortal(ox, oz, groundBlock, dest, active) {
+    // Standing level = the first air cell above the highest ground under the frame.
+    let base = 1;
+    for (let dx = 0; dx < 4; dx++) base = Math.max(base, this.heightAt(ox + dx, oz) + 1, this.heightAt(ox + dx, oz + 1) + 1);
+    // Fill any dips so the doorway sits flush and there's solid footing right in front.
+    for (let dx = 0; dx < 4; dx++) {
+      for (let yy = this.heightAt(ox + dx, oz) + 1; yy < base; yy++) this.set(ox + dx, yy, oz, groundBlock);
+      for (let yy = this.heightAt(ox + dx, oz + 1) + 1; yy < base; yy++) this.set(ox + dx, yy, oz + 1, groundBlock);
+    }
+    // Recess the frame one block so its bottom row is flush with the ground and the
+    // glowing swirl starts at FOOT level — you walk straight in, no hopping over a sill.
+    const fy = base - 1;
+    for (let dx = 0; dx < 4; dx++) for (let dy = 0; dy < 5; dy++) {
+      if (dx === 0 || dx === 3 || dy === 0 || dy === 4) this.set(ox + dx, fy + dy, oz, B.OBSIDIAN);
+    }
+    const portal = { f: [ox, fy, oz], dest, a: [ox + 1.5, base, oz + 1.5], active: false };
+    this.portals.push(portal);
+    this.setPortalActive(portal, !!active);
+    return portal;
+  }
+
+  // Fill (or clear) one portal's swirl — used to open a gateway once it's earned.
+  setPortalActive(portal, active) {
+    if (!portal) return;
+    const [ox, oy, oz] = portal.f;
+    for (let dx = 1; dx < 3; dx++) for (let dy = 1; dy < 4; dy++) this.set(ox + dx, oy + dy, oz, active ? B.PORTAL : B.AIR);
+    portal.active = !!active;
+  }
+
+  // Which active portal's swirl is at this block? (for stepping through). Works
+  // for any portal — the built obsidian frames and the auto ones — by finding the
+  // nearest active portal whenever you're standing in a PORTAL swirl block.
+  portalAt(x, y, z) {
+    if (this.get(x, y, z) !== B.PORTAL) return null;
+    let best = null, bd = Infinity;
+    for (const p of this.portals) {
+      if (!p.active) continue;
+      const dx = x - p.a[0], dy = y - p.a[1], dz = z - p.a[2], d = dx * dx + dy * dy + dz * dz;
+      if (d < bd) { bd = d; best = p; }
+    }
+    return best;
+  }
+
+  // Minecraft-style: is (x,y,z) an air cell inside a complete obsidian frame
+  // (a closed vertical rectangle)? Returns the interior air cells, or null.
+  findFrame(x, y, z) {
+    if (this.get(x, y, z) !== B.AIR) return null;
+    for (const ax of [0, 1]) {               // 0 = frame in the XY plane, 1 = ZY plane
+      const cells = [], seen = new Set(), stack = [[x, y, z]];
+      let ok = true;
+      while (stack.length) {
+        const [cx, cy, cz] = stack.pop();
+        const k = cx + ',' + cy + ',' + cz;
+        if (seen.has(k)) continue; seen.add(k);
+        if (cx < 0 || cx >= SX || cy < 0 || cy >= SY || cz < 0 || cz >= SZ) { ok = false; break; }
+        const id = this.get(cx, cy, cz);
+        if (id === B.OBSIDIAN) continue;       // frame wall — bounds the flood
+        if (id !== B.AIR) { ok = false; break; }   // leaky / not a clean frame
+        cells.push([cx, cy, cz]);
+        if (cells.length > 30) { ok = false; break; }  // open or too big
+        stack.push([cx, cy + 1, cz], [cx, cy - 1, cz]);
+        if (ax === 0) stack.push([cx + 1, cy, cz], [cx - 1, cy, cz]);
+        else stack.push([cx, cy, cz + 1], [cx, cy, cz - 1]);
+      }
+      if (ok && cells.length >= 2 && cells.length <= 30) return cells;
+    }
+    return null;
+  }
+
+  // Light a found frame: fill its interior with the portal swirl + register the
+  // gateway leading to `dest`. Returns the portal.
+  lightFrame(cells, dest) {
+    let minX = 1e9, minY = 1e9, minZ = 1e9;
+    for (const c of cells) { this.set(c[0], c[1], c[2], B.PORTAL); minX = Math.min(minX, c[0]); minY = Math.min(minY, c[1]); minZ = Math.min(minZ, c[2]); }
+    const bottom = cells.slice().sort((a, b) => a[1] - b[1])[0];
+    const portal = { f: [minX - 1, minY - 1, minZ], dest, a: [bottom[0] + 0.5, bottom[1], bottom[2] + 0.5], active: true };
+    this.portals.push(portal);
+    return portal;
+  }
+
+  // Is this block part of any portal (frame or swirl)? Such blocks are protected
+  // from digging and explosions, so a gateway can never be accidentally lost.
+  isPortalBlock(x, y, z) {
+    for (const p of this.portals) {
+      const [ox, oy, oz] = p.f;
+      if (z === oz && x >= ox && x <= ox + 3 && y >= oy && y <= oy + 4) return true;
+    }
+    return false;
+  }
+
+  // Redstone! Flip a lever (LEVER_ON) → power spreads through REDSTONE wire to
+  // any touching lamp, which lights up (REDLAMP → REDLAMP_ON). Recomputed from
+  // scratch whenever a lever/wire/lamp changes. Returns how many lamps are lit.
+  updateRedstone() {
+    const leverOn = [], lamps = [];
+    for (let i = 0; i < this.data.length; i++) {
+      const id = this.data[i];
+      if (id === B.LEVER_ON) leverOn.push(i);
+      else if (id === B.REDLAMP || id === B.REDLAMP_ON) lamps.push(i);
+    }
+    if (!lamps.length) return 0;                 // nothing to light → done fast
+    // Flood power through connected redstone wire (6-neighbour).
+    const powered = new Set(), q = [];
+    const N = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+    const xyz = (i) => [i % SX, Math.floor(i / (SX * SZ)), Math.floor(i / SX) % SZ];
+    const feedWire = (x, y, z) => {
+      if (this.get(x, y, z) !== B.REDSTONE) return;
+      const k = this.idx(x, y, z);
+      if (!powered.has(k)) { powered.add(k); q.push([x, y, z]); }
+    };
+    for (const li of leverOn) { const [x, y, z] = xyz(li); for (const [dx, dy, dz] of N) feedWire(x + dx, y + dy, z + dz); }
+    while (q.length) { const [x, y, z] = q.pop(); for (const [dx, dy, dz] of N) feedWire(x + dx, y + dy, z + dz); }
+    // A lamp lights if it touches an on-lever or a powered wire.
+    let lit = 0;
+    for (const li of lamps) {
+      const [x, y, z] = xyz(li);
+      let on = false;
+      for (const [dx, dy, dz] of N) {
+        const nx = x + dx, ny = y + dy, nz = z + dz, nid = this.get(nx, ny, nz);
+        if (nid === B.LEVER_ON || (nid === B.REDSTONE && powered.has(this.idx(nx, ny, nz)))) { on = true; break; }
+      }
+      const want = on ? B.REDLAMP_ON : B.REDLAMP;
+      if (this.data[li] !== want) this.set(x, y, z, want);
+      if (on) lit++;
+    }
+    return lit;
   }
 
   markAllDirty() { for (let i = 0; i < this.meshes.length; i++) this.dirty.add(i); }
@@ -234,10 +1199,95 @@ export class World {
     return AO_LEVEL[ao];
   }
 
+  // --- Light fields (session 42) -----------------------------------------
+  // Two derived per-voxel light levels (0..15), recomputed from the blocks:
+  //  • skylight — bright (15) above the surface, 0 the moment a solid block is
+  //    overhead. So the open world stays bright but caves/roofed rooms go dark.
+  //  • blocklight — a flood-fill from glowing blocks (torches, glowstone, lava…)
+  //    that spreads through air with a 1-level falloff, so a torch lights a pool
+  //    around it. Light passes through air + see-through blocks (glass/leaves).
+  // Derived only (never saved): recomputed on load and after any block change.
+  lightPasses(id) { return id === B.AIR || (BLOCKS[id] && BLOCKS[id].seethrough); }
+
+  // Light of the empty cell a face looks into (its outward neighbour), 0..15.
+  // Above the world counts as open sky; out-of-bounds sides are dark (and culled).
+  lightSkyAt(x, y, z) {
+    if (y >= SY) return 15;
+    if (!this.skyLight || x < 0 || x >= SX || y < 0 || z < 0 || z >= SZ) return 15;
+    return this.skyLight[this.idx(x, y, z)];
+  }
+  lightBlkAt(x, y, z) {
+    if (!this.blockLight || x < 0 || x >= SX || y < 0 || y >= SY || z < 0 || z >= SZ) return 0;
+    return this.blockLight[this.idx(x, y, z)];
+  }
+
+  computeLight() {
+    const N = SX * SY * SZ;
+    if (!this.skyLight || this.skyLight.length !== N) this.skyLight = new Uint8Array(N);
+    if (!this.blockLight || this.blockLight.length !== N) this.blockLight = new Uint8Array(N);
+    // One world is lit at a time, so the BFS queue is a shared scratch buffer.
+    if (!_lightQueue || _lightQueue.length !== N) _lightQueue = new Int32Array(N);
+    const sky = this.skyLight, blk = this.blockLight, data = this.data, q = _lightQueue;
+    sky.fill(0); blk.fill(0);
+
+    // Skylight: each column is lit (15) from the top down until the first block
+    // that blocks light; everything below that is 0 (needs torches). Cheap, and
+    // gives clean "outside bright / inside dark" without ugly soft shadows.
+    for (let x = 0; x < SX; x++) {
+      for (let z = 0; z < SZ; z++) {
+        let i = this.idx(x, SY - 1, z);
+        for (let y = SY - 1; y >= 0; y--, i -= SX * SZ) {
+          if (!this.lightPasses(data[i])) break;
+          sky[i] = 15;
+        }
+      }
+    }
+
+    // Block light: seed every glowing block, then flood outward through passable
+    // cells losing one level per step (a classic voxel light BFS).
+    let head = 0, tail = 0;
+    for (let i = 0; i < N; i++) {
+      const e = LIGHT_EMIT[data[i]] || 0;
+      if (e > 0) { blk[i] = e; q[tail++] = i; }
+    }
+    const SXZ = SX * SZ;
+    while (head < tail) {
+      const i = q[head++];
+      const lvl = blk[i];
+      if (lvl <= 1) continue;
+      const x = i % SX, y = (i / SXZ) | 0, z = ((i / SX) | 0) % SZ;
+      const nbrs = [
+        x > 0 ? i - 1 : -1, x < SX - 1 ? i + 1 : -1,
+        z > 0 ? i - SX : -1, z < SZ - 1 ? i + SX : -1,
+        y > 0 ? i - SXZ : -1, y < SY - 1 ? i + SXZ : -1,
+      ];
+      for (const ni of nbrs) {
+        if (ni < 0) continue;
+        if (blk[ni] >= lvl - 1) continue;
+        if (!this.lightPasses(data[ni])) continue;   // light stops at solid blocks
+        blk[ni] = lvl - 1;
+        if (tail < N) q[tail++] = ni;                // guard: never overflow the queue
+      }
+    }
+    this.lightDirty = false;
+  }
+
   buildChunkArrays(cx, cz) {
-    const pos = [], uv = [], col = [], light = [], idxArr = [];
+    const pos = [], uv = [], col = [], light = [], blight = [], idxArr = [];
     const x0 = cx * CHUNK, z0 = cz * CHUNK;
     let base = 0;
+    // Push one quad (4 corners, CCW) for a Lego stud face: textured with the
+    // brick's side tile + tint so the bump matches the brick colour. Studs sit
+    // on top of the brick, so they take the light of the cell above.
+    const studQuad = (corners, sh, rs, t, sN, bN) => {
+      const uvs = [[0, 0], [1, 0], [1, 1], [0, 1]];
+      for (let k = 0; k < 4; k++) {
+        pos.push(corners[k][0], corners[k][1], corners[k][2]);
+        uv.push(uvs[k][0] ? rs.u1 : rs.u0, uvs[k][1] ? rs.v1 : rs.v0);
+        col.push(t[0], t[1], t[2]); light.push(sh * sN); blight.push(sh * bN);
+      }
+      idxArr.push(base, base + 1, base + 2, base, base + 2, base + 3); base += 4;
+    };
     outer:
     for (let x = x0; x < x0 + CHUNK; x++) {
       for (let z = z0; z < z0 + CHUNK; z++) {
@@ -248,23 +1298,48 @@ export class World {
           if (base + 24 > 0xffff) break outer;
           const def = BLOCKS[id];
           for (const f of FACES) {
-            if (this.opaqueAt(x + f.n[0], y + f.n[1], z + f.n[2])) continue;
+            const nx = x + f.n[0], ny = y + f.n[1], nz = z + f.n[2];
+            if (this.opaqueAt(nx, ny, nz)) continue;
+            // Don't draw the face between two of the same see-through block (so a
+            // glass or leaf wall stays clean instead of double-faced).
+            if (def.seethrough && this.get(nx, ny, nz) === id) continue;
             const tile = def.tiles[f.slot];
             const r = getUV(tile);
             const t = def.tint;
+            // Light comes from the empty cell this face looks into (its neighbour),
+            // split into skylight (fades at night) and block light (torches/glow).
+            const sN = this.lightSkyAt(nx, ny, nz) / 15, bN = this.lightBlkAt(nx, ny, nz) / 15;
             for (const vert of f.v) {
               pos.push(x + vert.o[0], y + vert.o[1], z + vert.o[2]);
               uv.push(vert.uv[0] ? r.u1 : r.u0, vert.uv[1] ? r.v1 : r.v0);
               col.push(t[0], t[1], t[2]);
-              light.push(f.shade * this.vertexAO(x, y, z, f.n, vert.o));
+              const sh = f.shade * this.vertexAO(x, y, z, f.n, vert.o);
+              light.push(sh * sN); blight.push(sh * bN);
             }
             idxArr.push(base, base + 1, base + 2, base, base + 2, base + 3);
             base += 4;
           }
+          // Lego brick with open air above → raise 4 little 3-D studs on top.
+          // Guard the stud verts separately (up to 80) so a dense build can't
+          // overflow the Uint16 index range between the per-block check above.
+          if (isLego(id) && this.get(x, y + 1, z) === B.AIR && base + 80 <= 0xffff) {
+            const rs = getUV(def.tiles.side), t = def.tint;
+            const sN = this.lightSkyAt(x, y + 1, z) / 15, bN = this.lightBlkAt(x, y + 1, z) / 15;
+            for (const [sx, sz] of STUD_CENTERS) {
+              const ax = x + sx - STUD_R, bx = x + sx + STUD_R;
+              const az = z + sz - STUD_R, bz = z + sz + STUD_R;
+              const y0 = y + 1, y1 = y + 1 + STUD_H;
+              studQuad([[ax, y1, bz], [bx, y1, bz], [bx, y1, az], [ax, y1, az]], 1.00, rs, t, sN, bN); // top
+              studQuad([[bx, y0, az], [ax, y0, az], [ax, y1, az], [bx, y1, az]], 0.70, rs, t, sN, bN); // -z
+              studQuad([[ax, y0, bz], [bx, y0, bz], [bx, y1, bz], [ax, y1, bz]], 0.85, rs, t, sN, bN); // +z
+              studQuad([[ax, y0, az], [ax, y0, bz], [ax, y1, bz], [ax, y1, az]], 0.65, rs, t, sN, bN); // -x
+              studQuad([[bx, y0, bz], [bx, y0, az], [bx, y1, az], [bx, y1, bz]], 0.80, rs, t, sN, bN); // +x
+            }
+          }
         }
       }
     }
-    return { pos, uv, col, light, idxArr };
+    return { pos, uv, col, light, blight, idxArr };
   }
 
   rebuildChunk(ci) {
@@ -276,12 +1351,17 @@ export class World {
     mesh.setAttrib('aUV', new Float32Array(a.uv), 2);
     mesh.setAttrib('aColor', new Float32Array(a.col), 3);
     mesh.setAttrib('aLight', new Float32Array(a.light), 1);
+    mesh.setAttrib('aBlockLight', new Float32Array(a.blight), 1);
     mesh.setIndex(new Uint16Array(a.idxArr));
   }
 
   rebuildAll() { for (let i = 0; i < this.meshes.length; i++) this.rebuildChunk(i); }
 
   flushDirty(limit) {
+    // Refresh the light field once before re-meshing any changed chunks, so the
+    // new mesh bakes in the updated torch/sky light. The dirty 3×3 chunk halo
+    // around each edit comfortably covers a single torch's 15-block reach.
+    if (this.lightDirty) this.computeLight();
     let n = 0;
     for (const ci of this.dirty) {
       this.rebuildChunk(ci);
@@ -323,15 +1403,106 @@ export class World {
 
   // --- Save / load (raw bytes, base64 into localStorage) ---
   serialize() {
-    return { v: 1, w: bytesToBase64(this.data) };
+    // v3: run-length-encoded bytes (tiny for flat/uniform worlds) + the world
+    // dims, so a future size change can migrate old saves without losing builds.
+    return { v: 3, d: [SX, SY, SZ], rle: 1, w: bytesToBase64(rleEncode(this.data)), p: [...this.placed], portals: this.portals, cs: this.crystalSpots || null };
   }
   loadFrom(obj) {
-    if (!obj || obj.v !== 1 || !obj.w) return false;
-    const bytes = base64ToBytes(obj.w);
-    if (bytes.length !== this.data.length) return false;
-    this.data.set(bytes);
+    if (!obj || !obj.w) return false;
+    const [osx, osy, osz] = obj.d || [64, 32, 64];     // old saves had no dims → 64³
+    const total = osx * osy * osz;
+    let bytes = base64ToBytes(obj.w);
+    if (obj.rle) bytes = rleDecode(bytes, total);
+    if (bytes.length !== total) return false;          // corrupt / wrong size
+    const sameSize = (osx === SX && osy === SY && osz === SZ);
+    if (sameSize) {
+      this.data.set(bytes);                            // exact: replace everything
+    } else {
+      // Migrate a smaller old world into this (already-generated) bigger one:
+      // overlay every old cell at the same coords, keeping fresh terrain around it.
+      const cx = Math.min(osx, SX), cy = Math.min(osy, SY), cz = Math.min(osz, SZ);
+      for (let y = 0; y < cy; y++) for (let z = 0; z < cz; z++) {
+        const ob = z * osx + y * osx * osz, nb = this.idx(0, y, z);
+        for (let x = 0; x < cx; x++) this.data[nb + x] = bytes[ob + x];
+      }
+    }
+    // Player-placed blocks (remap packed indices if the world grew).
+    this.placed = new Set();
+    for (const k of (obj.p || [])) {
+      if (sameSize) { this.placed.add(k); continue; }
+      const ox = k % osx, oz = Math.floor(k / osx) % osz, oy = Math.floor(k / (osx * osz));
+      if (ox < SX && oy < SY && oz < SZ) this.placed.add(this.idx(ox, oy, oz));
+    }
+    this.portals = (obj.portals || []).map((p) => ({ f: p.f.slice(), dest: p.dest, a: p.a.slice(), active: !!p.active }));
+    if (obj.cs) this.crystalSpots = obj.cs.map((c) => c.slice());   // End-world crystal pillars
     return true;
   }
+
+  // Migrate an OLD (shallower) overworld save into this freshly-generated DEEP
+  // overworld: KEEP the new deep terrain + caves + vault, and lift the player's
+  // builds straight up onto the new, higher surface so nothing is lost. Each
+  // build column shifts by (new ground height − old ground height), preserving
+  // its shape and keeping it grounded. Used only the first time an old save loads
+  // into the deeper world; afterwards saves are already deep (exact load).
+  liftOldBuildsInto(obj) {
+    if (!obj || !obj.w) return false;
+    const [osx, osy, osz] = obj.d || [64, 32, 64];
+    const total = osx * osy * osz;
+    let bytes = base64ToBytes(obj.w);
+    if (obj.rle) bytes = rleDecode(bytes, total);
+    if (bytes.length !== total) return false;
+    const oIdx = (x, y, z) => x + z * osx + y * osx * osz;
+    const oldPlaced = new Set(obj.p || []);
+    // Old natural ground height per column = highest solid the player did NOT place.
+    const oldGround = (x, z) => {
+      for (let y = osy - 1; y >= 0; y--) { const k = oIdx(x, y, z); if (bytes[k] !== B.AIR && !oldPlaced.has(k)) return y; }
+      return 0;
+    };
+    const shiftCache = new Map();
+    const colShift = (x, z) => {
+      const key = x + z * SX; let s = shiftCache.get(key);
+      if (s === undefined) { s = this.heightAt(x, z) - oldGround(x, z); shiftCache.set(key, s); }
+      return s;
+    };
+    this.placed = new Set();
+    for (const k of oldPlaced) {
+      const ox = k % osx, oz = Math.floor(k / osx) % osz, oy = Math.floor(k / (osx * osz));
+      if (ox < 0 || ox >= SX || oz < 0 || oz >= SZ) continue;
+      const id = bytes[oIdx(ox, oy, oz)];
+      if (id === B.AIR) continue;
+      const ny = oy + colShift(ox, oz);
+      if (ny < 1 || ny >= SY) continue;
+      const nk = this.idx(ox, ny, oz);
+      this.data[nk] = id;
+      this.placed.add(nk);
+    }
+    // Portals are rebuilt at the new ground by tidyPortals/regroundHome after load.
+    this.portals = (obj.portals || []).map((p) => ({ f: p.f.slice(), dest: p.dest, a: p.a.slice(), active: !!p.active }));
+    this.deepMigrated = true;   // signal the loader to drop the player at the new surface
+    return true;
+  }
+}
+
+// Run-length encode/decode the voxel array (3 bytes per run: value + 16-bit count).
+// Block worlds are full of long runs (air, floors, stone), so this shrinks saves
+// massively — which is what lets the world be bigger without blowing the quota.
+function rleEncode(bytes) {
+  const out = [];
+  for (let i = 0; i < bytes.length;) {
+    const v = bytes[i]; let run = 1;
+    while (i + run < bytes.length && bytes[i + run] === v && run < 65535) run++;
+    out.push(v, run & 0xff, (run >> 8) & 0xff);
+    i += run;
+  }
+  return new Uint8Array(out);
+}
+function rleDecode(rle, len) {
+  const out = new Uint8Array(len); let o = 0;
+  for (let i = 0; i + 2 < rle.length; i += 3) {
+    const v = rle[i], run = rle[i + 1] | (rle[i + 2] << 8);
+    for (let j = 0; j < run && o < len; j++) out[o++] = v;
+  }
+  return out;
 }
 
 function bytesToBase64(bytes) {

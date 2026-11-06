@@ -81,6 +81,31 @@ const SPECIES = {
     addBox(A, 0, 0.52, 0.42, 0.05, 0.05, 0.16, [0.95, 0.62, 0.28]);
     legs(A, 0.06, 0.12, 0.06, 0.10, 0.20, [0.9, 0.55, 0.22]);
   },
+  horse(A) {
+    const body = [0.52, 0.36, 0.22], dark = [0.30, 0.19, 0.10], mane = [0.22, 0.14, 0.07];
+    addBox(A, 0, 0.68, 0.04, 0.26, 0.22, 0.50, body);      // body
+    addBox(A, 0, 0.92, -0.42, 0.13, 0.22, 0.15, body);     // neck
+    addBox(A, 0, 1.06, -0.58, 0.12, 0.13, 0.20, body);     // head
+    addBox(A, 0, 1.00, -0.74, 0.09, 0.09, 0.08, dark);     // snout
+    addBox(A, 0.08, 1.22, -0.52, 0.04, 0.07, 0.03, body);  // ears
+    addBox(A, -0.08, 1.22, -0.52, 0.04, 0.07, 0.03, body);
+    addBox(A, 0, 1.06, -0.40, 0.05, 0.13, 0.10, mane);     // mane
+    addBox(A, 0, 1.18, -0.50, 0.05, 0.07, 0.06, mane);
+    addBox(A, 0, 0.74, 0.54, 0.05, 0.20, 0.06, mane);      // tail
+    legs(A, 0.07, 0.30, 0.08, 0.18, 0.34, dark);           // four long legs
+  },
+  ant(A) {
+    const dark = [0.16, 0.12, 0.10], dk2 = [0.24, 0.17, 0.13];
+    addBox(A, 0, 0.18, -0.24, 0.11, 0.10, 0.11, dk2);    // head
+    addBox(A, 0, 0.18, -0.02, 0.12, 0.10, 0.12, dark);   // thorax
+    addBox(A, 0, 0.18, 0.26, 0.15, 0.13, 0.18, dark);    // abdomen
+    addBox(A, 0.06, 0.32, -0.32, 0.02, 0.06, 0.02, dark);  // antenna R
+    addBox(A, -0.06, 0.32, -0.32, 0.02, 0.06, 0.02, dark); // antenna L
+    for (const dz of [-0.10, 0.04, 0.16]) {              // six little legs
+      addBox(A, 0.15, 0.07, dz, 0.04, 0.07, 0.03, dark);
+      addBox(A, -0.15, 0.07, dz, 0.04, 0.07, 0.03, dark);
+    }
+  },
 };
 
 const KINDS = ['pig', 'sheep', 'cow', 'chick', 'pig', 'cat'];
@@ -114,9 +139,10 @@ class Animal {
 }
 
 export class Animals {
-  constructor(gl, world) {
+  constructor(gl, world, kinds) {
     this.gl = gl;
     this.world = world;
+    this.kinds = kinds || KINDS;   // which species this group spawns
     this.meshes = {};
     for (const k of Object.keys(SPECIES)) this.meshes[k] = makeMesh(gl, k);
     this.list = [];
@@ -127,7 +153,7 @@ export class Animals {
 
   spawn(count) {
     for (let i = 0; i < count; i++) {
-      const kind = KINDS[Math.floor(Math.random() * KINDS.length)];
+      const kind = this.kinds[Math.floor(Math.random() * this.kinds.length)];
       let x, z, gy, tries = 0;
       do {
         x = 4 + Math.random() * (SX - 8);
@@ -142,6 +168,7 @@ export class Animals {
 
   update(dt, player) {
     for (const a of this.list) {
+      if (a.ridden) continue;     // a pony you're riding is steered by the player
       a.t += dt;
       if (a.hop > 0) a.hop = Math.max(0, a.hop - dt * 2.5);
 
@@ -179,6 +206,23 @@ export class Animals {
         }
       }
     }
+  }
+
+  // Spawn a permanent pet (a cat) that follows the player — bought in the shop.
+  spawnPet(x, z) {
+    const a = new Animal('cat', this.meshes['cat'], x, this.groundY(x, z), z);
+    a.follower = true; a.isPet = true;
+    this.list.push(a);
+    return a;
+  }
+
+  // Spawn the rideable pony (bought in the shop). It follows you when you're not
+  // riding it; hop on with the 🐴 button.
+  spawnPony(x, z) {
+    const a = new Animal('horse', this.meshes['horse'], x, this.groundY(x, z), z);
+    a.follower = true; a.isPony = true; a.speed = 2.0;
+    this.list.push(a);
+    return a;
   }
 
   // Pet the closest animal within reach. Returns its head position for hearts.

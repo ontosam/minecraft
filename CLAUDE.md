@@ -9,21 +9,1777 @@ Safari/Chrome and installs to the iPad home screen as a PWA.
 > The dad is non-technical — explain choices simply and keep things forgiving
 > and non-scary (always daytime, no death).
 
-## Two games in one repo
-1. **Ezra's Blocks** (root `/`) — the 3D builder described below.
-2. **Ezra's Mine** (`/mine/`, session 2) — an *original* tap-and-merge idle
-   mining game, made because Ezra loves the mobile game "Minetap" and kept
-   asking to buy things in it. Same genre/mechanics, **our own name, art,
-   text and characters** (we must not copy Minetap's name/art, nor Minecraft
-   trademarks like Creeper/Nether/Redstone/Glowstone), and **no ads, no real
-   money, no energy limits**. See **Ezra's Mine** section at the bottom.
-
 ## Status (end of session 1)
 Playable: third-person character with a follow-camera, walk/look, **tap to
 build/dig where you touch**, ~30 block types via a categorized pop-up picker,
 wandering animals you can pet, a **goals/progression** system with stars, and
 **auto-save/resume**. All verified by headless tests; the dad has been playing
 it on laptop + iPad and loves it.
+
+## Status (session 2)
+Shipped roadmap #1: **friendly "protect your house" creepers** (`js/creepers.js`).
+They stroll in toward blocks *you placed*, give a gentle "uh-oh" wobble while
+nibbling, slowly chip a block — but **chipped blocks always come back** (auto-
+rebuild after ~6s, or instantly when you defend). **Tap a creeper → harmless
+poof** + a ⭐. New goals **"Protect your house!"** and **"Block hero"**. Paced:
+none appear until you've placed ≥3 blocks; rare/slow at first, ramps gently with
+stars. Verified headless (spawn→seek→nibble→chip→rebuild, tap-to-poof, normal
+build/dig unaffected). Deployed to `main`. Tuning candidates:
+creeper green vs. grass (could pop more), nibble/rebuild timings, pacing.
+
+## Status (session 3)
+Two more rounds shipped + deployed:
+1. **Navigation:** removed the hover build/dig outline (tap-anywhere made it
+   redundant); added a **🔍/🗺️ "switch view"** zoom button (wide overview default,
+   cycles to close, eased + saved). Movement/feel confirmed good by the dad.
+2. **The Nether (Ezra's wishes #2 & #3):** a **separate Nether dimension** reached
+   through a **portal** (find it via a new **minimap**, top-right). Home to
+   **friendly ghasts** (big floaty white coo-ers) and **blazes** (glowy spinning
+   rods) — both harmless, pettable, with "meet" goals. New goals: Find the portal,
+   Meet a ghast, Meet a blaze.
+3. **Make it a journey (engagement pass):** the Nether portal is now a **reward**
+   — it starts as a **dormant obsidian frame** and **opens with a celebration once
+   ⭐`NETHER_STARS`(=4) goals are earned** (locked frame nudges the kid + minimap
+   marker is greyed until then; `maybeUnlockNether`, `portalUnlocked`, saved as
+   `pu`). Plus **buried treasure**: gold/diamond pockets hidden in the stone (both
+   worlds) — digging up a *natural* one (not your own placed block) sparkles ✨ +
+   chimes + counts toward "Treasure hunter"/"Treasure chest" goals.
+   All verified headless (locked→unlock at ⭐4→travel, treasure dig, portal swap
+   both ways, mobs/goals, building in both worlds, **v3 save** persists the unlock,
+   **v2 saves upgrade safely** — old worlds get a portal). Minimap is top-right
+   (dad approved "anywhere"). Follow-ups: richer creature sounds, nether
+   structures, build-shape challenges, giants (roadmap #2).
+
+## Status (session 4)
+Shipped Ezra's next batch of wishes (dad delegated the order + the "make worlds
+scalable" design). Two increments:
+1. **Fly + beach + water bucket (the "soft landing" wish).** A **🕊️ Fly** toggle
+   (topbar): hold **Up** (the Jump button relabels) to rise, **let go to drift
+   down gently**. **Water is swim-through now** (`passable`): gentle buoyancy + a
+   **splash** on entry = a soft landing in any pool. **"Water 🪣"** is selectable
+   in the picker (placed water is *not* added to `world.placed`, so creepers ignore
+   it). A big **beach lagoon** in the overworld (`World.carveBeach`), also added to
+   existing saves but **only if untouched** (`carveBeachIfClear`). New goals:
+   *Take off!*, *Big splash!*. Sounds: `fly`, `splash`. (player.js: `flying`,
+   `inWaterAt`, `onSplash`.)
+2. **Scalable worlds + flint & steel + Gold/Ant worlds (Ezra's #1 wish).** Worlds
+   are now a **registry of recipes** — `js/worlds.js` `WORLD_KINDS` (name/emoji,
+   `sky`, `fog`, `gen` = a World method name, `ground`, `mobs` list, flags
+   `home`/`reward`/`flint`). main.js holds a **lazy `worlds` map**
+   (key→`{world,mobs,kind}`) built on first visit (`ensureDim`/`registerDim`,
+   `makeMobs`/`populateMobs`/`updateMobs`/`drawMobs`). **Portals became a list per
+   world with a destination** (`World.portals`, `addPortal(ox,oz,ground,dest,
+   active)`, `setPortalActive(portal,active)`, `portalAt(x,y,z)`). **Flint & steel**
+   (🔥 topbar → "Where to?" menu built from the registry) pops a **lit obsidian
+   portal in front of the player** to the chosen world (`lightPortal`); stepping in
+   `travelTo(dest)`. **Every away world auto-gets an always-open obsidian portal
+   home** ("back to obsidian"); the **Nether stays the ⭐4 reward** (excluded from
+   the flint menu). New worlds: **Gold World** (`generateGold`) and **Ant World**
+   (`generateAnt` + an `ant` species in animals.js, spawned via
+   `new Animals(gl,w,['ant'])`). New goal: *World hopper*. **Save is now v4** (a map
+   of visited worlds, per-world `positions`, `pu`); the loader still reads **v3/v2**
+   and upgrades them (and adds the beach). Verified: Node logic tests (fly/water
+   physics, generators, portal list, save round-trip) + headless browser (clean
+   boot, flint→travel→Gold/Ant, **v4 save+resume**, screenshots of beach/gold/ant/
+   flint-menu). Dev branch this session: **`claude/jolly-brown-mndfr5`** (mirror to
+   `main`/live pending the dad's OK). Tuning candidates: gold-world treasure makes
+   the "treasure" goals trivial there; flint can make many portals (no limit);
+   ant-world ants are small — could enlarge.
+
+## Status (session 5)
+Ezra's next four wishes (dad picked **"real-er challenge"** for the night tier).
+All shipped + deployed to `main`:
+1. **🏠 House kit** — a 2-tall **openable door** (`B.DOOR`/`B.DOOR_OPEN`, procedural
+   tiles): place as a unit (`placeDoor`), **tap to open/close** (`toggleDoor`, both
+   halves), dig removes both (`removeDoor`). New **"House 🏠"** picker tab (door +
+   glass "window" + planks + brick). `door` sound.
+2. **💥 TNT** — `B.TNT` (new "Boom 💥" tab). **Tap a TNT block to light it**
+   (`lightTNT` → a `fuses` list); after a short fuse it detonates (`detonate` →
+   `World.explode(cx,cy,cz,r)` carves a crater; bedrock/portal survive). Caught TNT
+   **chain-reacts**; explosions add camera **`shake`**, a harmless **knockback**, 💥
+   particles + a `boom` sound. New **TNT World** (`generateTnt`, in the flint menu).
+   Ant World kept as a bonus. Goal: *Demolition!*.
+3. **🌙 Night + ❤️ hearts + 🧟 zombies (real-er).** `btn-night` toggles night; an
+   eased `nightAmt` blends sky→`NIGHT_SKY` and drives a new world-shader uniform
+   **`uDayLight`** (dims everything). `js/zombies.js` `Zombies` (built like creepers
+   but they **chase + attack**): spawn at night in the overworld, bonk a **heart**
+   off on a cooldown (`onEvent('hit')`→`hurt`), take **two taps** to defeat
+   (`pickRay`/`bonk`), fade at dawn. **Hearts HUD** (`#hearts-bar`, `MAX_HEARTS=6`),
+   red `#hurt-flash`, brief `invuln`, slow regen when safe. **Out of hearts → a
+   gentle knock-out**: wake at home, full hearts, night cleared — **never lose
+   builds or stars**. **Lava now hurts** (`player.onLava` → bounce out + a heart).
+   Goals: *Brave at night*, *Zombie bonker*. Sounds: `hurt`, `groan`.
+   All verified: Node logic (door, explosion+chain, zombie chase/attack/defeat,
+   fly/water) + headless browser (boot, house, TNT detonation, **night→zombie
+   hit→bonk→lava→knockout**, save/resume) with screenshots.
+   Tuning candidates: night dim is gentle (`uDayLight≈0.4`) — could go darker;
+   zombies cap at 4; lava damage is also active in the Nether.
+   **Post-feedback fixes (same session):** flint portals were stacking in front of
+   each other (hard to find/enter) — they now line up in a tidy **row by home**,
+   **one per destination** (`HUB_DESTS`, `placeHubPortal`, keyed by `dest` so
+   re-lighting never duplicates). **Portal frames are now unbreakable** (`World.
+   isPortalBlock` guards both digging and explosions), so a gateway can't be lost;
+   the 🏠 button is the always-works safety net. Older saves get their stacked
+   portals **auto-tidied into the row on load** (`tidyPortals`, v4 only — clears
+   just the old obsidian/swirl, never builds).
+
+## Status (session 6)
+End-of-arc additions (reset + an incentive economy beyond stars). All deployed:
+- **Reset world (confirmed).** Goals panel → "🔄 Start this world fresh…" → a
+  confirm dialog (`askReset`) → `resetWorld()` regenerates the **current** world
+  (builds + `placed` cleared), keeps the standard + flint portals, and **never
+  touches ⭐ stars or 💎**. `World.generate()` now clears `data/placed/portals` like
+  the other generators.
+- **Mine diamonds + a 💎 economy.** Digging a *natural* diamond → **+2 💎** (gold
+  +1) and a new **Diamond miner** goal; **every goal also pays +2 💎**. A **💎
+  counter** sits top-left (tap → shop). Currency + unlocks live in the goals save
+  (`gems`, `unlocks`; `addGems`/`spend`/`hasUnlock`/`setUnlock`).
+- **💎 Treasure Shop** (`SHOP`, `buildShop`/`buyItem`): **Pet Friend** (a follower
+  cat — `Animals.spawnPet`, re-spawned each load by `ensurePet`), **Extra Heart**
+  (`maxHearts` 6→7 via `applyUnlocks`), **Mega TNT** (bigger `explodeRadius()`).
+- **More build incentives:** new goals Diamond miner, Master builder (75),
+  Decorator (8 kinds), Door maker (`placeDoor` bumps `doors`). Goals now total 25.
+  Verified: Node (gems/spend/unlocks/persist) + headless (mine→💎→shop→buy
+  pet+heart, reset clears builds but keeps ⭐/💎) with a shop screenshot.
+  Idea backlog: more shop items (speed boots, sparkle trail, new worlds), build
+  challenges that check structures, spend 💎 to instantly unlock the Nether.
+
+## Status (session 7)
+Two bug fixes the dad flagged + a big reward pass (he said Ezra loves 💎;
+"add more rewards he has to work for, plus special things — pen is yours").
+Dev branch this session: **`claude/gifted-gates-h9dzy2`** (push there; mirror
+to `main`/live pending the dad's OK).
+1. **Reset button was invisible** — the Goals panel is `overflow:hidden`, but
+   `#goals-body` had no internal scroll, so the long (now 28) goal list shoved
+   the "🔄 Start this world fresh…" button off the clipped bottom. Fixed in CSS:
+   `#goals-body` now `flex:1; min-height:0; overflow-y:auto` and `#btn-reset` is
+   `flex:0 0 auto` (pinned, always visible). Verified headless (button is on-
+   screen *and* `elementFromPoint` returns it = clickable).
+2. **Zombie bug** — attacks only checked horizontal distance, so a zombie could
+   bonk you from straight below while you flew/towered up to escape. Added a
+   vertical gate: `ATTACK_VRANGE=2.0`, attack needs `d<=ATTACK_RANGE &&
+   |dy|<=ATTACK_VRANGE` (zombies.js). Flying/climbing is now a real escape.
+   Verified by a Node logic test.
+3. **Bigger 💎 shop** (`SHOP` in main.js) — now 8 items, mixing "work for it"
+   with delight: **👟 Speed Boots** (`player.speedMul`), **🦘 Super Jump**
+   (`player.jumpMul`), **✨ Sparkle Trail** (frame-loop ✨ particles while
+   moving, `trailT`), **🌈 Rainbow Block** (new `B.RAINBOW`/`TILE.RAINBOW`;
+   shows up in a new **"Special ✨"** picker category gated by `cat.locked`, and
+   is auto-selected on buy), **👑 Golden Crown** (`character.wearCrown` + a crown
+   mesh on the head), plus the existing Pet/Heart/Mega-TNT. Costs 5–20💎.
+   `applyUnlocks()` now also sets speed/jump/crown; `buyItem` bumps a new
+   `bought` counter. 3 new goals (Treasure shopper, Diamond king, Marathon →
+   28 total). All unlocks persist (goals save `u`).
+4. **☁️ Sky World** (the big-ticket reward, 20💎) — `World.generateSky()`:
+   grassy islands floating in a bright sky + trees/glowstone/treasure/clouds,
+   a guaranteed central island for spawn + the home portal. Registered in
+   `WORLD_KINDS.sky` with `flint:true` + `locked:'skyworld'`; the flint "Where
+   to?" menu hides locked worlds until bought. Added to `WORLD_ORDER` and
+   `HUB_DESTS` (tidy portal row). Falling off just respawns you (no harm) and
+   it pairs perfectly with Fly. Verified headless: hidden→buy→appears in flint
+   menu→travel→build→return home, and **builds persist across save/reload**;
+   full world-hop regression (gold/ant/tnt/nether/over) stays green.
+   New debug hook: `__ezra.crown()`. Tuning candidates: crown sits a touch tall;
+   Sky World home-portal can land on a tree (cosmetic); sky-world treasure adds
+   to the "treasure goals are easy in resource-rich worlds" note.
+
+## Status (session 8)
+Dad approved session 7 → pushed live to `main`. Then he handed over a wishlist
+with full autonomy ("keep him busy like Minecraft, reward him, make him work;
+he gets anxious losing lives so let him feel the loss but always recover").
+Shipped as five verified increments on **`claude/gifted-gates-h9dzy2`**, mirrored
+to `main`. Now **33 goals**, **10 shop items**, **49 block ids**.
+1. **Half-heart stakes + tougher zombies.** Hearts now track in **half** steps and
+   render full/half/empty (CSS `.hs` slot: a 🤍 base with a clipped ❤️ overlay).
+   Regen is a bit quicker (0.5 every 2.2s after 4s safe) so he always climbs back.
+   Zombies need **3** bare-hand bonks now (was 2); `bonk(a, dmg)` takes damage.
+   `__ezra.hurt(n)` debug hook.
+2. **🕷️ Spiders (`js/spiders.js`).** Quick, low, cute (big eyes) night mob that
+   spawns with zombies, skitters in and **nibbles half a heart**; 2 taps to shoo
+   (1 with the sword). Same vertical-reach escape rule. Wired into the over mob
+   set, tap routing, knockout cleanup; `hiss` sound; 'Spider shoo-er' goal.
+3. **⚔️ Diamond Sword (Ezra asked).** Shop item (12💎). `swordDamage()` = 3 when
+   owned → one-shots zombies/spiders. Visibly **held in the action hand**
+   (`character.holdSword` + sword mesh that swings with the chop). 'Monster masher'
+   goal (`monster` counter, bumped on any night-mob defeat). `__ezra.sword()`.
+4. **⚙️ Redstone (Ezra asked).** New blocks LEVER/REDSTONE/REDLAMP (+ on-states)
+   in a 'Redstone ⚙️' picker tab. `World.updateRedstone()` floods power from
+   on-levers through connected wire into touching lamps (REDLAMP↔REDLAMP_ON);
+   recomputed on lever toggle, on place/dig of a redstone block, and on load
+   (in `registerDim`). Tap a lever to flip it. Goals: 'Lever flipper', 'Light it
+   up!'. `__ezra.toggleLever(x,y,z)`.
+5. **🟢 Bouncy Slime block (creative extra).** `B.SLIME` (Fun tab): land with
+   speed → spring up in decaying hops (`player.onBounce`, threshold vy<-3.5,
+   bounce = min(13, -vy*0.85)); trampolines! 'Boing!' goal + sound.
+   Verified throughout: Node logic tests (zombie/spider vertical-attack + HP +
+   sword one-shot, redstone flood/break, slime bounce decays & settles) +
+   headless (half-heart HUD + regen, spider live −0.5, sword one-shot, a
+   lever→wire→lamp circuit lighting, a full build-everything **save/reload**
+   keeping the lit lamp/slime/rainbow + all unlocks, and the world-hop
+   regression). Tuning candidates: night dim still gentle (uDayLight≈0.4) so
+   mobs are easy to spot but the scene isn't dark; up to 4 zombies + 3 spiders
+   at once (weak but many — could cap lower if it feels busy); slime+sword could
+   later combine (sword "knockback").
+
+## Status (session 9)
+Dad gave full creative freedom ("give you the torch… pen is yours, I love your
+creativity"). Shipped two delightful, beloved-game-inspired features on
+**`claude/gifted-gates-h9dzy2`**, mirrored to `main`. Now **36 goals**,
+**11 shop items**.
+1. **🐴 Rideable Pony (the headline).** New `🐴 Ride-On Pony` shop item (16💎).
+   Once owned, a horse spawns at home (re-spawned each load via `ensurePony`) and
+   **follows you like the pet cat**. A new **🐴 topbar button** (revealed when
+   owned) hops you on/off. Riding **snaps the pony to you** (always comes when
+   called), boosts speed/jump (`player.mountSpeed=1.7`, `mountJump=1.18`), and the
+   kid is drawn **sitting astride it** (new `character.draw(..., seated)` pose:
+   legs forward, hands on reins; rider raised +0.62). Dismount sets it down beside
+   you. Travelling worlds / knockout auto-dismounts (pony stays home). New `horse`
+   mesh in animals.js (shop-only, so it stays special); `Animals.update` skips a
+   `ridden` pony. 'Giddy up!' goal, `neigh` sound, `__ezra.toggleRide()/riding()`.
+2. **🎣 Fishing (cozy loop).** New **🎣 topbar button**: near any water it casts a
+   projected **bobber** (`#bobber`), and after a short wait you reel in a 🐟 (+1💎),
+   sometimes 💎 treasure (+2), or a silly 🥾 boot. Tapping again reels in early;
+   travel/knockout reels in safely. Pairs with the beach lagoon. New goals
+   'Gone fishing!' + 'Master angler' (12). `__ezra.castLine()/fishing()`.
+   Verified headless: pony buy→spawn→mount(1.7×)→dismount→travel auto-dismount and
+   **persists across reload**; fishing does nothing on dry land, casts at water,
+   the bite pays out + ticks the goal; all 8 topbar buttons fit (right edge 548<
+   1024); full world-hop + build-everything save/reload regression stays green,
+   zero errors. Tuning candidates: pony's neck/head is hidden from directly behind
+   (fine from the side); fishing is free (no rod to buy) — could gate it later;
+   topbar is now 8 minis + block (fits tablet/laptop; a tools sub-menu later if it
+   ever feels busy on small phones).
+
+## Status (session 10)
+Dad said simply "keep going" (full creative freedom continues). Shipped two more
+beloved-game-inspired features on **`claude/gifted-gates-h9dzy2`**, mirrored to
+`main`. Now **38 goals**, **11 shop items**, **50 block ids**.
+1. **🧑‍🌾 Villagers + quests (a living world with purpose).** New
+   `js/villagers.js`: two calm, cute townsfolk (big nose, robe) stand near the
+   home spawn, turn to face you, bob gently. **Tap one to talk** (added to the tap
+   routing after the hostile-mob picks). A quest system in main.js offers a simple
+   task from `QUEST_POOL` (place/pet/fish/diamond/treasure/dig/monster/plant);
+   progress tracks a goals counter **from a baseline**, so it's "from now on".
+   Finish it, tap again, **claim 💎**, get a fresh one — an endless rewarding loop.
+   Kid-friendly `#quest` dialog (villager + task + green button). New 'Village
+   helper' goal. `__ezra.talkVillager()/questOk()`. Spawned via the over `mobs`
+   list (`'villagers'`), re-spawned each load; quest state is transient.
+2. **🌱 Planting (saplings grow into trees).** New walk-through `B.SAPLING`
+   (Nature tab). Plant it and after ~15–30s it sprouts into a full tree
+   (`World.placeTree`). Growth ticks per-sapling in the frame loop (`saplings`
+   list with a `world` ref so it's correct across dimensions); on load each world
+   is scanned (`scanSaplings`) so saved saplings keep growing. Sparkle+chime on
+   grow. New 'Green thumb' goal + a 'plant saplings' quest. `__ezra.plant/growNow`.
+   Verified headless: villager talk→offer→do→claim pays the exact reward + ticks
+   the goal + re-offers; sapling → full tree (trunk + 57 leaves), list clears,
+   saved sapling re-scanned after reload; world-hop + build-everything save/reload
+   regression all green, zero errors. Tuning candidates: quests don't persist
+   mid-progress across reloads (short enough that it's fine); villagers stand
+   still (easy to find) — could let them stroll a little.
+
+## Status (session 11) — polish pass (dad feedback)
+Dad: "hearts are covering tiles up top… clean up; ghasts are just floating; make
+characters more cohesive." Shipped on **`claude/gifted-gates-h9dzy2`**, mirrored
+to `main`. No difficulty changes (purely look-and-feel).
+1. **Hearts overlap fixed.** The centered `#hearts-bar` sat at the very top and
+   covered the right-hand toolbar (now 8 minis + block). Moved it to its own row
+   just under the toolbar (`top: 72px`); verified no overlap at tablet + portrait.
+2. **Soft blob shadows for everyone (cohesion).** New `gfx.shadowMesh` (a flat
+   1×1 dark quad, NEUTRAL-centre UV, black, light 1) drawn in a **blended pass**
+   in main (`drawShadows`/`shadowAt`) between `world.draw()` and the characters:
+   `gl.enable(BLEND)` + `depthMask(false)` + `uAlpha 0.26`, one quad per creature
+   (+ the player, skipped while riding since the pony's covers it) sized per type,
+   at `heightAt(x,z)+1.02`. Grounds the whole cast — floaty ghasts included.
+3. **Nether floaters lowered** (`FLOAT` ghast 2.7→2.0, blaze 1.9→1.5) now that a
+   shadow sits beneath them. Verified headless (no errors): hearts clear, shadows
+   render in overworld + nether, world-hop + save/reload regression green.
+   Note: shadows use `heightAt` (topmost block), so under deep overhangs a shadow
+   lands on the roof — fine for this mostly-surface game.
+
+## Status (session 12)
+Dad's wishlist: character selection (himself/family/friends/Cristiano/Steve),
+"Steve's lava chicken store" as a challenge, and "he loves math." Shipped both on
+**`claude/gifted-gates-h9dzy2`**, mirrored to `main`. Now **40 goals**.
+1. **🙂 Character selection.** The character rig is now **skinnable**:
+   `character.js` exports a `CHARACTERS` roster (per-character colours + style
+   flags `long`/`beard`/`cape`/`ball`) and `Character.setCharacter(def)` rebuilds
+   the kid's part meshes live (crown/sword/seated-riding still work; old meshes
+   `dispose()`d). New **🙂 topbar button** → "Who do you want to be?" picker with
+   8 friendly blocky options: Ezra, Mama (long hair), Dada (beard), Cora (long
+   hair), Jovi, Cristiano (red kit + a soccer ball), Steve (cyan), Super Hero
+   (blue suit + red cape). Choice saved as `char` and applied on load
+   (`applyCharacter`). `__ezra.setCharacter()/character()`.
+2. **🍗 Steve's Lava Chicken math challenge.** A second `Character` (Steve skin)
+   stands at a little stand near home (`setupSteve`/`buildLavaStand` — planks
+   counter, glowstone grill + ORANGE "lava", log posts, brick awning; placed
+   only into AIR so it never harms a build; rebuilt on reset). He turns to face
+   you + casts a shadow. Tapped via a ray/sphere test (`rayHitsSphere`, in the
+   tap routing after villagers, overworld only) → a **math dialog** (`#math`):
+   `makeMath` scales difficulty by `goals.counts.math` (sums →10, →20, then
+   subtraction), 3 answer buttons; right → +💎2 + 🍗 + next question, wrong →
+   gentle retry. Goals 'Math whiz' (5) + 'Number master' (20).
+   `__ezra.openMath()/mathQ()/steve()`. Verified headless: 8-char picker
+   applies+persists, topbar (9 minis+block) still fits; math opens with 3 opts,
+   correct pays +💎2 and advances, wrong doesn't; full regression green, zero
+   errors. Tuning candidates: Steve's stand sits at spawn+7 (could collide with a
+   pre-existing build on old saves since it only fills AIR — safe but may look
+   sparse); character previews are emoji (no live 3D thumbnail).
+
+## Status (session 13)
+Dad feedback: "Steve selling snacks is great — snacks could give hearts; Jovi is
+a girl; instead of dada/mama use Vlad and Chris." Shipped on
+**`claude/gifted-gates-h9dzy2`**, mirrored to `main`. Now **41 goals**.
+1. **🍎 Steve's snack stall (💎 → hearts).** Tapping Steve now opens a stall menu
+   (`#steve`, `openSteveMenu`/`buildSteveMenu`) with the 🧮 Math Challenge button
+   (earn 💎) **and** snacks that spend 💎 to restore hearts: `SNACKS` = Apple
+   (1💎,+1❤️), Lava Chicken (2💎,+2❤️), Cake (3💎, full). `buySnack` heals up to
+   `maxHearts`, refuses politely at full (no charge), bumps a `snack` counter
+   (new 'Snack time' goal). A renewable 💎 *sink* to balance all the income.
+2. **Character fixes.** `jovi` is now a girl (long hair, purple top, 👧). `mama`/
+   `dada` renamed to **`chris`**/**`vlad`** (Chris keeps long hair, Vlad the
+   beard). `CHAR_ALIAS` maps old saved ids (mama→chris, dada→vlad) in `charById`,
+   and the loader normalises `selectedChar = charById(obj.char).id` so a saved
+   pick survives the rename.
+   Verified headless: roster reads Ezra/Chris/Vlad/Cora/Jovi/Cristiano/Steve/
+   Super Hero; snack heals +charges +refuses-at-full; math still launches from the
+   stall; a `char:'mama'` save loads as `chris`; full world-hop + save/reload
+   regression green, zero errors. Note: snacks only help when you're below full
+   hearts (by design) — pairs with night combat. Idea backlog: a temporary
+   "golden apple" over-heal buff; live 3D character thumbnails; counting/number-
+   bonds math mode.
+
+## Status (session 14)
+Dad: "go for it [on the backlog] — and will he keep up, or do you have cool
+blurbs?" So: shipped the three backlog ideas AND a friendly one-time hint system
+so a 6-year-old is never lost. On **`claude/gifted-gates-h9dzy2`**, mirrored to
+`main`. Still 41 goals (no new metrics needed).
+1. **🍏 Golden Apple (temporary bonus hearts).** 4th snack (5💎): sets
+   `heartBuff=2` + `heartBuffT=90s`, fills to `effMax()`; bonus hearts render as
+   golden 💛 (`.hs.hb`); buyable at full health (it's a buff, not a heal); ends on
+   knockout; frame loop counts it down. Hearts code now uses `effMax()=maxHearts+
+   heartBuff` everywhere (updateHearts/regen/applyUnlocks/buySnack).
+2. **Varied math.** `makeMath` now returns `{prompt(html), ans, opts}` and picks a
+   type by skill: **count** ("how many 🍎" + emoji row), **add**, **sub**, and
+   **number bonds** ("3 + ? = 10"). `showMath` renders `prompt`.
+3. **Character previews.** `charPreview(def,size)` draws a 2D blocky paper-doll in
+   the character's real colours (hair/beard/long-hair/cape/ball); the picker shows
+   these canvases instead of emoji.
+4. **Friendly blurbs (`goals.tips` + `tip(id,text)`).** One-time hints shown the
+   first time you're near **Steve** or a **villager**, and the first **night**.
+   Saved (`p` in the goals save) so each shows once, ever.
+   Verified headless: golden apple → 8 hearts incl. 2 gold; all 4 math types
+   appear with valid options; 8 avatar previews render; night+steve blurbs fire
+   once; full regression green, zero errors. Tuning: golden-apple buff is fixed
+   at +2/90s (could scale); blurbs are proximity/event based (no full tutorial).
+
+## Status (session 15)
+Dad feedback: "can't find Steve; spiders too easy (give them webs); add
+skeletons (fewer, harder, more rewarding); fishing = unlimited diamonds — tell
+him bigger water = bigger fish; some features I'm not seeing." Shipped on
+**`claude/gifted-gates-h9dzy2`**, mirrored to `main`. Now **42 goals**, **51 block
+ids** unchanged.
+1. **Deploy/caching.** "Not seeing features" → bumped `sw.js` `CACHE` v1→**v3** and
+   completed `CORE` (all js/*). It's network-first already, but the bump forces
+   old caches to clear on the installed iPad PWA. (Tell the dad: fully close &
+   reopen the app once to pick it up.)
+2. **Findability.** Minimap now marks **Steve** (orange dot) + **villagers**
+   (green) in the overworld (`drawMinimap`).
+3. **Fishing economy.** `reelIn` now scales by `waterBodySize()` (capped flood
+   fill): size<8 → only minnows/boot (**0💎**), <32 → fish/treasure, ≥32 → BIG
+   fish (2–3💎). First-cast blurb: "little ponds have little fish — find/build a
+   big lake/ocean." **Bug fixed**: bobber coords are floats, so `world.get` read
+   undefined → every catch counted as tiny (0💎); `waterBodySize` now floors.
+4. **Spiders** tougher (HP 2→3) + **webs**: from ~2–6 blocks they `emit('web')`
+   → `player.webT` halves walk speed for 1.6s (harmless, fun). `hiss`+🕸️.
+5. **💀 Skeletons** (`js/skeletons.js`): rare (cap 2, ~9–15s), tough (HP 4 / 2
+   sword hits), **more rewarding** (+3💎 + 'Skeleton slayer' goal). Aim telegraph
+   (`AIM_TIME`) → slow **arrow** for half a heart, gated on `|dy|` so flying
+   dodges. `bow`/`rattle` sounds. Wired into over mobs, tap routing, shadows,
+   knockout cleanup, `__ezra.skeletons`.
+   Verified: Node logic (spider web/HP, skeleton HP/melee/aim-shoot/fly-dodge) +
+   headless (water-size: big lake ~97💎 vs puddle 0 over 40 casts; night spawns;
+   blurbs) + full regression — all green, zero errors. Tuning: night still gentle
+   (uDayLight≈0.4); skeleton arrow always lands after the telegraph if you didn't
+   leave range/height (no true projectile dodge); could add real arrow physics.
+
+## Status (session 16)
+Dad feedback + two AskUserQuestion answers: flint "Full Minecraft: build your own
+frame, then light it"; blocks "make them functional like Minecraft." Also: cap
+math diamonds; springier slime. Shipped on **`claude/gifted-gates-h9dzy2`**,
+mirrored to `main`. 42 goals (no new metrics). **sw cache v3→v4.**
+1. **🔥 Flint & steel = a real tool.** The 🔥 button now **toggles flint mode**
+   (gold ring) instead of an instant menu. In flint mode a tap lights **TNT** or,
+   if you're aiming through a **closed obsidian frame**, opens the "Where to?"
+   menu and lights it. `World.findFrame(x,y,z)` planar-floods the interior air and
+   validates it's enclosed by obsidian (≤30 cells); `World.lightFrame(cells,dest)`
+   fills the swirl + registers the portal. `portalAt` rewritten: nearest active
+   portal while standing in a `B.PORTAL` block (works for any frame shape).
+   `lightChosenFrame` sets arrival **one block in front** of the frame (player's
+   side) so returning never bounce-loops. Existing hub/auto portals + 🏠 remain
+   (no one gets stuck). `flintTap`/`aimFrameCell`; `__ezra.flint/findFrame/lightFrame`.
+2. **Block fixes.** `blockPreview(tile,size,tint)` now multiplies the tint so the
+   **colour blocks show real colours** in the picker (were all grey). **Glass &
+   leaves are see-through**: shader `if (tex.a<0.5) discard;` (cutout), atlas
+   punches transparent texels (glass = clear pane + frame; leaves = leafy gaps),
+   `opaqueAt` returns false for `seethrough` blocks, and the mesher culls faces
+   between two of the same see-through block (clean panes).
+3. **Math 💎 cap.** Steve has a `MATH_POUCH_MAX=6` pouch that refills +1/30s; a
+   correct answer pays `min(reward, pouch)` (reward 1 for count/easy-add, 2 for
+   harder), then only lava chicken + praise when empty. `goals.bump('math')` still
+   fires so the math goals progress. (14 correct = ~8💎 instead of ~28.)
+4. **Slime** springier: bounce threshold −3.5→−2.3 and checks the whole footprint.
+   Verified: Node (frame light/reject, see-through opacity) + headless (build→light
+   →travel, auto-portal step still works, math cap, colour + glass screenshots) +
+   full regression — all green, zero errors. Note: built obsidian frames go to the
+   flint worlds (not the Nether — that stays the ⭐ reward with its own portal).
+
+## Status (session 17) — bug-hunt pass (dad: lever? can't see his Mega TNT; a
+portal shows an error). Shipped on **`claude/store-portal-bugs-hzcr72`**.
+Now **52 block ids**.
+1. **💣 Mega TNT is now a real, visible block (the headline fix).** It used to be
+   an *invisible* shop upgrade — buying it only widened `explodeRadius()` on
+   ordinary TNT, so Ezra "couldn't see his Mega TNT." It's now a proper block:
+   new `B.MEGA_TNT` (id 50) with its own angry-red `TILE.MEGA_TNT_SIDE/TOP`
+   (fat label, bold "M", spark dots), shown in a new **"Mega 💣"** picker tab
+   **gated by the `megatnt` unlock** (same pattern as Rainbow). Buying it now
+   reveals the tab, **auto-selects the block**, and toasts how to use it. Lighting
+   it (tap, or flint & steel) blows a much bigger crater: `TNT_RADIUS=3.2` vs
+   `MEGA_TNT_RADIUS=5.2` (decided per-block in `detonate`, not by a global
+   unlock), with a bigger flash + shake. `isTNT(id)` now covers both everywhere
+   (tap routing, flint tap, fuse tick, `World.explode` chain). Verified headless:
+   buy→tab appears→block selected; mega crater (~44 cleared) ≫ regular (~21);
+   chain reaction catches a mega in the middle; save/load round-trips id 50.
+2. **Lever — works; made it *obvious* it works.** Logic was fine (toggles
+   43↔44, powers wire→lamp, verified). But a lone lever gives almost no visible
+   feedback, so it "looked broken." Added a one-time **`tip('redstone', …)`** the
+   first time you place any redstone block, explaining: put a Lamp next to a
+   Lever (or wire them up), then tap the Lever to switch the light.
+3. **Portal "shows an error" — couldn't reproduce, so made it impossible to
+   strand him.** Extensively black-box tested every world both ways (debug travel,
+   real swirl step-through, flint-built frames, Nether reward, repeated in/out,
+   night, TNT-by-portal, 4s render soaks) — **zero errors** in any path. As a
+   safety net (and matching the "non-scary, never stuck" rule) `travelTo` is now
+   wrapped in try/catch: any hiccup mid-trip is logged to the console for us and
+   **pops Ezra safely back home** (`recoverHome`) with a friendly toast — never
+   the scary "Oops" screen. Confirmed by forcing an exception mid-travel: lands
+   in the overworld, no overlay. **Ask the dad** for the exact "Oops" text / which
+   portal next time it happens so we can pin the root cause.
+   All verified headless (CDP) + Node logic; full world-hop regression green.
+
+## Status (session 18) — intuitive building (dad: one-block-at-a-time is too
+hard for Ezra; he wants whole-wall/whole-floor builds + a roomy house he can
+move around in and see). Shipped on **`claude/store-portal-bugs-hzcr72`**.
+Now **52 block ids** + sandstone (**53** including SANDSTONE id 51), **sw cache
+v4→v5**.
+1. **🏗️ Big Builds — one-tap structures (the headline).** New topbar 🏗️ button
+   opens a little "Build something big!" menu (`#buildmenu`, mirrors the portal
+   menu; reuses `.portal-choice` styling) with three one-tap builds that appear
+   a few steps **in front of where you're looking**, no aiming or block-by-block:
+   - **🏠 Cozy House** — a roomy 5×5 interior, 4-high ceiling (so the
+     third-person camera has room), a **door facing you**, **glass windows** on
+     every wall, a **glowstone ceiling lamp**, planks floor/roof. Verified you
+     can stand inside and see around.
+   - **🟫 Big Floor** / **🧱 Long Wall** — a 7×7 patio / a 7×4 wall of **your
+     currently-selected block**.
+   Core helpers: `bigSet(x,y,z,id,force)` (force punches a build's own
+   door/windows through walls it just placed; **never** overwrites *his* placed
+   blocks otherwise), `bigBuildSpot(dist)` (lands in front, center-ground height,
+   clamped in-world), `levelPad(cx,cz,rad,g,floor)` (**auto-flattens**: fills
+   dips below + clears bumps above so a house sits clean even on a hill).
+   `goals.onBuildMany(id,n)` credits every block (a house ≈194 → instant builder
+   stars, intentional). One-time `tip('buildkit', …)`.
+2. **🏜️ Sandstone block** (`B.SANDSTONE`, `TILE.SANDSTONE`) in the **Stone**
+   picker tab — a desert/End-themed building block (down payment on the
+   Ender-Dragon/Endermen/desert idea; in MC it's Enderman-proof).
+   Verified headless: menu shows House/Floor/Wall; house has door+glass+glow+
+   walkable interior and flattens on slopes; floor=+49, wall=+28; Stone tab now
+   7 tiles; full world-hop + build-anywhere regression green, zero errors.
+   **Open with the dad (asked via AskUserQuestion):** how gentle to make the
+   **End / Ender Dragon / Endermen** (friendly pet-dragon vs. a gentle
+   beat-the-crystals "boss" vs. hold) — it's a big feature so it's not built yet.
+   Also unclear: his **"land with a water bucket in the sand"** remark — needs
+   clarifying (likely the existing soft-landing water feature).
+
+## Status (session 19) — The End + a gentle dragon (dad picked the
+"gentle adventure-boss" via AskUserQuestion). Shipped on
+**`claude/store-portal-bugs-hzcr72`**. Now **53 block ids** (END_STONE id 52),
+**13 shop items**, **44 goals**, **sw cache v5→v6 (bump on deploy)**.
+1. **🐉 The End world + friendly Ender Dragon (`js/dragon.js`).** A new flint
+   world `WORLD_KINDS.end` (dark-indigo sky, `generateEnd()` = a pale END_STONE
+   island floating in the void, ringed by **6 obsidian pillars topped with
+   glowing magenta End Crystals**). Bought in the 💎 shop (`endworld`, 30💎 — the
+   big reward), then lit via flint like Sky World. The **dragon glides in a big
+   circle** above the island (harmless, never attacks). **Tap the crystals to pop
+   them** (harmless poofs, `goals.bump('crystal')`); once all are gone she's
+   **tamed** — **tap her for a celebration + 💎12** (first time only; re-taming
+   just says hi, no farming). `Dragon` class mirrors the nethermob pattern
+   (`pickRay` → crystal vs. dragon, `popCrystal`, `tame`, `onEvent`/`onTame`).
+   Crystal spots persist in the save (`world.crystalSpots` ↔ `cs` in serialize).
+   Tap routing checks the dragon first in the End. New goals **Crystal popper**
+   (3) + **Dragon tamer** (1). Debug: `__ezra.dragon/popCrystals()/tameDragon()`.
+   The dragon was darkened-against-dark-sky at first → lightened her body +
+   lifted the End sky a touch so a 6-yr-old can clearly see (and she's friendly,
+   not scary).
+   Verified headless: buy→travel→6 crystals→early dragon-tap refused→pop all→
+   tamed→tame pays +💎 once (not on revisit)→goals tick; 4s render soak + revisit
+   + full world-hop all green, zero errors; screenshot of the island/pillars/
+   crystals/portal. Tuning candidates: dragon is posed hard to frame in
+   third-person (big + circles high); could add wing-flap; Endermen + a desert
+   pyramid are the natural next End additions.
+
+## Status (session 20) — one-tap world travel (dad: "how do we see the new
+worlds?"). Shipped on **`claude/store-portal-bugs-hzcr72`**, mirrored to `main`.
+**sw cache v6→v7.**
+- The only way to reach flint worlds was **build an obsidian frame + light it** —
+  far too hard for a 6-yr-old (hence the question). Added a **🌍 topbar button →
+  "Go to a world!" menu** (`#worldmenu`, reuses `.portal-choice`) that lists every
+  world and **travels there instantly on tap** (`travelTo`, the tested path). The
+  flint & steel "build your own portal" path still works for the full-Minecraft
+  experience. Locked worlds show dimmed with 🔒 + reason: **Nether** = "Earn ⭐4"
+  (tapping nudges), **Sky/End** = "Buy in 💎 shop" (tapping opens the shop).
+  One-time `tip('worlds', …)`. Verified headless: menu lists over/nether(locked)/
+  gold/ant/tnt/sky(locked)/end(locked); tap Gold→travels, Home→back, buy Sky+End→
+  they unlock, tap End→travels; zero errors; topbar still fits (right edge 668<
+  1024).
+
+## Status (session 21) — 📖 Adventure with friends (dad: engagement via friends
+who do challenges *with* him; he picked "adventure story" + "friendship hearts +
+gifts" via AskUserQuestion). Shipped on **`claude/store-portal-bugs-hzcr72`**,
+mirrored to `main`. **sw cache v7→v8.** Now **45 goals**.
+- **A story journey across the worlds, hosted by the character roster as
+  friends.** New **📖 topbar button** opens an Adventure dialog: the current
+  friend's `charPreview` portrait + name + **friendship hearts**, a short
+  **readable blurb**, and one clear **do-it-together task** (tracked from a
+  baseline like the villager quests) with a 💡 hint. Finish it → the 📖 button
+  gets a **gold ring**; open it and tap **"Yay! What's next?"** to claim 💎,
+  earn a friendship heart with that friend, sometimes get a **gift**, and
+  advance. `STORY` = 8 chapters (Chris→build a house, Vlad→pet animals [gift
+  pet], Cora→plant, Jovi→Gold-World treasure, Steve→math, Cristiano→slime bounce
+  [gift sparkle], Hero→night monster [gift crown], Cora→tame the dragon [gift
+  rainbow]). Tasks use `mode:'do'` (relative baseline) or `'have'` (absolute,
+  for the dragon). A happy **finale** shows all friends. New 'Adventurer' goal
+  (`story` counter, 5 chapters). All state persists in the goals save
+  (`adv:{i,base}`, `fr:` friendship hearts). `__ezra`: drive via the buttons; the
+  loop badges 📖 each frame (`updateAdventureButton`).
+  Verified headless: dialog renders portrait+blurb+task; complete→badge→claim
+  pays 💎 + heart + gift; all 8 chapters + finale; gifts (pet/sparkle/crown/
+  rainbow) unlock; 'storyteller' goal completes; **state survives reload**; zero
+  errors. Screenshots of the offer + done states.
+  Next steps offered to dad: friends that physically **walk up** in the world
+  (not just the 📖 log), build-challenges that **check the real structure**, and
+  repeatable per-friend activities to grow hearts further.
+
+## Status (session 22) — friends who walk up + bed + barrier + lantern (dad:
+Ezra's enjoying building; wants friends that approach gently, a Minecraft-style
+bed and barrier block, more build options). Shipped on
+**`claude/store-portal-bugs-hzcr72`**, mirrored to `main`. **sw cache v8→v9.**
+Now **56 block ids**, **46 goals**.
+1. **🧑‍🤝‍🧑 A friend strolls up (gently).** The current Adventure host now appears
+   in the overworld as a walking `Character` (`buddy`/`buddyChar`, skin synced to
+   `curChapter().friend`). It idles near home and, on a **long cooldown
+   (45–85s)** — or sooner when a chapter is **ready to claim** — ambles over
+   (`updateBuddy`: home→approach→leave), says hi with a chime + ⭐/👋, lingers
+   ~8–14s, then wanders back. **Never naggy** (no auto-popups; just a friendly
+   presence). Tap it → opens the 📖 Adventure. Drawn + shadowed in the overworld;
+   re-placed on reset. Debug: `__ezra.buddy/callBuddy()`.
+2. **🛏️ Bed** (`B.BED_FOOT`/`B.BED_HEAD`, in the House tab). Placed as a 2-block
+   unit lying along the way you face (`placeBed`, ground-supported, both halves
+   to `placed`). **Tap to sleep** (`sleepInBed`): night→morning (clears monsters),
+   **hearts refill**, and it **sets your 🏠 home here** (`world.spawn` = bed) —
+   just like Minecraft. Dig removes both halves. 'Sweet dreams' goal (`sleep`).
+3. **✨ Force Field / Barrier** (`B.BARRIER`, Fun tab) — a mostly-see-through but
+   **solid** block (`seethrough` cutout: faint cyan border + sparkle), great for
+   invisible-ish platforms/walls; monsters can't pass (it's solid). The MC barrier
+   with a friendly twist.
+4. **🏮 Lantern** (`B.LANTERN`, House tab) — a warm glowing decoration block, more
+   building variety.
+   Verified headless: picker tabs (House 6, Fun 3); bed sleep flips night→day +
+   full hearts + moves home + ticks the goal; barrier places (id 55, see-through
+   solid); buddy walks from home to ~2.2 blocks of the player and stops, tap opens
+   Adventure; new block ids save/reload; full world-hop (gold/nether/end/over)
+   green, zero errors. Screenshot of a friend stood by the player with the bed +
+   lantern on a build pad. Tuning candidates: buddy walks straight (no terrain
+   pathing — fine on mostly-open ground); barrier icon is faint in the picker (by
+   design). Backlog still open: build-challenges that check real structures;
+   repeatable per-friend activities; more decor (fences/stairs need sub-cube
+   geometry the voxel engine doesn't have yet).
+
+## Status (session 23) — new friends + build challenges that check real builds
+(dad: added Ezra's real friends Alex/Chip/Milo/Brexin; "challenges sound great,
+pen is yours"). Shipped on **`claude/store-portal-bugs-hzcr72`**, mirrored to
+`main`. **sw cache v9→v10.** Roster now **12 characters**.
+1. **4 new friends** in `CHARACTERS` (alex/chip/milo/brexin, distinct skins) —
+   selectable in the 🙂 picker AND they host adventure chapters + walk up as the
+   buddy.
+2. **🏗️ Build challenges that detect real structures (the headline).** New
+   `task.kind:'build'` chapters where a friend asks for a TOWER / BRIDGE / FLOOR /
+   WALL and the game **scans `world.placed`** (`runBuildCheck`: vertical run =
+   tower, horizontal run = line/bridge, n×n = floor, w×h plane = wall) to know
+   when it's really built — re-checked on place/dig/big-build/travel/open (cached
+   in `buildMet`, never per-frame). Tuned so the **🏗️ Big Build** buttons satisfy
+   them (Long Wall → tower(4)+wall(6×3); Big Floor → bridge/floor) so a 6-yr-old
+   can always complete one. Woven into the STORY (Alex=tower, Chip=bridge,
+   Milo=floor, Brexin=wall, +gift sparkle) → now **12 chapters**.
+3. **Endless build mode after the story.** Once the finale is acknowledged
+   (`goals.adv.fin`), friends keep dropping by with random `BUILD_POOL`
+   challenges (`goals.adv.fc`, `makeFreeChallenge`) — repeatable 💎 + friendship
+   hearts, hosted by the new friends, so the build loop never ends.
+   `activeChapter()` unifies story + free; `advReady()` drives the 📖 badge + the
+   buddy "claimable" nudge.
+   Verified headless: 12-friend picker; a 4-tall placed column completes Alex's
+   tower → claim → advance; jump to finale → ack → endless build challenges
+   generate, complete (a floor/tower slab), pay 💎 + heart, and re-roll; all
+   persists across reload; zero errors. Screenshots of the roster + a build
+   challenge. (Fixed a stale `curChapter` ref in `updateBuddy` found in testing.)
+   Tuning candidates: build checks use "have such a structure" semantics, so a
+   pre-existing big build can satisfy a challenge instantly (intentional — it
+   rewards building); could later diff "new since the ask" if it feels too easy.
+
+## Status (session 24) — big block-variety pass (dad: "variety charms him —
+research more Minecraft blocks/elements that surprise him; a lot more block
+types"). Shipped on **`claude/store-portal-bugs-hzcr72`**, mirrored to `main`.
+**sw cache v10→v11.** Now **83 block ids** (26 new), **77 picker tiles**.
+- **Atlas expanded** `perRow 8→16` / `size 128→256` (256 tiles) — everything is
+  parameterized off `ATLAS`, so getUV/`at()`/blockPreview all scaled for free.
+- **26 recognizable Minecraft-style blocks**, drawn with compact reusable
+  texture styles (`metal`/`gem`/`speckle`/`glow`/`soft` helpers in
+  `buildAtlasCanvas`): **Shiny 💎** (Iron/Gold/Diamond/Emerald/Lapis/Redstone/
+  Coal blocks + Amethyst), **Stone 🪨** (Deepslate/Granite/Andesite/Diorite/
+  Quartz/Prismarine), **Nature** (Moss/Mud/Cactus[top+side]/Red &Brown Mushroom),
+  **Nether 🔥** (Nether Brick/Magma), **Decor 🪑** (Melon/Hay/Sponge/Sea Lantern
+  + Note Block). Picker reorganized into clearer tabs (Stone🪨, Shiny💎, Decor🪑,
+  Nether🔥).
+- **🎵 Note Block is interactive** — tap it to play a pentatonic note (`sound.note`
+  added to audio.js; taps climb the scale so a row makes a tune). One-time
+  `tip('note', …)`.
+  Verified: ids unique + every category block has a def (Node); headless boot
+  with the 256-atlas = zero errors; all 26 new blocks place; picker shows 12 tabs
+  / 77 tiles (Shiny 11, Decor 7); place + reload clean. Screenshots of a showcase
+  wall + the picker. Tuning candidates: glow blocks (sea lantern/magma) use bright
+  textures, not true emissive light (engine bakes light); more waves possible
+  (crafting table/furnace/chest need multi-face art; froglight/sculk/copper easy
+  to add next).
+
+## Status (session 25) — readability + friend interaction + 🧱 Lego World (dad:
+small font/long sentences mean he doesn't read them; friend interaction low; add
+a high-value Lego World that costs lots of 💎; Legos should look higher-res).
+Shipped on **`claude/store-portal-bugs-hzcr72`**, mirrored to `main`.
+**sw cache v11→v12.** Now **95 block ids**, **8 worlds**, **14 shop items**.
+1. **Readability pass.** Bumped dialog/toast fonts (`.adv-text` 17→24 bold,
+   `.adv-name` 24, `.adv-task` 21, `#quest-msg` 22, `#goaltoast` 20 + wrap) and
+   **rewrote every adventure blurb + all `tip()` strings into short, punchy lines**
+   (e.g., "Let's build a cozy house! 🏠"). A 6-yr-old can actually read them now.
+2. **Friend interaction.** The walking buddy now greets with a clear **"👋 [name]
+   is here! Tap me!"** (or "you did it! Tap me! 🎉") on **every** visit, and
+   visits a bit more often (first 16–38s, then 35–65s) — still gentle, not naggy.
+3. **🧱 Lego World (the big-ticket reward, 50💎).** New flint world
+   `WORLD_KINDS.lego` (`generateLego` = a big flat **studded green baseplate** +
+   a few sample brick stacks, bright sky). Bought in the 💎 shop (priced high so
+   it's real work — diamonds are easy to earn). Unlocks a **"Lego 🧱" picker tab**
+   with **12 vivid Lego bricks** (`B.LEGO_*`): drawn from **two neutral tiles**
+   (`LEGO_TOP` = 2×2 glossy studs via `ctx.arc`, `LEGO_SIDE` = shiny-rim brick)
+   **× a per-colour tint** (new `tinted()` def helper) — so 12 colours cost only
+   2 atlas tiles. Reachable via the 🌍 menu / flint; auto-selects a brick on buy.
+   Verified headless: fonts 24px + short blurbs; Lego tab hidden→buy→12 bricks;
+   travel to Lego (baseplate id 86 under spawn); place bricks; 4s soak; reload +
+   world-hop all green, zero errors. Screenshots of the Lego build + the big-text
+   dialog. Note on "higher res": the engine is 16px pixel-art atlas-wide, so the
+   studs are as crisp as 16px + tint allows (glossy, rounded) — true HD or real
+   3-D stud geometry would be an engine-level change (offered as a future step).
+
+## Status (session 25, addendum) — handoff prep for the Lego "Vegas" build
+Dad approved turning Lego World into the big fun hub (3-D studs + paid rides +
+NPCs + dazzle) but asked to **scope it to its own session**. So this turn added
+**`js/legoworld.js`** (an un-imported `LegoPark` skeleton — safe, zero runtime
+effect) and the **"NEXT SESSION" spec below**. No behaviour changed; nothing new
+shipped to players. Next session: implement per the spec + wire-in checklist.
+
+## Status (session 26) — Lego glow-up + the new Secret World fun park
+Dad **changed the plan** (this overrides the "Lego = Vegas" spec below): keep
+**Lego World as a clean, high-res *build* world**, and put the "spend 💎 on fun"
+hub in a **separate new world he named "Secret World."** He gave full creative
+freedom on the rest ("let form what forms") and asked for **a few high-WOW
+attractions, not many meh ones.** Shipped on **`claude/dreamy-mccarthy-g6wgjr`**
+in two increments (push there; mirror to `main`/live pending the dad's OK).
+Now **47 goals**, **sw cache v12→v14**.
+1. **🧱 Lego World glow-up (high-res).** The chunk mesher now raises **real 3-D
+   studs** — four little bumps on every exposed Lego-brick top (`isLego` ids
+   83–94; visual only, never in collision; stud verts guarded separately so a
+   dense build can't overflow the Uint16 index range). In **Lego World the block
+   picker is a pure Lego palette** (only the 12 bricks show) and you **arrive
+   holding a brick**; every other world is unchanged. `generateLego` now lays a
+   cheerful **rainbow staircase + brick pyramid** to show off the studs.
+2. **🎡 Secret World (`js/secretworld.js`) — a free-to-enter fun park.** New
+   `WORLD_KINDS.secret` (festive ring-plaza `generateSecret`, reached via the 🌍
+   menu — no purchase, no flint). You **earn 💎 working in the other worlds and
+   SPLURGE here** (the dad's "work hard → treat yourself" grip): **rides cost a
+   few 💎 (`goals.spend`) and NEVER pay 💎** — the reward is fun + a ⭐. Three
+   WOW rides via a `SecretPark` mob-manager (mirrors nethermobs): a **real
+   vertically-turning Ferris wheel** (rotateX, rainbow spokes + gondolas with
+   **friends riding**), a **hot-air balloon ride** (float up for a view), and a
+   **spinning carousel**. Plus **drifting balloons, fireworks (timed particle
+   bursts + notes), glowing lamp posts, and roster-friend NPCs** wandering/riding.
+   Tap a ride → "Ride for 💎X?" prompt (`#ride`) → pay → a scripted ride that
+   drives the player along the attraction (physics paused via the `ride` state in
+   the frame loop), then deposits them back safely + a ⭐. Travel/recover always
+   ends a ride cleanly. New goals **Fun park!** + **Thrill seeker** (`funride`).
+   Debug: `__ezra.funRide(id)/endFunRide()/funRiding()/funpark`, `setView(yaw,pitch)`.
+   Deleted the obsolete `js/legoworld.js` scaffold (its "Lego = Vegas" purpose is
+   now the Secret World).
+   Verified: Node logic (studs geometry + no index overflow + covered-brick has
+   no studs; Secret gen + registry + attractions) + headless browser (Lego studs
+   ~21.7k verts/chunk + Lego-only picker; Secret World travel, all 3 rides
+   start→spend the right 💎→animate→bump the goal→end clean, **refused when
+   broke**, fireworks; full world-hop + **save/reload** keeps it all; zero
+   errors) with screenshots of the studded rainbow staircase, the Ferris wheel
+   with riders, and the carousel. Tuning candidates: fun-park NPCs have no blob
+   shadow yet (rides are elevated, so minor); the Ferris wheel faces ±X (full
+   from the front, thin edge-on from the side); carousel ride spins fast (fun but
+   could ease). Backlog: go-kart ride, bumper cars, a Ferris-wheel that frames
+   nicer in third-person, balloon variety.
+3. **Crash-proofing hotfix (dad saw a "script error" Oops screen on iPad).** The
+   render loop scheduled its next `requestAnimationFrame` only at the *end* of
+   `frame()`, so ANY error in a frame froze the game and tripped the global
+   handler → the scary full-screen "Oops". Couldn't repro headlessly (SwiftShader
+   has loads of GPU/memory headroom; iOS Safari is stricter — likely a transient
+   WebGL/render blip surfacing as the generic cross-origin "Script error."). Fixed
+   the root fragility: `frame()` now wraps `frameBody()` in try/catch and ALWAYS
+   reschedules (one bad frame is logged + skipped, the loop carries on; a ride is
+   ended safely). Runtime `window` errors no longer pop the big overlay — they
+   `softError()` (console log + one tiny toast), keeping the kid unscared; the
+   overlay is reserved for a FATAL `init()` failure. `funpark` update/draw are
+   also individually try/caught so the park can never take down the rest of the
+   game. Trimmed park NPCs (5→4) as a small iPad-GPU hedge. **sw cache v14→v15.**
+   Verified headless: forced frame error + park-draw-throwing-every-frame both
+   leave the overlay hidden and the loop running; rides still complete; full
+   regression green. (Ask the dad if the Oops is truly gone on the iPad — if a
+   *specific* error text still shows in the console we can pin the iOS root cause.)
+
+## Status (session 27) — walk-in portals + far/top-down camera (dad feedback)
+Dad: portals were "floating in the air" and hard to walk into; wanted a more
+zoomed-out option + a top-down view for navigation. Shipped on
+**`claude/dreamy-mccarthy-g6wgjr`**, deployed to `main`. **sw cache v15→v16.**
+1. **Grounded, walk-straight-in portals.** `World.addPortal` used to put the
+   obsidian sill at foot level with the glowing swirl one block ABOVE it — so it
+   read as floating and you had to bump/auto-jump in. Now the frame is **recessed
+   one block** (`fy = base-1`): the bottom obsidian row sits flush with the ground
+   and the **swirl starts at FOOT level**, so you walk straight through. Updated
+   `portal.f`/`a` accordingly (`setPortalActive`/`isPortalBlock` unchanged — they
+   key off `f`). Existing saves are fixed on load by a new `regroundHome(key)`
+   (clears + rebuilds the home/Nether gateway grounded), run alongside the
+   existing `tidyPortals` (which already rebuilds the flint/hub row via
+   `addPortal`, so those reground for free).
+2. **Two new camera views (`VIEW_PRESETS`).** The 🔍 view button now cycles four
+   presets — **🔍 wide (default) → 🔎 close → 🔭 far (zoomed out) → 🗺️ top-down
+   map view** — each a `{dist, pitch, icon}`. Top-down snaps `camPitch` to 1.12
+   (looking down) and leaving it restores 0.42; the others keep your drag pitch.
+   Saved index still round-trips (now indexes `VIEW_PRESETS`, restoring dist +
+   any preset pitch). `ZOOM_LEVELS` → `VIEW_PRESETS` everywhere.
+   Verified: Node (16 portal-geometry asserts: flush sill, swirl at foot level,
+   walk-through, footing, still protected — overworld + secret) + headless
+   (view cycle hits all 4 icons with pitch 0.42/0.42/0.42/1.12; lit portal →
+   stand in swirl → travels; **save/reload regrounds the home portal + hub portal
+   still travels**; zero errors) with screenshots of the grounded portal, the
+   top-down map view, and the far view. Idea backlog offered: a "home/portal"
+   compass arrow, a bigger/clearer minimap, pinch-to-zoom.
+
+## Status (session 28) — make Secret World rides discoverable (dad feedback)
+Dad: navigation's great + Ezra loves building patterns on the flat Secret World
+floor, but he **couldn't figure out how to ride** the attractions (aiming a tap
+at a 3-D ride from third-person while focused on the floor is too fiddly for a
+6-yr-old). Shipped on **`claude/dreamy-mccarthy-g6wgjr`** → `main`. **sw v16→v17.**
+- **Big tappable floating "Ride!" signs** over each attraction. `SecretPark`
+  now exposes `signs` (anchored over each kiosk); main projects them to screen
+  each frame (`updateRideSigns`, mirrors the fishing-bobber projection) as bright,
+  bouncing `.ridesign` buttons reading e.g. "🎡 Ride! 💎3". Tap one → the existing
+  "Ride for 💎?" prompt. Hidden during a ride and in every other world. The
+  on-canvas 3-D tap still works too.
+- **Minimap ride markers** (pink dots) in the Secret World so the rides are easy
+  to find; arrival tip rewritten to "Tap a glowing Ride! sign… find them with the
+  pink dots on your map."
+  Verified headless: 3 signs render with the right emoji+cost; tapping a sign
+  opens the prompt and starts the ride; signs hide during a ride + at home; zero
+  errors; screenshot of a "🎡 Ride! 💎3" sign floating over the wheel. (Idea if
+  still tricky: also auto-pop the prompt when he walks right up to a ride.)
+
+## Status (session 29) — Ticket booth + Popcorn + Gift Shop (rides finally easy)
+Dad: Ezra loves the game but STILL couldn't get on the rides; he asked for a
+"stand where he gets ride tickets," a popcorn stand, and shops. Also wants more
+MC blocks + a larger flat high-res building world (those two queued — see
+Backlog). Shipped the stands on **`claude/dreamy-mccarthy-g6wgjr`** → `main`.
+**sw v17→v18.** Now **48 goals**.
+- **🎟️ Ticket booth = the easy way onto rides.** A booth by the spawn; **walk up
+  to it and a simple "Pick a ride!" menu opens automatically** (`onApproachTicket`,
+  re-arms when you step away so it's never naggy) — or tap it. The menu lists each
+  ride + 💎 cost; tap one → `beginRide` (pays + starts). This is the foolproof
+  fix (he already uses the 🌍 menu fine). The per-ride floating signs + on-canvas
+  taps still work too.
+- **🍿 Popcorn stand** (`TREATS`: popcorn/pop/cotton-candy/ice-cream, 1–2💎) →
+  a treat menu; buying heals up to `effMax()` + a fun burst + new 'Sweet tooth'
+  goal (`treat`). **🛍️ Gift Shop** → opens the existing 💎 shop.
+- Booths built from a new `buildBooth` mesh; `SecretPark.stands`; `pickRay` now
+  returns `{kind:'ride'|'stand', id}`; floating signs + pink/gold minimap markers
+  cover rides + stands. New dialogs `#ridemenu`/`#popcorn`. Debug:
+  `__ezra.openStand(id)/buyTreat(i)`.
+  Verified headless: 3 stands + 6 signs; ticket menu lists 3 rides and a tap
+  starts one (−3💎); **walking up to the booth auto-opens the menu**; popcorn buys
+  a treat (−1💎, goal ticks); gift shop opens the 💎 shop; signs hide at home;
+  zero errors. Screenshot of the booth row.
+
+## Status (session 30) — intuitive building for a 6-yr-old architect (dad: Ezra
+chose the game over YouTube + loves building, but "can't choose where to put the
+walls / hard to make a 4-walled building"). Shipped on
+**`claude/dreamy-mccarthy-g6wgjr`** → `main`. **sw v18→v19.** Now **49 goals**.
+1. **🏗️ Walk-and-confirm Big Builds (the headline).** Picking a structure no
+   longer drops it instantly in front of you — instead a **bright cyan footprint
+   outline** shows where it'll land (a `quadMesh` drawn in the blended pass at
+   `bigBuildSpot`, updated each frame as you **walk/turn to move it**), with a
+   bottom **`#placebar`**: a big **"✅ Build here!"** button + **"✖ Cancel"**.
+   Taps are suppressed while placing (use the button); travel/knockout cancels.
+   `startPlacement`/`confirmPlacement`/`drawBuildPreview`; `pendingBuild`. This
+   fixes "can't choose where."
+2. **8 structures (bigger + varied).** Refactored the build fns to take a spot
+   `s`: **House** (4-wall room+door+windows+lamp), **Big House**, **🗼 Tower**
+   (tall, crenellated), **🏰 Castle** (walls+4 corner towers+gateway, ~305
+   blocks), **🔺 Pyramid**, **🌉 Bridge**, **Big Floor**, **Long Wall**.
+   `bigBuildSpot(dist, rad)` clamps by footprint.
+3. **CSS hidden-bug fix (important).** `#ride`/`#ridemenu`/`#popcorn` were missing
+   from the modal `display:flex` + `#id.hidden{display:none}` lists, so they
+   rendered as `block` and **never hid** — the ride prompt had been a stuck box
+   since the Secret World shipped (likely part of why rides felt broken). Added
+   them to both lists + `#placebar.hidden`. Now all dialogs open/close correctly.
+   Verified: Node syntax; headless — all 8 structures place via placeBuild→
+   confirmPlace (House 242 blocks incl. a door, Castle 305, Pyramid 165…) and
+   clear cleanly; placebar shows then **hides** after building; the 4 new dialogs
+   all compute `display:none` when hidden; cyan footprint visible on grass; zero
+   errors. Screenshots of the footprint preview + the finished house on a hill.
+   Still queued (dad's wishlist): lots more MC blocks + a special "Creative"
+   group; a **larger flat high-res building world** (do carefully w/ save
+   migration so builds are never lost).
+
+## Status (session 31) — a TON more blocks + a Creative ✨ group (dad: "load him
+up with fun MC blocks + creative group, then the world"). Shipped on
+**`claude/dreamy-mccarthy-g6wgjr`** → `main`. **sw v19→v20.** Now **126 block
+ids** (31 new), **77→108 picker tiles**, **16 picker categories**.
+- **20 recognizable MC blocks** (tiles 84-104, ids 95-114), drawn with the
+  session-24 helpers (`noise`/`shade`/`metal`/`speckle`): Crafting Table,
+  Furnace, Chest, Cherry Planks + see-through **Cherry Leaves**, Bamboo, Crimson
+  & Warped planks, Soul Sand, Bone Block, Copper + Oxidized Copper, Sculk,
+  Blackstone, Smooth Stone, Packed Ice, Honey, Target, Terracotta, Mossy Stone
+  Brick. Slotted into Nature/House/Wood/Stone/Shiny/Decor/Redstone tabs.
+- **Creative ✨ group (11, ids 115-125)** — wild blocks for crazy builds, in a
+  new freely-available picker tab: **Neon ×5** (one bright `TILE.NEON` tinted via
+  `colored()`), **Glow Crystal**, **Starry** (night sky), **Cloud**, **Checker**,
+  **Candy** (stripes), **Chrome** (mirror). (RAINBOW stays shop-gated in Special.)
+- New ids are plain bytes so the existing base64 save round-trips them for free;
+  `isLego` (83-94) is unaffected.
+  Verified: Node (20 asserts — ids unique + in-byte-range, every category block
+  has a def with valid UVs, Cherry Leaves see-through, Creative free) + headless
+  (atlas builds **0 errors**, Creative tab present, 108 picker tiles, a 31-block
+  showcase renders, picker swatches show real colours). Screenshots of the
+  showcase wall + the picker. **Next: the larger flat building world** (careful
+  SX/SZ refactor with save migration so Ezra's builds are never lost).
+
+## Status (session 32) — BIGGER world (64→96) + a graphics glow-up + a flat
+Build World (dad: "open to what you make of the world, but make it even cooler
+with graphics we can support"). Shipped on **`claude/dreamy-mccarthy-g6wgjr`** →
+`main`. **sw v20→v22.** World is now **96×32×96** (2.25× the area).
+1. **Bigger world, builds kept safe.** `SX=SZ=64→96` (still ÷16 for chunks).
+   The save is now **RLE-compressed + carries its dims** (`serialize` v3:
+   `rleEncode` → ~17-25KB/world vs ~175KB, so the bigger world stays *way* under
+   the localStorage quota). `loadFrom` is **migration-aware**: an old 64-save's
+   bytes are overlaid at the same coords onto a freshly-generated 96 world
+   (loader now pre-generates each world before `loadFrom`), and `placed` indices
+   are remapped — **so every existing build survives and just gains open land
+   around it**. Far plane 120→220 + fog ×1.5/1.7 so you can see across.
+   `secretworld.js` park positions are now centre-relative (re-centred for 96).
+   Un-silenced the loader's catch (logs `loadGame failed` instead of hiding it).
+2. **🌍 Build World** — `generateBuild`: a big, perfectly-flat grass plain, wide
+   open and calm, just for building; free via the 🌍 menu (`WORLD_KINDS.build`).
+3. **✨ Graphics glow-up.** A **gradient sky** (new `makeSkyProgram`/`skyQuad` —
+   a cheap fullscreen quad, saturated up top → hazy horizon the fog blends into,
+   night-aware) and **softer ambient occlusion** (`AO_LEVEL` lifted) for a
+   gentler, prettier look. No FPS-heavy effects; 16px textures untouched.
+   Verified: Node (RLE round-trip exact; **migration preserves a diamond tower +
+   floor, remaps placed, fills the new region with terrain, 96 save ~17KB**) +
+   headless (96 boots 0 errors, world-hop, park re-centred at cx≈34, **real
+   in-browser migration of a 175KB old save keeps both towers + floor + placed**,
+   **explicit-save reload keeps tower/neon/placed/dim**, gradient-sky + Build
+   World screenshots). Debug: `__ezra.save()/saveSize()`. Tuning candidates: 96
+   terrain is ~2.25× geometry (fine on a real GPU; SwiftShader slow — watch FPS
+   on an old iPad); old↔new terrain seam at the 64 line is cosmetic (more land).
+
+## Status (session 33) — 🚀 Space World (the 100💎 dream reward)
+Dad: Ezra's collecting 100💎 (loved Lego World at 50) and asked what's worth 100.
+Offered 4 ideas via AskUserQuestion; Ezra picked **Space World**. Shipped on
+**`claude/dreamy-mccarthy-g6wgjr`** → `main`. **sw v22→v23.** Now **50 goals**,
+**15 shop items**, **12 worlds**.
+- **`WORLD_KINDS.space`** (`generateSpace`): floating quartz/deepslate asteroids
+  in a **dark starry void** (the gradient sky renders deep space), dotted with
+  **Glow-Crystal stars**, a guaranteed central spawn island + the home portal.
+  Bought in the 💎 shop (`spaceworld`, **100💎** — the big one), then reached via
+  the 🌍 menu / flint like Sky/End (`locked:'spaceworld'`).
+- **Low gravity (the headline feel).** New `player.gravityScale` (used in the
+  gravity step); `setDimension` sets it to **0.36** in any `lowGrav` world, else
+  1 — so in Space you **bounce sky-high and float down** between the islands.
+  Falling off respawns you on the central island (`pos[1] < -4 → goHome`, already
+  there). New **🚀 Astronaut** goal (`space` metric, bumped on first arrival) +
+  a first-time tip.
+  Verified headless: buy→owns→travel; `gravityScale` 1→0.36→1 across worlds;
+  **free-fall ~1.2 blocks/0.5s in Space vs ~3.6 in the overworld** (low-g
+  confirmed); central island solid under spawn; Astronaut goal ticks; zero
+  errors; screenshot of the asteroids + starry sky. Tuning candidates: low-g
+  jump uses the same JUMP velocity (lower gravity alone makes it float — feels
+  great; could add a bigger launch); space islands are quartz/deepslate (could
+  add neon/space-themed decor next).
+
+## Status (session 34) — 🚀 Space Adventure: a drivable moon, rover, alien cops,
+black holes + space blocks (dad: "he's mesmerized by building; what's missing is
+a little adventure — black holes you can't see and fall into, a space rover you
+buy and drive [choose speed → needs big terrain], an alien cop or two that keeps
+your speed in check, an anti-gravity lever, and many space-friendly blocks incl.
+sticky + rock ones. Go crazy."). Shipped on **`claude/dreamy-mccarthy-g6wgjr`** →
+`main`. **sw v23→v24.** Now **52 goals**, **16 shop items**, **132 block ids**.
+1. **🌑 The moon got real (terrain redesign).** `generateSpace` is rebuilt: a big,
+   **solid, drivable cratered moon surface** (MOON_ROCK over deepslate, gentle
+   rolling height — 223/225 columns are drivable) instead of sparse islands, with
+   the **floating asteroid islands kept above** to bounce up to (low-grav). Old
+   floating-island saves are **migrated to the new moon without losing builds**
+   (`migrateSpaceIfOld` in main: detects the sparse old terrain, regenerates the
+   moon, then **re-stamps every `world.placed` block back**; also drops a hanging
+   arrival point onto solid ground). Space World was already live (v23 on `main`),
+   so this migration was required.
+2. **🕳️ Black holes (the "adventure" surprise).** Dark round pits punched straight
+   through the moon to the void (a subtle BLACKSTONE rim is the only tell). Drive
+   over one and *whoosh* — `blackHoleWhoosh()` (frame check: `dimension==='space'
+   && pos[1]<3`) pops you safely back to the launch pad with 🌀 particles + a
+   chime, ticks the new **🕳️ Black hole!** goal. Never scary, always recovers.
+   `world.blackHoles` lists them (debug only; the open shafts live in the bytes so
+   it still works after a save/reload).
+3. **🛸 Space Rover (`js/rover.js`).** Shop item (**30💎**); a **🛸 topbar button**
+   appears in Space when owned. Tap to hop on, tap again to **cycle the speed**
+   (🐢 Slow → 🚗 Cruise → 🚀 Zoom → 🛑 Park) — reuses the pony's `player.mountSpeed`
+   (muls 1.8/3.0/4.6). A little box-mesh moon buggy (wheels, rails, glowing
+   headlights/antenna) is drawn at the player's feet; the kid rides **seated**.
+   Travel/knockout/reset auto-park it (`stopRover`); `setDimension` shows/hides the
+   button. New **🛸 Space driver** goal. `__ezra.toggleRover/setRoverSpeed/roving/
+   roverSpeed`.
+4. **👽 Alien cops (`js/aliencops.js`).** 1–2 friendly UFO saucers patrol the moon
+   (drift + bob + flashing red/blue siren, blob-shadowed). Drive at **top speed
+   (🚀 Zoom)** near one → it flashes, eases toward you ("pulling you over"), and
+   `onSiren` toasts **"Slow down! Space speed limit!"** + **gently drops you to
+   Cruise** (no harm, no catch). Wired as a `space` mob via the registry
+   (`WORLD_KINDS.space.mobs=['aliencops']`). `__ezra.aliencops()`.
+5. **🚀 Six space blocks (ids 126–131) + a "Space 🚀" picker tab.** MOON_ROCK,
+   SPACE_METAL, METEOR, CRYSTAL_ORE, PLASMA (glow), and **ALIEN_GOO — a *sticky*
+   block** (`sticky:true`; player.js slows you to 0.4× while stood on it, like
+   honey). Drawn with the session-24 atlas helpers (new TILE ids 112–117) and
+   scattered across the moon (meteor boulders, goo puddles, gem ore, glow stones).
+   **Anti-gravity lever: DEFERRED** (a true upside-down camera/gravity flip is
+   finicky + nausea-risky for a 6-yr-old; the low-grav bounce already gives a
+   strong space feel) — told the dad it's a future pass.
+   Verified: Node logic (6 blocks defined + sticky + the Space cat; moon floor
+   solid, bedrock base, 6 black-hole shafts open to the void, 223/225 drivable,
+   save round-trip) + headless CDP (boot 0 errors with the new atlas tiles; buy
+   space+rover→travel; rover speed cycles 1→2→3→0 with muls [1,1.8,3,4.6]; cop
+   sirens at Zoom and drops you to Cruise; black-hole whoosh + a natural shaft-fall
+   both recover + tick the goal; **save/reload keeps space+rover+the new moon**;
+   full 11-world hop + a space soak all green, **zero errors**) with screenshots of
+   the rover on the cratered moon + an overview. Tuning candidates: rover is a
+   box-mesh buggy (no wheel spin); cops always patrol (could nap when you're slow);
+   the black-hole rim is subtle on purpose (a kid learns to spot them);
+   anti-gravity is still open if the dad wants the literal flip.
+6. **Follow-up increment (same session, "keep going naturally"): the moon now has
+   a purpose + the rover hums.** Made Space World a place to **earn** 💎 (not just
+   spend): `generateSpace` buries **CRYSTAL_ORE veins** inside the moon (~50 buried
+   + ~48 sparse surface "tells"); digging a *natural* crystal → **+1💎** + sparkle
+   + chime + a new **🔷 Space miner** goal (`spacegem`, mirrors the gold/diamond
+   dig reward in `doDig`) + a first-time tip — so the rover has somewhere to
+   prospect. Tuned the crater crystal chance 0.30→0.06 so it's real digging work,
+   not free 💎. Plus a soft **looping engine hum** for the rover (`Sound.engine
+   (level)` in audio.js: two oscillators, pitch rises with gear; driven once-per-
+   change from the frame loop via `engineLevel`; idles when seated, revs when
+   moving, stops on park/leave). **sw v24→v25.** Verified headless: 98 natural
+   crystals; a real Dig-button mine pays +1💎 + ticks Space miner + removes the
+   ore; rover drive (engine on) + park + world-hop all **zero errors**.
+7. **Follow-up increment ("keep going"): two space-themed Big Builds.** Added
+   **🚀 Rocket** (`buildRocket`: a 5×5 SPACE_METAL launch pad + a hollow tube body
+   with a GLASS window band, a nose cone, a glowing PLASMA tip, 4 METEOR fins,
+   PLASMA engine glow, and a walk-in DOOR) and **🛖 Moon Base** (`buildDome`: a
+   SPACE_METAL silo wall + a real **voxel glass dome** cap via a sphere-shell test,
+   a door, a PLASMA core + SEA_LANTERN floor light) to the 🏗️ Big Builds menu —
+   one-tap, walk-and-confirm like the others, available in every world (a rocket
+   in the backyard is half the fun). They put the new space blocks to use.
+   **sw v25→v26.** Verified headless: both place via placeBuild→confirmPlace
+   (Rocket 87 blocks = 66 metal/4 glass/2 door/6 plasma/8 meteor; Moon Base 136 =
+   79 metal/53 glass dome/2 door/plasma+lantern), placebar hides after, zero
+   errors; screenshots of the rocket + the glass dome.
+
+## Status (session 35) — 🐉 the Flying Dragon (dad: "flying dragon it is")
+A rideable **flying mount** — the dad's pick. Shipped on
+**`claude/dreamy-mccarthy-g6wgjr`** → `main`. **sw v26→v27.** Now **53 goals**,
+**17 shop items**.
+- **`js/dragonmount.js` `DragonMount`** — a friendly purple box-mesh dragon (head,
+  neck, horns, tapering tail, back ridge, tucked legs) with **two flapping wings**
+  drawn as separate meshes rotated about the forward axis (new **`mat4.rotateZ`**;
+  `body·rotateZ(±a)`), beating faster while climbing/moving. Drawn at the player's
+  feet with the kid **seated** on top (reuses the pony/rover seated pose, +0.62)
+  and a big blob **shadow on the ground below** so the height reads.
+- **Reuses the Fly physics.** Mounting sets `player.flying=true` + `mountSpeed=1.7`,
+  so **hold Up to climb, let go to glide down gently** (the Jump button already
+  relabels to "Up"). Verified: holding Up climbs ~4 blocks/sec, releasing drifts
+  down. A **🐉 topbar button** (shown when owned) hops on/off; `syncFlyButton`
+  keeps the 🕊️ button in sync. Works in **any world** (it's a summon-style mount —
+  no per-world entity), so he can soar over his builds, the moon, Sky World…
+- Bought in the 💎 shop (`dragonride`, **45💎** — a dream reward). New **🐉 Dragon
+  rider** goal (`dragonfly`), friendly **`roar`** sound (warm, not scary).
+  Auto-lands (dismounts) on travel/knockout/reset; `__ezra.toggleDragon()/
+  dragonRiding()`.
+  Verified headless: hidden→buy→button shows→mount (flying+1.7×, goal ticks)→hold
+  Up climbs +4.1→release glides −1.5→dismount (flying off, speed 1)→travel
+  auto-dismounts; **save/reload keeps the unlock + button**; over→space→sky→over
+  hop + a flight soak, **zero errors**; screenshots of the dragon in flight + an
+  aerial soar over the world. Tuning candidates: wings flap about a fixed root
+  (no fold on glide); dragon is a fixed size (frames fine in 3rd-person); flight
+  uses the gentle Fly speeds — could add a faster "dive."
+
+## Status (session 36) — challenge pass (dad: "he's missing some challenge")
+Dad's wishlist: a rocket that launches + explodes on asteroids, racing action,
+the same flight physics for the dragon, manual "feel in charge" startup steps,
+and **auto-night every ~15 min** (not frequent; shelter in builds). Shipping in
+increments on **`claude/dreamy-mccarthy-g6wgjr`** → `main`.
+1. **🌙 Auto-night every ~15 min.** `AUTO_NIGHT_EVERY=900s` of play, then the next
+   time he's home in the overworld it **falls to night** (`startAutoNight`: warns
+   "get inside!", spawns the existing zombies/spiders/skeletons), lasting
+   `AUTO_NIGHT_DURATION=85s` before **dawn** (`endAutoNight`). Only fires in the
+   overworld (held while he's in space/etc.), never mid-big-build. The manual 🌙
+   button still works and **cancels the auto cadence** (`nightAuto=false`; turning
+   day back on / sleeping / knockout all reset the ~15 min timer). **sw v27→v28.**
+   Debug: `__ezra.forceNight()/endNight()/setNightTimer(s)/nightInfo()`. Verified
+   headless: timer counts down, does NOT fire in space, fires on return to the
+   overworld (night+nightAuto), dawn + manual toggle + knockout all reset cleanly,
+   zero errors.
+2. **🚀 Rideable Rocket + crash challenge (`js/rocketship.js`).** A 🚀 topbar
+   button (shown in Space World). Tap to **board** (`rocketState` off→ready), tap
+   again to **LAUNCH** — a manual **3-2-1 countdown** (he's in charge of blast-off)
+   → `rocketLiftoff`: a `rocketKick=1.1s` window lifts him **skyward** (applied
+   after `player.update` since fly physics resets vel each frame), `flying=true`,
+   `mountSpeed=2.6` (fast = racing), big boom + shake. Tap 🛬 to land. Engine
+   flames (a glow mesh on `rocketship.js`) stretch with the boost. **sw v28→v29.**
+3. **💥 Crash physics, shared by rocket + dragon** (`flightCrashCheck`). Flying
+   *fast* into an asteroid (any solid block ~0.55 ahead at chest height) in Space
+   World → a **harmless boom** + 💥 particles + back to the launch pad
+   (`crashFlight` → `goHome`), so it's a real "dodge the asteroids" challenge that
+   never hurts/strands him. Applies to the dragon too (the dad's "same physics").
+   New **🚀 Rocket pilot** goal. Auto-parks on travel/knockout/reset/black-hole.
+   Debug: `__ezra.toggleRocket()/rocketState()/_liftoff()/flightCrash()`.
+   Verified headless (CDP): board→countdown→**flying** + goal + 2.6× speed; the
+   blast-off kick lifts him; **rocket crash → off + back on the pad**; **dragon
+   crash recovers** too; land + travel auto-stop + button hides outside space;
+   zero errors; screenshot of the rocket on the moon. **Testing note:** headless
+   Chrome starves rAF during plain sleeps, so sustained-frame behavior (the 3-2-1
+   countdown, the lift kick) must be checked by **pumping frames** (repeated
+   `Page.captureScreenshot`) or a `_liftoff` debug hook — plain `sleep` leaves the
+   countdown stuck. Anti-throttle flags (`--disable-renderer-backgrounding` etc.)
+   help only partially.
+4. **🏁 Space Race (`js/spacerace.js`) — the racing payoff.** A loop of **7 glowing
+   ring-gates** floating among the asteroids; fly through them **in order** (rocket,
+   dragon, or plain Fly) and the **next ring pulses gold** (passed=dim, upcoming=
+   cyan; three baked hoop meshes since the world shader has no tint uniform).
+   Forgiving **proximity** detection (`HIT_R=2.8`, so a 6-yr-old flies *near* a ring,
+   not through a pixel). Each ring → a climbing chime + ⭐ + "Ring n/7"; finishing
+   the loop pays **+💎3** + a new **🏁 Space racer** goal + the time. A **fresh course
+   each take-off** (`startSpaceRace` on rocket liftoff / dragon-mount-in-space /
+   arriving in Space). A **gold minimap marker** points to the next ring. **sw
+   v29→v30.** Debug: `__ezra.race()/nextGate()/flyThroughGate()`. Verified headless:
+   travel resets to gate 0; flying through all 7 advances 0→7→finished, pays the
+   reward (+💎 incl. the goal bonus) + ticks the goal; minimap marker; zero errors;
+   screenshot of the gold "next" ring + a cyan upcoming ring over the moon. Still
+   open: a manual takeoff flourish for the dragon; a best-time leaderboard.
+
+## Status (session 37) — Space gets a face, cozy pillows, real fishing, puzzles
+Dad said "keep going" ("what forms next") → full creative freedom, then after
+the first ship handed a wishlist: **lie-down pillows, a real fishing process
+(bigger fish = more 💎, harder), and puzzles/mini-games in all worlds for 💎**.
+Shipped as four verified increments on **`claude/dazzling-rubin-tabkcg`** →
+deployed to `main` (each mirrored). **sw v30→v34.** Now **52 goals**, **134 block
+ids** (PILLOW 132, PUZZLE 133).
+1. **🧑‍🚀 Captain Nova — an astronaut for Space World (`js/astronaut.js`).** Space
+   World had terrain/rides/mining but no *face* (every other big world has
+   villagers/Steve/the buddy). A friendly astronaut (white suit, golden visor,
+   pack, blinking antenna) stands near the moon launch pad, turns to greet you,
+   floats a little (low-grav) + blob shadow. **Tap her for a space mission** —
+   mine crystals / dig moon rocks / build on the moon / race the rings — finish
+   for 💎 (baseline-relative tracking like the villager quests; `ASTRO_MISSIONS`,
+   `talkToAstronaut`/`showAstro`/`astroOk`, `#astro` dialog). Wired as a `space`
+   mob (`WORLD_KINDS.space.mobs += 'astronaut'`), white minimap marker, arrival
+   tip. New 'Nova's helper' goal (`spacemission`). `__ezra.astronaut()/talkAstronaut()/astroOk()`.
+2. **🛌 Pillow blocks you can lie down on (`B.PILLOW`, House tab).** Soft pastel
+   cushion (2 new atlas tiles). **Tap → lie down**: a new `lying` pose in
+   character.js (tips the rig flat onto its back), `resting` state pauses physics
+   + **slowly refills hearts** (cozy, never skips night), wider blob shadow, 💤.
+   Get up by tapping/moving/Jump; travel/knockout/reset always stand him up.
+   Lay a row to stretch out. `lieDown`/`getUp`; `__ezra.lieDown()/getUp()/resting()`.
+3. **🎣 Fishing is now a catch-it game.** Cast → WAIT → a fish **BITES** (bobber
+   becomes a pulsing 🐟 + "A bite! TAP to catch it!"), tap (🎣 button or anywhere)
+   within a short window to hook it. **Bigger water hides bigger, rarer fish that
+   pay more 💎 but bite for a SHORTER time** (harder): minnow(0)→fish/big(1–2)→
+   HUGE/GIANT 🐋 + treasure(2–4). Miss = it wiggles off, re-waits (no penalty).
+   `rollCatch`/`startBite`/`missBite`/`hookCatch`; `#bobber.bite` CSS pulse;
+   `__ezra.bite()/catchFish()`.
+4. **🧩 Color Puzzle cubes — a memory mini-game in every world (`B.PUZZLE`,
+   Creative tab).** One auto-placed near each world's spawn (`placePuzzleFixture`,
+   idempotent — only fills air, never stacks, respawns if dug) + placeable
+   anywhere. **Tap → watch the colors flash (each a musical note), tap them back**
+   (Simon-style). Right → +💎 (1→3, capped) + harder next round; wrong → forgiving
+   replay, no penalty. `#puzzle` dialog (2×2 color pad), 'Puzzle solver' goal
+   (`puzzle`). `__ezra.openPuzzle()/puzzleState()/puzzleSolve()/puzzleMiss()`.
+5. **🛏️ Lie down on the bed too (dad follow-up: "he can't lay on his bed like
+   Minecraft").** Tapping a bed used to instant-flash to morning; now it LAYS him
+   on the bed (reuses the pillow `resting` system: drawn lying centered along the
+   two halves, hearts refill, sets home). At night, lying down still sleeps to a
+   safe morning (clears monsters). Tap/move/travel to get up. `__ezra.sleepBed()/
+   restingBed()`. **sw v34→v35.** NOTE: the dad described the *old* fishing + no
+   pillow — his iPad PWA was still on the cached build; he needs to FULLY close &
+   reopen the app to pick up the new version.
+   All verified headless (CDP) with screenshots: Nova spawn/mission/claim/persist;
+   pillow lie-down + heart regen + save-reload; fishing bite→hook→exact reward +
+   water-size scaling + forgiving miss; puzzle open→solve→💎→difficulty-up +
+   forgiving miss + fixture in over & gold + no-stacking across reload; full
+   11-world hop green, **zero errors**. Tuning candidates: rare 🐋 fish window
+   (0.6s) is a real challenge (forgiving, so fine); puzzle fixture sits at
+   spawn+3 (fills only air — could rarely perch on a portal/build, cosmetic);
+   pillow body overhangs a single cushion (lay a row — intentional).
+
+## Status (session 38) — ⛏️ the earn-your-tools ladder (the progression spine)
+Dad asked "where's the game lacking vs Minecraft?" I diagnosed it as **wide but
+shallow** — many parallel toys, but nothing *compounds* the way Minecraft's one
+loop (mine → craft a better pickaxe → mine deeper → better stuff) does; the 💎
+economy pays out from everything and buys mostly cosmetics, so earning never made
+him more *capable*. He picked the **earn-your-tools ladder** via AskUserQuestion.
+Shipped on **`claude/dazzling-rubin-tabkcg`** → `main`. **sw v35→v36.** Now **136
+block ids** (COAL_ORE 134, IRON_ORE 135), **55 goals**. Hybrid by design: free
+creative building is 100% untouched — the ladder is a purely *additive* layer.
+- **Collect materials by mining** (`collectFromDig` in `doDig`): digging a
+  *natural* block drops crafting materials into a tiny inventory (`goals.items`:
+  🪵wood/🪨stone/⚫coal/⚙️iron). YOUR placed blocks are never "mined" (creative stays
+  free + snappy). A top-left **materials HUD** (`#inv-bar`, hidden until you start,
+  no hearts overlap) shows counts + your pickaxe.
+- **A crafting table that works** (`B.CRAFTING` was decorative): tap it → the
+  `#craft` dialog with big picture recipes; a **fixture** drops near spawn in every
+  world (`placeCraftFixture`, idempotent like the puzzle cube).
+- **The pickaxe ladder** (`goals.tools.pick` 0→4, `RECIPES`): 🪵 Wooden (unlocks
+  mining stone+coal) → 🪨 Stone (unlocks iron) → ⚙️ Iron (strong) → 💠 **Diamond
+  (costs 10💎 + iron)** — so the diamonds earned everywhere finally buy *capability*.
+  You can only craft the *next* tier up (a clear climb). **Gentle gating**
+  (additive, never punitive): bare hands get wood; a better pick unlocks the next
+  material, with a throttled "make a pickaxe!" nudge (`pickNudge`, ≤1/12s, never
+  spammy — nothing existing got harder). The pickaxe is **held in hand while
+  digging** (tier-colored mesh, `character.holdPick`/`syncHeldTool`; sword shows
+  otherwise).
+- **Ore to mine** (`World.sprinkleOre`): coal+iron seeded into natural stone —
+  idempotent (runs only if the world has stone but no ore), so new/reset worlds AND
+  **older saves all get ore** without losing a single build (only replaces
+  un-placed stone; once seeded+saved it never re-runs). Ores added to the Shiny
+  picker tab.
+- 3 new goals: **Gather materials** / **Toolsmith** / **Master miner** (→ 55).
+  Debug: `__ezra.openCraft()/craft(tier)/pickTier()/inventory()/giveMaterials(n)/
+  mine(x,y,z)`. Verified: Node logic (materials, canAfford-with-💎, tier-only-
+  climbs, save round-trip, old-save safe defaults) + headless CDP (ore seeded
+  ~78 coal/86 iron; full ladder wood→stone→coal→iron→diamond with gating at each
+  rung; 💎 really spent on the diamond pick; held pickaxe on Dig / hidden on Build;
+  dialog opens with 4 recipes; HUD visible + no hearts overlap; **save/reload keeps
+  materials+tier+ore ids**; 11-world hop clean; creative dig-your-own-block gives
+  no material) — all green, **zero errors**. Screenshots of the crafting dialog +
+  mining. Tuning candidates: crafting-table fixture sits at spawn−3 (only fills
+  air — could rarely be blocked on a cramped old save; a minimap marker / topbar
+  button is the easy follow-up); ore is surface-shallow (no caves yet); dig is
+  still instant (a "break time" sped up by better picks is a natural follow-up).
+  **Next rungs of this arc (offered to dad):** caves (deeper = better ore), real
+  break-time so faster picks *feel* faster, and more recipes (axe/shovel/armor).
+  **DEPLOY NOTE:** session 38 + 39 are committed locally (`3725d13`, `54b5b94`)
+  but the git **push relay was returning 403** (infra; reads + GitHub MCP work,
+  only `git push` fails). They'll go live the moment the relay recovers — retry
+  `git push -u origin <branch>` then mirror to `main`. Nothing is lost.
+
+## Status (session 39) — 🕳️ caves + ⛏️ break-time (the underground update)
+Dad loved the phased plan and said "build the next set." Shipped the next two
+rungs of the earn-your-tools arc on **`claude/dazzling-rubin-tabkcg`** (commit
+`54b5b94`; **pending deploy** — see the 403 note above). **sw v36→v37.** Gives
+the pickaxes somewhere exciting to earn their keep AND makes a better pickaxe
+*feel* more powerful (the two things missing after the ladder).
+1. **🕳️ Caves.** `World.carveCaves(rand, protect)` digs wandering tunnels + a few
+   caverns + a handful of **surface entrances** (sloped shafts through open grass)
+   into the overworld stone — carved in `generate()` with its own RNG (trees/
+   treasure unchanged). It **only ever removes natural stone/dirt/ore, never
+   bedrock, never a placed block**, and skips any column in `protect`.
+   `carveCavesIfNone()` retroactively adds caves to **older overworld saves**
+   without touching builds (builds `protect` = a 5×5 around every placed block;
+   idempotent via an underground-air sample). Wired: `generate()` carves; main's
+   `registerDim` calls `carveCavesIfNone()` for `key==='over'` before `sprinkleOre`.
+2. **Deeper = better ore.** `sprinkleOre` now also seeds **sparse gold + diamond
+   down near bedrock** (`seed(B.GOLD,6,0.4)`, `seed(B.DIAMOND,6,0.3)` — deep), so
+   braving the caves with an iron+ pickaxe is the payoff (diamond sits below coal).
+   Existing natural gold/diamond still pays 💎 on dig (ungated, unchanged).
+3. **⛏️ Break-time mining (the "feel").** Natural rock/ore now takes a few *chips*
+   to break, and a better pickaxe chips harder: `PICK_POWER=[1,2,3,5,8]` (bare→
+   diamond) vs `HARDNESS` (stone 2, coal 2, iron 3, gold/diamond ore 4, deepslate
+   3). Tuned so the pickaxe that **unlocks** a block breaks it in ~1 tap and the
+   **diamond pick shatters everything instantly** (power fantasy); a weaker tool
+   takes 2–3 (a gentle nudge to upgrade). **Soft blocks and anything YOU placed
+   still break in one tap** (`need = wasPlaced ? 0 : blockHardness(id)`), so
+   creative building stays snappy. State in a `breaking={key,progress}`; a chip
+   plays the dig sound + a ⛏️ particle and returns before removal.
+4. **Cave visibility.** A `max(vLight, 0.3)` **ambient floor** in the world
+   fragment shader so caves are dim-but-explorable (you can spot ore), not
+   pitch-black — without washing out the surface AO. Non-scary: daytime, no fall
+   damage, Fly always available to climb back out.
+   Debug: `__ezra.breaking()/caveAir()` (+ `mine(x,y,z)` from s38).
+   Verified: Node logic (caves carved ~2.7k underground-air cells + bedrock
+   intact + diamond-below-coal; migration kept all 48 build blocks + idempotent) +
+   headless CDP (overworld has caves; break-time: bare 2 chips on stone / wood 1,
+   wood 2 chips on diamond ore / diamond pick 1; placed blocks still 1 tap;
+   ambient floor) + the s38 ladder & 11-world-hop regressions — all green, zero
+   errors. Screenshot of a cave entrance. Tuning candidates: third-person camera
+   makes tight cave interiors pull the camera in close (fine, like any wall);
+   caves are overworld-only for now (could extend to gold/ant); no torches yet
+   (the 0.3 floor covers visibility) — a real block-light system + torches is the
+   natural next step, along with axe/shovel and a "break time" crack overlay.
+
+## Status (session 40) — 🔥 The Forge (smelting + armor: mining ↔ combat)
+Dad asked "what makes it deeper, not shallow?" I diagnosed depth = systems that
+FEED each other, and the mining spine (s38–39) was walled off from combat. He
+picked **The Forge** via AskUserQuestion — the bridge tying mining → smelting →
+crafting → surviving. Shipped on **`claude/dazzling-rubin-tabkcg`** (commit
+**pending the same 403 deploy relay**; stacks on s38–39). **sw v37→v38.** Now
+**57 goals**.
+1. **🔥 Functional furnace.** The decorative `B.FURNACE` now opens a `#furnace`
+   dialog (tap it, or its near-spawn fixture beside the crafting table — they sit
+   side by side as one workshop, via `placeFixtureBlock`). **Smelt raw iron (⛓️) +
+   a coal (⚫ fuel) → an iron bar (🔩)** (`goals.smeltIron`, with a "Smelt all"
+   button). This finally gives **coal a purpose** (it was collected but unused).
+2. **Smelting is on the ladder.** The **Iron + Diamond pickaxes now need 🔩 bars**
+   (`RECIPES`: iron = 3 bars + wood, diamond = 2 bars + 10💎). So the path is
+   mine ⛓️ → smelt → craft — a real processing step, not just collecting. (Note:
+   the mined material is still `goals.items.iron`; smelting turns it into `ingot`.)
+3. **🛡️ Armor — the mining↔combat bridge.** Forge **Iron Armor** (6 bars) or
+   **Diamond Armor** (3 bars + 12💎) in a new "Armor" section of the crafting
+   dialog (`ARMOR_RECIPES`, `craftArmor`, tier-gated like pickaxes). Armor **soaks
+   damage** in `hurt()` (iron ×0.5, diamond ×0.25, min 0.5/hit) — so mining iron
+   deep in the caves lets you **survive the night & deep caves**, fusing mining +
+   smelting + crafting + combat into ONE "gear up to go deeper" loop. Drawn on the
+   kid as a tier-coloured **chestplate + helmet** (`character.armor`,
+   `buildChest`/`buildHelmet`; iron grey, diamond cyan; set in `applyUnlocks` +
+   `craftArmor`).
+4. HUD shows 🔩 bars + a 🛡️ armor badge. 2 new goals: **Smelter** (smelt 3) +
+   **Suit up!** (forge armor → 57). Save round-trips `items.ingot` +
+   `tools.armor` for free (existing `it`/`tl` keys). Debug: `__ezra.openFurnace()/
+   smelt(n)/craftArmor(t)/armorTier()`.
+   Verified: Node logic (smelt fuel cost, ingot-gated recipes, armor only-climbs +
+   goals, save round-trip, old-save defaults) + headless CDP (furnace fixture +
+   dialog; smelt 4 burns 4 iron + 4 coal → 4 bars; iron pickaxe via bars; iron +
+   diamond armor; **armor halves a hit: no-armor 1❤ vs diamond-armor 0.5❤**;
+   save/reload keeps bars + armor; armor drawn on the kid) + the updated ladder &
+   11-world-hop regressions — all green, **zero errors**. Screenshots of the
+   furnace dialog + the kid in diamond armor. **DEPLOY: s38–40 all committed
+   locally, pending the 403 relay** (push + mirror to `main` when infra recovers).
+   Next rungs offered to dad: axe/shovel (chop/dig faster), torches + a real
+   block-light system (deep caves get dark + torches matter), underground
+   dungeons with loot.
+
+## Status (session 41) — 🏆 Journey to the Deep (the grand goal)
+Dad asked "what makes it deeper, not shallow?" and picked **"a grand goal to gear
+up for"** via AskUserQuestion. Built a legendary quest that gives the whole
+mining → smelting → crafting → armor spine ONE epic destination. On
+**`claude/dazzling-rubin-tabkcg`** (**pending the 403 deploy relay**; stacks on
+s38–40). **sw v38→v39.** Now **59 goals**, **137 block ids** (RELIC 136).
+- **🏆 The Deep Vault + the Relic.** `World.carveVault` digs an **obsidian chamber
+  near bedrock** holding a glowing **legendary RELIC** (new block 136 +
+  `TILE.RELIC`), with a **shaft up to the surface** so you can find it and drop
+  down. Carved in `generate()` + a build-safe `carveVaultIfNone()` migration for
+  older saves (skips placed blocks/columns; idempotent; `findVault` locates the
+  one relic on load, in `registerDim`). A **gold ✦ minimap marker** shows where to
+  dig (until claimed).
+- **📜 The Great Quest journal** (new 📜 topbar button, overworld-only, hidden once
+  won). A staged checklist (`questStages`): ⛏️ forge an Iron Pickaxe → 🛡️ forge
+  Armor → 🕳️ dig deep (a frame check `pos[1]≤4` ticks `wentdeep`) → 🏆 claim the
+  Relic. Big readable text; the button **glows** (`questReadyToClaim`) once you're
+  geared up.
+- **The grand prize, gated by the gear.** Tapping the Relic ungeared = "sealed by
+  magic — gear up first!" (opens the journal). With an **Iron Pickaxe + Armor**,
+  `claimVault` pays **+💎25 + the Hero's Crown trophy + the Champion of the Deep
+  ⭐** + a celebration — *once* (no farming; `goals.done.champion` guards). So the
+  whole spine finally has a destination + payoff. The Relic is tap-to-claim only
+  (`doDig`/tap routing guard — can't be dug away).
+- 2 new goals: **Into the deep** + **Champion of the Deep** (→ 59). Save persists
+  Champion (the goal) + the relic block (world bytes) for free. Debug:
+  `__ezra.vault()/openQuest()/claimVault()/goDeep()/champion()`.
+  Verified: Node logic (one deep relic, obsidian walls, bedrock intact, reachable
+  shaft; migration keeps all 48 build blocks + idempotent) + headless CDP (vault +
+  relic present; journal 4 stages; ungeared claim = sealed; gear up → 📜 glows →
+  deep stage ticks → claim pays 💎+crown+Champion; button hides; relic undiggable;
+  no double reward; **save/reload keeps Champion**) + forge & 11-world-hop
+  regressions — all green, **zero errors**. Screenshots of the journal + the
+  crowned Champion beside the Relic in the vault. **DEPLOY: s38–41 all committed
+  locally, pending the 403 relay** (push + mirror to `main` when infra recovers).
+  Tuning candidates: crown sits a touch tall (known since s7); vault is
+  overworld-only; the surface shaft can clip a hillside (cosmetic). Next rungs:
+  axe/shovel, torches + real cave darkness, more vault tiers / a deeper boss.
+
+## Status (session 42) — 🔦 Torches + real dark caves (a block-light system)
+Dad: "deeper, not wider — pick a direction, I'll steer." Offered 3 backlog rungs
+via AskUserQuestion; he picked **Torches & dark caves**. This is the iconic
+Minecraft cave moment and the piece missing from the middle of the mining spine
+(caves were lit, so torches had no reason to exist + going deep didn't *feel*
+like an expedition). Shipped on **`claude/ezra-minecraft-next-2y6301`**, mirrored
+to `main`. **sw v39→v40.** Now **60 goals**, **138 block ids** (TORCH 137), **125
+atlas tiles** (TORCH 124). First confirmed main was green (clean boot, 0 errors,
+all of s38–41 already live — the old 403 relay recovered).
+1. **A real block-light engine (`js/world.js` `computeLight`).** Each world now
+   bakes **two derived per-voxel light fields** (0..15), recomputed on load and
+   after any edit (`lightDirty` → recompute in `flushDirty`; the existing dirty
+   3×3 chunk halo covers a torch's 15-block reach). Never saved — purely derived,
+   so **no save-format change/migration** (verified: a placed torch reloads with
+   its light recomputed to 14).
+   • **skylight** — a cheap column scan: bright (15) above the surface, 0 the
+     moment a solid block is overhead → open world stays bright, caves/roofed
+     rooms go dark. • **block light** — a flood-fill BFS from glowing blocks
+     (`LIGHT_EMIT`: torch 14, glowstone/sea-lantern 15, lantern 14, lava 13,
+     glow-crystal/plasma 13, redlamp-on 14, magma 9, relic 11, neon 8) that
+     spreads through air **and see-through blocks** (glass/leaves) losing 1/level,
+     stopping at solid blocks. (Node-verified: 14→13→12… falloff, glass passes,
+     stone blocks, enclosed tunnel skylight 0.)
+2. **Shader (`js/gfx.js`).** World VS/FS gained a 2nd light attribute
+   **`aBlockLight`** so block light stays warm **even at night** while skylight
+   fades (`lit = max(max(vLight*uDayLight, vBlock), uAmbient)`). New per-world
+   **`uAmbient`** floor: **overworld 0.18** (caves go genuinely dark) / **0.42
+   everywhere else** — so nothing surprising darkens in Lego/Build/Secret/Space/
+   Ant/etc. (the change is *contained* to where caves live). **Critical fix:**
+   `GLMesh.draw` now clears 5 attrib locations (was 4) so meshes without
+   `aBlockLight` (characters/mobs/shadows) fall back to 0, not a stale buffer.
+   Characters keep their own shade (not world-lit), so **the kid is always
+   visible even in a pitch-dark cave** (non-scary). Mesher (`buildChunkArrays`)
+   samples the face's neighbour-air sky/block light → two vertex light values
+   (studs sample the cell above); `rebuildChunk` sets `aBlockLight`.
+3. **🔦 The Torch** (B.TORCH 137, TILE.TORCH 124 — a dark block with a bright
+   procedural flame). Emits light 14. Lives in a new **'Light 💡' picker tab**
+   (torch + lantern + glowstone + sea-lantern + glow-crystal) — **always
+   available, never gated**, so a kid is never stuck in a black cave (the game's
+   #1 rule). One-time tips: first time underground in the dark ("open the Light
+   💡 tab, place Torches") + on first torch placed. New **'Torch bearer'** goal
+   (place 3 torches). `goals.bump('torch')` in `doBuild`.
+   Verified: Node logic (skylight column scan, block-light BFS falloff/glass/
+   stone, max levels) + headless CDP (**0 errors**): surface unchanged & bright,
+   caves genuinely dark, glowstone/torch light a warm pool with falloff; Light
+   tab present w/ torch swatch; torch places→lights→goal ticks; **6-world hop
+   (lego/nether/gold/space/end/over) zero errors**; **save/reload keeps the torch
+   (id 137) + recomputes its light to 14**; night surface unregressed. Screenshots
+   of a dark cave, a glowstone-lit cave, and a **torch-lined tunnel** (the hero
+   shot). Tuning candidates: ambient floors 0.18/0.42 are first picks (easy to
+   nudge if the dad wants caves darker/lighter on the real iPad); torch is a solid
+   full cube (engine has no thin/attached geometry) — reads fine via its texture;
+   torch picker swatch is a touch dark (it's a dark block by design).
+   **iPad caveat (flag to dad):** this is a *shader* change; it passed in ANGLE/
+   SwiftShader headless but iOS Safari GL is stricter (cf. the s26 crash) — ask
+   him to confirm caves look right on the actual iPad after a full app
+   close/reopen (to pick up sw v40). **Next rungs offered:** axe/shovel tools,
+   torches that also *drop* from crafting (coal+stick) for the full loop,
+   biome-flavoured caves (lush/lava), repeatable higher-tier vaults.
+
+## Status (session 43) — ⛏️ Deepen the home world (a real underground)
+Dad playtested s42 and reported: in the home world "it's only digging so far and
+grey appears" — he expected Minecraft caves. **Diagnosed the real problem:** the
+overworld was only **~5 blocks of stone before bedrock** (spawn column was
+`grass·dirt·dirt·stone×5·bedrock`), so digging hit the unbreakable bottom before
+he could find a cave — all the caves/ores/vault were crammed into a 5-block
+sliver. Via AskUserQuestion he picked **"Deepen the home world"** (over a separate
+caves world), accepting a careful reshape of his saved world. Shipped on
+**`claude/ezra-minecraft-next-2y6301`**, mirrored to `main`. **sw v40→v41.**
+1. **World height `SY` 32→48** (in js/world.js:6 — flows everywhere as a constant,
+   no hardcoded ceilings). Other worlds just gain harmless extra sky; only the
+   overworld is redesigned for depth.
+2. **Deep overworld terrain** (`generate()` + new `export const GROUND = 26`):
+   surface hills at ~y21–31 over a deep column — grass → 2 dirt → thick **stone**
+   → dark **deepslate** (y1–7, near bedrock) → bedrock. **~28 blocks of digging
+   depth** (was 5). Beach water level follows `GROUND`.
+3. **Caves rebuilt for the depth** (`carveCaves`): 16 winding tunnels that roam
+   up/down through the whole column, 8 caverns at varied depths, 9 surface
+   entrances, **+ a GUARANTEED wide cave mouth a few steps from spawn** (offset so
+   he never loads standing over it) so a 6-yr-old finds a cave on his first
+   wander. carveSphere/ore now also cut/seed **deepslate**.
+4. **Depth-layered ore** (`sprinkleOre` now takes a `loFrac..hiFrac` band):
+   coal high (90), iron mid (60), gold deep (16), **diamond deepest near bedrock**
+   (14) — brave the dark for the best loot. Buried-treasure gold/diamond likewise
+   biased by depth.
+5. **Build-safe migration (the careful part).** New `World.liftOldBuildsInto(obj)`:
+   when an old (shallower) overworld save loads, KEEP the new deep terrain + caves
+   + vault and **lift the player's builds straight up** — each build column shifts
+   by `newGround − oldGround` (from the old bytes, ignoring placed), so builds stay
+   **grounded and intact**. Wired in the v4 loader (`oldHeight = data.d[1] !== SY`
+   → lift instead of the generic same-coords overlay) + `deepMigrated` flag →
+   reset `positions.over` to the new surface (old standing pos is now underground).
+   Other worlds use the existing same-coords overlay (their content unchanged,
+   extra sky on top; placed indices are y-independent so they survive). One-time:
+   after the first deep save (`d:[96,48,96]`) every later load is a stable exact
+   load. **Light BFS queue is now a shared module-level scratch** (`_lightQueue`)
+   so the taller worlds don't multiply memory.
+   Verified: Node logic (fresh world: spawn dig-depth 28, layered ore by avg-Y
+   [coal 14.8 / iron 8.3 / diamond 3.3], 12.9k cave-air cells, vault deep,
+   guaranteed mouth near spawn; **migration: a 30-block synthetic build [gold
+   patio + diamond tower] preserved + grounded on the new surface**) + headless
+   CDP (**0 errors**): deep boot, deepslate cave + torch, **6-world hop**, and
+   the **real scenario — inject an old `d:[96,32,96]` v4 save → reload → all 30
+   builds preserved + world deep + player at surface; save→reload again is a
+   stable exact load (no re-migration), save ~58KB**. Screenshots: surface, a
+   deep deepslate cave lit by a torch, the preserved build. Tuning candidates:
+   per-column grounding means a *flat* build gently terraces over the new hills
+   (stays grounded — chosen over float/bury; could flatten terrain under builds
+   later); **iPad perf** with the 1.5× taller world — ask the dad to confirm FPS;
+   the guaranteed cave mouth could rarely clip a near-spawn fixture (cosmetic).
+
+## Status (session 44) — 🪓🥄 The full toolkit: craftable Axes & Shovels
+Dad (after loving the deep world): "Ezra's into mining; the tool table was nice
+but I'm not sure it worked as in Minecraft; we have lots of WIDTH but not DEPTH —
+keep him engaged. Open to your builds." Diagnosed: the crafting table *works* but
+was **pickaxe-only** (4 tiers + armor) — thin. Minecraft depth = a full toolkit
+where each tool makes a different job satisfyingly faster, so every material has
+more uses + there's always a next tool. Built that on
+**`claude/ezra-minecraft-next-2y6301`**, mirrored to `main`. **sw v41→v42.** Now
+**63 goals**.
+- **Two new tool ladders** (wood→stone→iron→diamond, like the pickaxe), crafted at
+  the table: **🪓 Axe** (chops natural wood fast) + **🥄 Shovel** (digs natural
+  dirt/sand/gravel fast). `AXE_RECIPES`/`SHOVEL_RECIPES`; `goals.tools` gained
+  `axe`/`shovel`; generic `goals.toolTier(kind)`/`setToolTier(kind,t)` (pickTier
+  is now an alias). Each ladder is independent (you can make an axe without a
+  pickaxe — both just need wood early).
+- **Break-time is now tool-category aware** (`toolCategory(id)` → pick/axe/shovel;
+  `toolPowerFor(id)` = the owned tier of the matching tool). A NATURAL block takes
+  ~2 chips bare and **1 with the matching tool** (the power-up feel); **anything
+  YOU placed still breaks in 1 tap** so creative building stays snappy. The game
+  **auto-uses the best tool you own** for each block (no hotbar to manage) and
+  **shows it in your hand** (`showHeldFor(id)` sets `holdPick`/`holdAxe`/
+  `holdShovel`; new tier-coloured axe/shovel meshes in character.js, drawn via a
+  generalized held-tool block).
+- **UX/findability** (the dad's "did it work" concern): crafting dialog reorganized
+  into **Pickaxes / Axes / Shovels / Armor** sections; the materials HUD shows your
+  🪓/🥄 tiers; a brown **🛠️ crafting marker on the minimap** points to the workshop
+  near spawn; crafting tip rewritten to name all three tools.
+- New goals: **Lumberjack** (craft an axe), **Dig dig dig** (craft a shovel),
+  **Master Toolsmith** (a full diamond set → counts.mastertool).
+  Verified: Node logic (tool ladders + craftaxe/craftshovel/mastertool counters +
+  save round-trip) + headless CDP (**0 errors**): craft dialog shows all 4
+  sections; craft axe+shovel; **behavioral break-time via `__ezra.mine` — LOG/
+  DIRT/STONE each 2 taps bare vs 1 with the matching tool; a PLACED log stays 1
+  tap**; HUD shows the tools; save/reload keeps them; world-hop clean. Debug:
+  `__ezra.craftAxe(t)/craftShovel(t)/toolTier(k)`. Tuning candidates: natural
+  dirt/grass now take 2 taps bare (the shovel incentive — gentle, +1 tap; lower
+  HARDNESS if it feels slow); the held axe/shovel swing is brief (headless capture
+  couldn't freeze it — same proven path as the pickaxe); sword is still a 💎-shop
+  item (could join the craft ladder next). Next depth rungs offered: a sword craft
+  ladder, a Nether "netherite"-style top tier, repeatable deeper vaults.
+
+## Status (session 45) — 🧭 UI restructure: a calm top bar + a ✨ Fun menu
+Dad: "the game's grown a lot — does the front layout need a restructure? Pet
+button's not used much, worlds are a separate button… make it seamless/coherent
+and easy for Ezra but still engaging." Audited it: the top bar had grown to **~15
+tiny buttons** (a jumble of go-places / view / fly / night / fish / vehicles /
+character / build-big…). Via AskUserQuestion he picked **"Group toys into a ✨ Fun
+menu."** Shipped on **`claude/ezra-minecraft-next-2y6301`** → `main`. **sw v42→v43.**
+1. **Top bar slimmed 15 → 6.** Now shows only the most-used: 🏠 Home, 🌍 Worlds,
+   ⭐ Goals, 🕊️ Fly, ✨ Fun, and the block picker. Core controls (joystick, Build,
+   Dig, block picker) untouched — no muscle-memory disruption.
+2. **✨ Fun menu** (`#funmenu`, reuses `.portal-choice` like the world menu) holds
+   the occasional toys: Character, Big Builds, Fishing, Day/Night, Switch view,
+   Make-a-portal (flint), Adventure, the Great Quest, and the vehicles. **Built
+   dynamically + context-aware** (`FUN_ITEMS` with a `when()` per entry): pony &
+   dragon show in the overworld, rover & rocket in space, quest only overworld/
+   pre-champion, etc. **Low-risk design:** the moved buttons stay in the DOM
+   (hidden via `#topbar .tucked{display:none!important}`) so ALL their existing
+   wiring/state still works — each Fun entry just **dispatches a pointerdown on
+   its hidden button** (`triggerBtn`). The **✨ button glows** (`updateFunButton`,
+   each frame) when an adventure/quest is ready to claim, so the nudge isn't lost
+   (and the ready entry gets a gold `ready-choice` glow inside the menu).
+3. **Retired the Pet button → tap-to-pet.** `tapPetHit(dir)` ray-tests animals/
+   nethermobs/ants in the tap routing (before flint/doAction); tapping a friendly
+   creature pets it (like everything else in the game). The action row is now a
+   cleaner **Jump / Dig / Build** (3 big buttons). `holdButton('btn-pet')` removed.
+   Verified headless (CDP, **0 errors**): top bar = exactly 6 visible buttons (15
+   tucked); actions = jump/dig/build; Fun menu lists the right items in overworld
+   (8) vs with unlocks (+pony/dragon) vs space (+rover/rocket, −pony/−quest);
+   tapping a Fun entry opens that feature + closes the menu; **a real point-blank
+   canvas tap on an animal pets it (count 0→1)**; the ✨ button glows when quest-
+   ready; **save/reload keeps the 6-button layout**; world-hop clean. Screenshots
+   of the new calm top bar + the Fun menu. Debug: `__ezra.openFunMenu()` (via the
+   button). Tuning candidates: Fun-menu labels are static (don't show on/off
+   state — e.g. "Day or night" doesn't say which is active); flint ("Make a
+   portal") is a power-user tool buried mid-list (fine); if any toy feels too
+   buried, easy to promote back to the bar.
+
+## Status (session 45 revision) — ↩️ Fun menu reverted → grouped visible buttons
+Dad playtested the s45 Fun menu: "the new menu is touchy + doesn't scroll well;
+honestly I liked the original buttons but better organized." So I **reverted the
+Fun-menu approach** and kept everything VISIBLE — just tidier. Shipped on
+**`claude/ezra-minecraft-next-2y6301`** → `main`. **sw v43→v44.**
+- **Removed** the ✨ Fun button + `#funmenu` dialog + all its JS (`FUN_ITEMS`,
+  build/open/close/triggerBtn/updateFunButton) and the `.tucked` CSS. Brought
+  every top-bar button back, restored their original inline `display:none` for
+  the contextual ones (vehicles + quest) so the existing update functions control
+  them exactly as before.
+- **Organized into clusters.** The top bar is now `display:flex; gap:16px` of
+  `.tg` groups (`gap:7px` within): **🏠🌍 navigate** · **⭐📖📜 progress/friends** ·
+  **🔍🕊️🌙 view&move** · **🙂🏗️🎣🔥 make&play** · **🐴🛸🚀🐉 vehicles** · 🧱 block.
+  Small gap within a group, bigger gap between groups → reads as tidy clusters,
+  not a jumble.
+- **Responsive shrink** (appended at the END of styles.css so it wins on source
+  order — a same-specificity media-query `.mini` rule placed *before* the base
+  rule silently loses; that bit me first): `@media ≤900px` → 43px buttons,
+  `@media ≤800px` → 36px, so the whole row keeps fitting on one line on a
+  narrower iPad. Verified the full 15-button row (pony+dragon owned) fits at
+  **1024 (911), 834 (762), 768 (630)** — all on one line.
+- **Kept the good bits** of the experiment: **tap an animal to pet it** (no Pet
+  button; `tapPetHit` in the tap routing) + the cleaner **Jump/Dig/Build** action
+  row. Verified headless (**0 errors**): 13 visible buttons grouped in 5 clusters
+  (overworld), each opens its feature (char/buildkit/worlds checked), vehicles
+  show in space (rover/rocket/dragon) and overworld (pony/dragon when owned),
+  **a real canvas tap on an animal pets it (0→1)**, save/reload keeps the layout,
+  world-hop clean. Screenshots: the grouped bar (landscape) + the shrunk-but-tidy
+  portrait bar. Tuning candidates: 15+ buttons is still a full row (responsive
+  shrink keeps it on one line; a 2-row grid would need moving gem-bar/hearts/inv
+  down — deferred); flint stays on the bar (he wanted buttons visible).
+
+## Status (session 46) — 🌙 LEGO DREAMZzz Dream Adventure (Mateo + Z-Blob)
+Ezra's request (Dad translating): "Lego Dreamzz… Mateo to do adventures with him,
+and Z-Blob." Plus two great Dad notes: **add challenge to keep him engaged**, and
+**"I lose him when he doesn't know what to do."** So this is a GUIDED, staged
+quest in Lego World with a persistent objective banner (the "lost" fix). Shipped
+on **`claude/ezra-minecraft-next-2y6301`** → `main`. **sw v44→v45.** Now **66
+goals**.
+- **`js/legodreamzz.js` `DreamCrew`** (a mob-manager like astronaut.js), added to
+  `WORLD_KINDS.lego.mobs = ['dreamzz']`:
+  • **Mateo** — a blocky boy inventor (teal hoodie, goggles) who hosts the quest;
+    stands near spawn, turns to greet.  • **Z-Blob** — his squishy blue blob
+    sidekick; hops along BEHIND the player like a puppy, pettable (tap-to-pet).
+    • **Nightmares** — gentle grumpy purple blobs that hop toward you; tap 3× to
+    shoo (the challenge; poof, no harm).  • **Dream Bricks** — glowing gold
+    bricks collected on proximity (no aiming — kid-friendly).
+- **The adventure (main.js)** — idle → build → stars → nightmare → claim:
+  tap Mateo → 🧱 build a tower (detected on the build event via `dreamOnBuild()` in
+  `recheckBuild`, not polled) → ✨ collect Dream Bricks → 🌙 shoo the Nightmares →
+  🎉 tap Mateo to claim 💎. **Difficulty RAMPS** each finish (`dreamLevel()` =
+  `goals.counts.dream`): towerN/bricks 3→6, nightmares 1→4, reward 3+lvl·2 💎.
+  Resets to idle in `setDimension('lego')` (fresh each visit; level persists).
+- **The "doesn't know what to do" fix:** a big always-on **`#dreamgoal` banner**
+  (purple pill under the top bar, shown only in Lego World) that states the
+  current objective + progress every frame (`updateDreamGoal()`), plus **minimap
+  markers** (Mateo teal / bricks gold / nightmares purple).
+- New goals: **Dream Chaser** (finish 1), **Dream Master** (finish 5), **Nightmare
+  chaser** (shoo 5). Debug: `__ezra.dreamState()/openDream()/dreamOk()/dreamCrew()`.
+  Verified: headless CDP (**0 errors**): arrive Lego → Mateo+Z-Blob spawn + banner
+  shows; tap Mateo → start; build a 3-tower → **stars stage + 3 bricks spawn**;
+  walk over bricks → **nightmare stage + nightmare spawns**; **pickRay hits the
+  nightmare + bonk×3 shoos it** (detection + logic proven; tap routing is the same
+  path as the proven pet/creeper tap); clear → claim → **+💎5 + Dream Chaser goal +
+  reset to idle**; full 4-world hop clean. Screenshots of Mateo + Z-Blob + a
+  Nightmare + the banner. Tuning candidates: Mateo/Z-Blob spawn close together so a
+  point-blank tap can hit Z-Blob instead of Mateo (Z-Blob follows the player away
+  once you move, so fine in play); tower detection needs a real build event
+  (`recheckBuild`) — direct byte edits won't trip it (only matters for tests).
+  **Follow-up (same session, dad: "he found it! make it more engaging, he likes
+  puzzles"):** added (1) a **🧩 puzzle stage** — "Z-Blob's Dream Code", a
+  Simon-says colour-memory woven into the flow (build → collect → **puzzle** →
+  shoo → claim). Reuses the colour-puzzle (`puzzle.dream` flag → one solve calls
+  `dreamAfterPuzzle()` → nightmares, instead of looping for 💎); length = 3+level.
+  (2) **Floating on-screen markers** (`#dreammarkers`, `updateDreamMarkers`,
+  projected like the ride signs) that hover over the current targets — Dream
+  Bricks / Nightmares / Mateo — so he can always SEE where to go (the "3rd brick"
+  findability fix); bricks also spawn closer (`7+rnd*10`). **sw v45→v46.** Verified
+  headless (0 errors): brick markers over all bricks, collect→puzzle opens→solve→
+  nightmares+markers→claim +💎 + Puzzle goal, markers hide outside Lego. Note: the
+  headless server had died in a container restart → a first test run showed all
+  `__ezra` calls `undefined` (blank page), not a code bug — always re-check the
+  server is up (`curl localhost:8000`) before trusting a red result.
+
+## Status (session 47) — 🐉👑 Dream Adventure revamp: Chase the Nightmare King
+Dad: "he's done the dream adventure a few times and the **color puzzles aren't
+his favorite**. I'm thinking **more of an adventure, more Minecraft like and Lego
+like**. Go crazy — make it fun for him." So I reworked the whole Dream Adventure
+into an **action-adventure with a rideable buddy + a boss chase** (Ezra loves the
+pony/dragon mounts and boss-y games). Shipped on
+**`claude/ezra-minecraft-next-2y6301`** → `main`. **sw v46→v47.** Still 66 goals.
+1. **Dropped the color-puzzle stage** entirely (the standalone 🧩 puzzle *cube*
+   stays in every world — only the forced dream-stage puzzle is gone). Removed
+   `startDreamPuzzle`/`dreamAfterPuzzle`/`puzzle.dream`, the tower-build stage
+   (`dreamOnBuild`/`dreamHasTower`), and the `dreamOnBuild()` call in `recheckBuild`.
+2. **🔵 Rideable Z-Blob (the headline).** Tap Mateo to start and you **auto-hop
+   onto Z-Blob** — a squishy bouncing mount (same pattern as the pony): `dreamRide`
+   flag, `player.mountSpeed=1.9`/`mountJump=1.35`, drawn **big under the seated
+   kid** (`DreamCrew.drawRiddenBlob`, springy squish) + a blob shadow. `zblob.ridden`
+   guards its normal "hop behind you" AI + its own draw/shadow so main draws the
+   mounted copy. Tap Z-Blob to re-mount if you slid off; else it's a pet.
+3. **👑 Nightmare King boss (`js/legodreamzz.js` `buildKing`/`spawnKing`/`bonkKing`).**
+   A big grumpy blob with a **gold crown, horns, glowing eyes**, a **hurt-flinch**
+   squish on each tap, and **flee-chase AI** (runs directly away when you close in,
+   curving back toward spawn so he never leaves the baseplate). `pickRay` checks him
+   first with a generous `KING_PICK=1.7` radius (easy to tap). HP scales with level.
+4. **New flow `idle → collect → boss → claim`.** Hop on Z-Blob → **zoom around
+   grabbing Dream Bricks** (`onDreamBrick`, proximity, markers show them) → all in →
+   the **King bursts in and flees** → **chase + tap him** (camera `shake` +💥 on each
+   bonk) → **tap Mateo to claim** 💎. **Ramps** each finish (`dreamLevel()`): bricks
+   4→8, King HP 4→9, reward 4+lvl·2 💎.
+5. **Guidance kept intact** (the "doesn't know what to do" fix): the `#dreamgoal`
+   banner + floating `#dreammarkers` (✨ bricks / 👑 King / 💙 "ride!" / 🧑‍🔧 Mateo)
+   + a **pink-gold King minimap dot** all track the current target.
+6. **Dismount on leave/reset:** `setDimension` now always calls `resetDream()`
+   (stops the ride on leaving Lego, fresh adventure on entering). Repurposed the
+   now-unreachable "Nightmare chaser" goal → **👑 King catcher** (`dreamnm`, catch
+   the King 3×, bumped on defeat). Debug: `__ezra.dreamState()/dreamRiding()/
+   grabBrick()/bonkKing()`.
+   Verified headless (CDP, **0 errors**): travel to Lego → start → **auto-ride
+   (mountSpeed 1.9, zblob.ridden)** → grab all bricks → **King spawns (hp 4)** →
+   bonk to defeat → claim pays **+💎6** (4 base + the goal bonus) + Dream Chaser +
+   King-catcher goals + **resets to idle + ride stopped + mountSpeed 1**; round-2
+   **ramps to 5 bricks**; **leaving Lego stops the ride** (over: riding false,
+   mountSpeed 1); over→space→lego world-hop clean. Screenshots of the kid **seated
+   on Z-Blob** + the King marker. Tuning candidates: the King is a *chase* boss so
+   from third-person he can be small until you close in on the mount (markers +
+   minimap guide there; `KING_PICK` is generous); flee speed 3.2–4.2 (catchable on
+   the 1.9× mount); Mateo/Z-Blob still spawn near spawn. Backlog: a wing-flap or
+   trail on Z-Blob, more boss variety (2nd-phase King), a repeatable higher tier.
+
+## Status (session 48) — ⛏️ Ezra's Mine: a second game at `/mine/`
+Dad: Ezra loves the mobile merge game **"Minetap"** and keeps asking to buy
+things in it; dad wants him to play something like it that isn't built to hook
+kids. We **did not copy** Minetap (its name/art/text/characters belong to its
+maker, and we also avoid Minecraft-only names like Glowstone/Redstone/Nether
+*in the mine*). Instead: an **original game in the same genre** —
+**Ezra's Mine**, live at **https://ontosam.github.io/minecraft/mine/** (own
+manifest + icons → its own home-screen app). Dev branch this session:
+**`claude/tender-mayer-550bb0`** (merged `main` s2–47 in; mirrored to `main`).
+**sw v47→v48** (root `sw.js` now precaches the mine too). Blocks' 🌍 Worlds
+menu has a last entry **"⛏️ Ezra's Mine"**; the Mine's grown-ups corner links
+back. Zero changes to the Blocks game otherwise.
+- **Loop (same genre feel):** tap the big **mine block** (face shows the block
+  it'll drop, taps-left number, hold = slow auto-tap) → a block flies to the
+  square nearest its twin → **drag onto its twin** (or tap, then tap the twin)
+  to merge up a **20-tier ladder** (Dirt → … → Star Block) → every block on the
+  board earns **gold/s** → levels open squares (9 → 30) → caves (backdrops)
+  change as you go deeper. Always-visible **goal card** (next quest; tap = read
+  aloud / open the right station / collect). Words are read aloud
+  (speechSynthesis).
+- **Healthy swaps for the paid bits:** yellow lightning bar = **Spark bar**
+  that *fills* (full → 2-block Super Swing), never an energy limit; x2 boost =
+  **Gold Rush jar** filled by merging (no ads); **purple gems** (not emerald)
+  only earned; treasure chests open instantly; board full → new blocks hop
+  into the storage chest (tapping never blocked); no streaks/daily rewards;
+  offline gold half-rate with one fixed 12 h cap. **Grown-ups corner** (⚙️,
+  one-finger 3 s hold + a sum written in words): sound, read-aloud, tier
+  numbers, **break reminder (default 30 min, friendly card, "Done for now"
+  first, never locks)**, Start over (keeps a restorable `.bak`).
+- **Stations** (unlock by level): Quests/Blocks book/Chest (1), Workshop +
+  Digby the mole helper (2: pickaxes crafted from blocks on the board or in the
+  chest + furnace bars; Dig Deeper ×7; Mole Helper; Lucky Dig), Shop (3: blocks
+  for gold, Boom Block/Magic Merge for gems), Furnace (4: blocks → bricks, ores →
+  metal bars; won't melt your two best kinds; "Take out"), Village (5: bricks →
+  6 buildings).
+- **Files** (`mine/`): `js/data.js` (ALL numbers/content), `js/game.js` (pure
+  rules, no DOM, emits `game.on(type,data)`), `js/main.js` (screen), `js/art.js`
+  (procedural 16px tiles + hand-drawn 16×16 sprites, all original incl. Digby),
+  `js/sound.js`, `js/fmt.js`; `scripts/make-mine-icons.mjs`. Save key
+  **`ezramine.save.v1`** (separate from Blocks).
+- **Balance:** `node mine/tests/sim.mjs [hours] [tapsPerSec] [mergeSecs]` (a
+  robot kid). Kid pace: Copper ~3 min, Ruby ~15–45 min, Gold Block ~1–1.5 h,
+  **Star Block ~4 h** ("You beat the mine!"). Main knob: `depthNeed()`.
+- **Verified:** `PORT=8123 node scripts/serve.mjs &` → `node mine/tests/e2e.mjs`
+  (**87 checks**, real touch: merge, tap-tap, chest, craft, furnace + take-out,
+  village, quests, Gold Rush, overflow, Boom, save/reload, offline gold, gate,
+  double-tap safety, break card, every panel, 9 screen sizes). A 5-reviewer +
+  skeptic review found 25 real issues (incl. a Boom-in-chest crash) — all fixed
+  and covered by tests. Reusable CDP driver: `mine/tests/cdp.mjs`. NOTE the
+  bundled browser moved: `ls /opt/pw-browsers/` (this session:
+  `chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell`).
+- **Backlog ideas:** a gentle "new world" after the Star Block (no prestige
+  pressure), Pebble Pals (friendly critters to tickle — replaces the original's
+  monsters), cosmetic pickaxe paints for gems, an Ezra-designed block painter,
+  and mine discoveries unlocking blocks in Ezra's Blocks (same origin →
+  shared localStorage).
+
+## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
+**This plan was replaced** (see session 26): Lego World stayed a *build* world
+and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept
+below only as historical context.
+Dad's brief (approved, build NEXT session — this session only **set up the repo +
+this handoff**; nothing below is built yet). He loved the Lego idea and wants it
+to become the **most fun world**: a dazzling amusement park you **visit to spend
+diamonds on fun**. Scaffold already in place: **`js/legoworld.js`** (a documented,
+**un-imported** `LegoPark` skeleton — zero runtime effect until wired).
+
+**Design pillars (keep these exact):**
+- 🎰 **It's "Vegas."** Lego World is a *spend-only fun hub*. You can **buy/play
+  here but NEVER earn diamonds here.** 💎 are earned by *working* in the other
+  worlds (mining, build challenges, math, fishing, goals). The grip the dad named:
+  **the feeling of achievement after hard work** — earn elsewhere, splurge here.
+- 🏎️ **Paid attractions** (each costs a few 💎 via `goals.spend`): **go-kart
+  racing, ice skating, hot-air-balloon rides** (+ maybe Ferris wheel, bumper
+  cars). Reward = **fun + a ⭐/trophy/cosmetic, NOT 💎** (so it stays a pure sink).
+- ✨ **Dazzle:** drifting balloons, fireworks, lights, music (audio `note`/blips),
+  a Ferris wheel turning.
+- 🧑‍🤝‍🧑 **Others having fun:** spawn the **friend roster** (Alex/Chip/Milo/Brexin/
+  Cora/…) as NPCs skating/karting/riding around (reuse `Character`+`charById`, like
+  the `buddy`/NetherMobs patterns). Makes it feel alive and social.
+- 🟩 **Higher-res / "better resolution":** implement **real 3-D Lego studs** (the
+  dad said yes). Approach: in `World.buildChunkArrays(cx,cz)` (js/world.js ~line
+  780), when a `B.LEGO_*` block's TOP face is exposed (air above), also emit **4
+  small raised stud boxes** on top (reuse the face-emit loop; respect the Uint16
+  guard `base+24>0xffff` — studs add verts, so budget them / consider a separate
+  stud mesh pass to avoid overflow on big builds). This is the headline visual.
+
+**Build it in verifiable increments (recommended order):**
+1. **3-D studs** for Lego blocks (mesher) — the "wow" resolution bump. Verify a
+   Lego build shows bumps; perf OK; no index overflow on a big Lego floor.
+2. **Park layout** in `LegoPark.populate()` (or extend `generateLego`): a kart
+   **track** (loop of a smooth block, e.g. ICE/quartz), an **ice rink** (B.ICE),
+   **balloon pads**, a **Ferris wheel** structure, decorative lights.
+3. **Attraction kiosks + pay-to-play:** tap a kiosk (`pickRay` ⟶ `rayHitsSphere`),
+   show a kid-friendly **"Ride for 💎X?"** prompt (new dialog, big short text per
+   the readability rules), `goals.spend(cost)` (deny politely if short), then run
+   the ride animation. New metrics + GOAL_DEFS (`kart`/`skate`/`balloon`), ⭐ only.
+4. **Rides themselves** (juicy but simple): go-kart = a fun auto-drive lap around
+   the track with the camera following; ice skating = low-friction movement on the
+   rink + a trick counter; balloon = ride a balloon up for a view, drift down.
+5. **NPC friends having fun** (`LegoPark.npcs`): a few roster `Character`s looping
+   the rides/rink. Draw + shadow like the buddy.
+6. **Dazzle pass:** fireworks (particle bursts on a timer), turning Ferris wheel,
+   balloon drift, a little music.
+
+**Wire-in checklist (so it "just works"):**
+- `import { LegoPark } from './legoworld.js'` in main.js.
+- In `makeMobs`, add a `'legopark'` entry (the lego kind's `mobs` list) →
+  `m.legopark = new LegoPark(gl,w)` with `onPlay` → the pay-prompt; handle it in
+  `populateMobs`/`updateMobs`/`drawMobs` (mirror `m.dragon`).
+- Add `'legopark'` to `WORLD_KINDS.lego.mobs` (js/worlds.js) — `makeMobs` already
+  loops `kind.mobs`.
+- Tap routing (main.js ~`tapPending`): add a `legopark.pickRay` check in the
+  Lego dimension (before `doAction`), like the dragon.
+- New goals in js/goals.js (`kart/skate/balloon/trophy` counters + GOAL_DEFS).
+- Bump `sw.js` CACHE (v12→v13) **and add `'js/legoworld.js'` to `CORE`**.
+- Keep the rule: **no `goals.addGems` anywhere in Lego World.**
+
+**Constraints / gotchas:**
+- World size is a global `SX=96,SY=48,SZ=96` (js/world.js:6; SY 32→48 in s43 for
+  a deep overworld). "Much bigger" can't
+  be per-world cheaply — options: (a) use the full 64×64 baseplate densely with
+  attractions (recommended, no engine change), or (b) a real size refactor (big:
+  arrays, minimap MM_SIZE, save format all key off SX/SZ — only if he insists).
+- Engine is **16px pixel-art atlas** (256 tiles, lots free). 3-D studs give the
+  "higher-res" feel without changing texture resolution.
+- Verify with the headless **CDP** harness (browser binary + `__ezra` hooks; see
+  "Debug & testing"); add `__ezra` debug hooks (`legoPark()`, `playRide(id)`).
+- Currency safety net already exists; just don't grant 💎 here.
+
+**Done-when (acceptance):** travel to Lego World shows 3-D studded bricks + a
+park; tapping a kiosk asks to pay 💎 and (if you can afford it) runs a fun ride
+that pays a ⭐/trophy but **0 💎**; friends are seen having fun; fireworks/dazzle
+play; full world-hop + reload regression green, zero errors; screenshots.
 
 ## Deploy / hosting
 - **GitHub Pages**, served from the **`main`** branch (root). Live at
@@ -56,59 +1812,116 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
 - `js/math.js` — `mat4` (perspective, lookAt, multiply, `model`=T·Ry·S,
   translate, rotateX, transformPoint), clamp.
 - `js/gfx.js` — WebGL init; **world shader** (textured · per-vertex tint · baked
-  light · fog · `uAlpha`); procedural **texture atlas** (8×8 of 16px tiles,
-  `TILE`); `getUV`, `blockPreview` (UI swatches), `GLMesh`, `cubeMesh`,
-  `frameMesh` (configurable wireframe). NOTE: `makeLineProgram` is currently
-  unused (safe to delete).
-- `js/world.js` — voxels (`SX=64,SY=32,SZ=64`), `B` ids, `BLOCKS` defs,
+  AO + **block-light system** [`aLight`=skylight, `aBlockLight`=torch/glow light,
+  `uAmbient` per-world floor; s42] · fog · `uAlpha`); procedural **texture atlas**
+  (16×16 of 16px tiles, `TILE`); `getUV`, `blockPreview` (UI swatches), `GLMesh`
+  (clears 5 attrib locs), `cubeMesh`, `frameMesh`. NOTE: `makeLineProgram`,
+  `cubeMesh` and `frameMesh` are now unused (the hover indicator was removed).
+- `js/world.js` — voxels (`SX=96,SY=48,SZ=96`; deep overworld, s43), `B` ids, `BLOCKS` defs,
   `CATEGORIES`/`PALETTE`, terrain gen (gentle hills + pond + trees), **chunk
-  mesher** (16×16 columns, face culling + baked ambient occlusion), `raycast`
-  (DDA), save/load (base64 of the byte array). Chunk meshes use **Uint16**
+  mesher** (16×16 columns, face culling + baked AO + per-voxel sky/block light),
+  **`computeLight()`** (s42: skylight column scan + block-light flood-fill from
+  `LIGHT_EMIT` sources; derived, recomputed on edit via `lightDirty`), `raycast`
+  (DDA), save/load (base64 of the byte array + `placed`: a Set of packed indices
+  of **player-placed** blocks, so creepers target your house not nature; +
+  `arrival`: the portal drop point; `portalFrame` for (de)activation). Terrain
+  also hides **gold/diamond ore** in the stone. Also `generateNether()`
+  (netherrack + glowstone + lava + a little ore), `addPortal(ox,oz,ground,active)`
+  + `setPortalActive()` (obsidian frame; the **passable** swirl interior is filled
+  only when active — a dormant frame is the locked state). Chunk meshes use **Uint16**
   indices with a guard (`base+24 > 0xffff` breaks) so extreme builds can't
   overflow.
+- `js/worlds.js` — the **world registry** (`WORLD_KINDS`, `WORLD_ORDER`): each
+  world is a recipe (name/emoji, `sky`, `fog`, `gen` method name, `ground`, `mobs`
+  list, `home`/`reward`/`flint` flags). Add an entry + a `generateXyz()` on World
+  and it shows up everywhere (flint menu, travel, minimap, save) automatically.
 - `js/player.js` — third-person physics: **camera-relative** movement, character
   faces travel (but **backpedals** when moving toward the camera), gravity, AABB
   collision, auto-jump, walk-phase, `movingForward` flag (camera trails only
-  when true).
+  when true). Also **flying** (`flying`: hold to rise, release = gentle sink, sky
+  cap) and **water** (`inWaterAt`: buoyant soft sink/swim + `onSplash` callback).
 - `js/character.js` — blocky kid (legs/arms/body/head, eyes+hair); walk-swing +
   **action chop + forward body-lean** when building/digging (`act` param).
 - `js/animals.js` — pig/sheep/cow/chick/cat; wander AI; `petNearest` → follower.
+- `js/nethermobs.js` — friendly Nether creatures (built like animals, but they
+  **float**). `NetherMobs` manages ghasts (puffy white cube + tentacles + calm
+  face) and blazes (core + spinning glowing rod ring, drawn as 2 meshes). Gentle
+  drift AI, ease to a hover height over the ground, `petNearest`, and an
+  `onMeet(species,pos)` callback the first time the player comes close (drives the
+  "meet a ghast/blaze" goals). Spawned via `populate(SX,SZ)`.
+- `js/secretworld.js` — the **Secret World fun park** (`SecretPark`, a mob-style
+  manager for `WORLD_KINDS.secret`). Box-mesh attractions: a **vertically-turning
+  Ferris wheel** (built in the Y-Z plane, spun with `mat4.rotateX`; gondolas drawn
+  upright with seated roster-friend NPCs), **drifting balloons**, a **carousel**
+  (spun about Y), glowing kiosks, wandering NPC `Character`s, and a fireworks
+  timer (`onFirework`). `pickRay` → an attraction; main shows a "Ride for 💎X?"
+  prompt, `goals.spend`s, then runs a scripted ride (see `ride`/`updateRide` in
+  main.js). **Never grants 💎** — it's a pure diamond *sink*.
+- `js/legodreamzz.js` — the **LEGO DREAMZzz Dream Adventure** crew for Lego World
+  (`DreamCrew`, `WORLD_KINDS.lego.mobs=['dreamzz']`; s46). Box meshes: **Mateo**
+  (boy inventor host), **Z-Blob** (blue blob that hops behind you), **Nightmares**
+  (tap 3× to shoo), **Dream Bricks** (collect on proximity). The staged quest +
+  the always-on `#dreamgoal` objective banner live in main.js (`dreamStage`,
+  `dreamOnBuild`/`dreamCheck`, `doDreamTap`, `showDream`, `updateDreamGoal`).
+- `js/zombies.js` — night-time `Zombies` (built like creepers, but they **chase +
+  attack**): spawn around the player at night, bonk a heart on a cooldown
+  (`onEvent('hit')`), take two `bonk`s to defeat (`pickRay`), fade out by day.
+- `js/creepers.js` — friendly creepers (built like animals). `Creepers` manages a
+  list + a `rebuilds` queue. Per-creeper state `seek`→`nibble`→`poof`; targets
+  nearest `world.placed` block via `findTarget` (`unkey` inverts `world.idx`);
+  `chip` removes a block and queues an auto-rebuild; `pickRay`(origin,dir) =
+  ray/sphere test for tap-to-defend; `defend` poofs + rebuilds all chipped now.
+  `onEvent('uhoh'|'chip', pos)` callback drives sound/save. Spawn paced by
+  `world.placed.size≥3`, count/interval scale with stars. `spawnNow` is a debug
+  helper (exposed as `__ezra.spawnCreeper()`).
 - `js/input.js` — unified pointer+keyboard. Touch: left half = floating
   joystick, right half = drag-look. Mouse: drag-look + hover; WASD/arrows + Space.
   **Tap detection**: quick tap (no drag, <300ms) sets `tapPending` + `tapX/tapY`;
   `aim{active,x,y}` tracks the finger/cursor for the live indicator.
-- `js/audio.js` — tiny WebAudio synth (place/dig/jump/pet/deny). No audio files.
-- `js/goals.js` — `GOAL_DEFS` + `Goals` (counters, stars, localStorage). Saves on
+- `js/audio.js` — tiny WebAudio synth (place/dig/jump/pet/deny/uhoh/poof/portal/
+  coo). No files.
+- `js/goals.js` — `GOAL_DEFS` + `Goals` (counters incl. `defend`/`treasure`/
+  `nether`/`ghast`/`blaze`, stars, localStorage, generic `bump(metric)`). Saves on
   every completion; throttled otherwise.
 - `js/main.js` — the glue: GL/program/atlas setup; **camera** (`camYaw/camPitch`,
-  `CAM_DIST=7`, `cameraFollow`, collision pull-in, `screenRay`/`rayHitAt`);
-  render loop; build/dig (`doBuild/doDig(hit)`, `doAction`, `lastTool`,
-  tap→`rayHitAt(tapX,tapY)`); indicators (`buildFrame` cyan outline / `glowCube`
-  additive glow); UI wiring (picker, goals, buttons); hearts; autosave; SW reg.
+  `cameraFollow`, collision pull-in, `screenRay`/`rayHitAt`); **zoom/"switch
+  view"** (`ZOOM_LEVELS=[7,4.5,3]`, `zoomIndex`, eased `camDistEased`, 🔍/🗺️
+  `btn-view`, saved); **two dimensions** (`overworld`/`nether` Worlds, active
+  `world` pointer, `dimension`, `setDimension`/`enterPortal`, per-dim `sky`/fog +
+  entity update/draw; `portalCooldown`; `overPos`/`netherPos`); **minimap**
+  (`initMinimap`/`drawMinimap`, top-down terrain + you + portal, `minimapDirty`);
+  **Nether gating** (`portalUnlocked`, `NETHER_STARS`, `maybeUnlockNether` on goal
+  completion → opens the portal + celebration; locked-frame nudge); **treasure**
+  (digging a natural gold/diamond → `goals.bump('treasure')` + `spawnSparkles`);
+  render loop; build/dig (`doBuild/doDig(hit)`, `doAction`, `lastTool`); **tap
+  routing**: in the overworld a tap first tries `creepers.pickRay` (→`doDefend`,
+  poof + ⭐), else `doAction` (no hover indicator — tap anywhere); UI wiring;
+  hearts + `spawnPuffs`; autosave (**v3** save: both dimensions, positions, dim);
+  SW reg.
 - `scripts/serve.mjs`, `scripts/make-icons.mjs`, `sw.js` (offline, network-first,
   https only), `manifest.webmanifest`, `icons/`.
 
 ## Controls (current)
 - **iPad:** drag **left** = walk, drag **right** = look (camera auto-trails when
-  moving forward; backing up is a backpedal). **Press a spot** → light outline
-  preview → **lift to place** (build) / glow → lift to dig. **Drag = move/look**,
-  **tap = act**. Buttons: Build/Dig (also act in front + pick the tool, gold
-  ring = active), Jump, Pet; 🏠 home, ⭐ goals, block-picker button.
-- **Laptop:** **WASD/arrows** move, **drag mouse** to look, **hover** previews,
-  **click** builds/digs there.
+  moving forward; backing up is a backpedal). **Tap a spot** = build/dig there
+  (no hover outline anymore — tap-anywhere made it redundant/in-the-way). **Drag
+  = move/look**, **tap = act**. Tap a **creeper** to poof it. Buttons: Build/Dig
+  (also act in front + pick the tool, gold ring = active), Jump, Pet; 🏠 home,
+  ⭐ goals, 🔍/🗺️ **switch view** (zoom wide↔close), block-picker button.
+- **Laptop:** **WASD/arrows** move, **drag mouse** to look, **click** builds/digs
+  there.
 
 ## Debug & testing (no browser-in-the-loop otherwise)
-- `window.__ezra = { world, player, animals, cam(), target(), rayHit(x,y),
-  sel(), goals }` — exposed for support/automated demos.
-- **Headless verification** (how every change was checked): drive
+- `window.__ezra = { world (active, getter), player, animals, creepers,
+  nethermobs, overworld, nether, cam(), target(), rayHit(x,y), sel(), dim(),
+  enterPortal(), goals, spawnCreeper() }` — exposed for support/demos.
+- **Headless verification** (how every change this session was checked): drive
   the bundled Chromium via the **DevTools Protocol** over a WebSocket (Node 22
   has global `WebSocket`/`fetch`), dispatch real input, read `__ezra`, and
-  `Page.captureScreenshot`. A reusable driver is committed at
-  `mine/tests/cdp.mjs` (`launch({width,height,touch})` → `tap/drag/eval/shot`).
-  Browser binary moves between sandbox images — `ls /opt/pw-browsers/`; in
-  session 2 it was
-  `/opt/pw-browsers/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell`
+  `Page.captureScreenshot`. Browser binary:
+  `/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell`
   with `--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader`.
+  Example test scripts lived in `/tmp/*.mjs` (not committed).
 - **Video:** record the canvas with in-page `MediaRecorder` (canvas-only, no
   UI). The bundled ffmpeg (`/opt/pw-browsers/ffmpeg-1011/ffmpeg-linux`) is
   minimal: **VP8/WebM only**, no JPEG decode, no `pipe:` protocol.
@@ -120,19 +1933,26 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
   **16px** (authentic Minecraft look — do not "HD" them).
 - Keep it **non-scary and forgiving**: always daytime, no death, no fall damage,
   can't leave the world, no accidental world-wipe button.
-- Save keys: `ezrablocks.save.v2` (world+player+selected block),
-  `ezrablocks.goals.v1`. iOS clears localStorage for non-home-screen sites — tell
-  users to **Add to Home Screen** for durable progress.
+- Save keys: `ezrablocks.save.v2` (the localStorage *key* name is unchanged; the
+  JSON inside is now **v4** — a `worlds` map (each = bytes + `placed` + `portals`
+  list), per-world `pos`itions, current `dim`, selected block, `zoom`, `pu`
+  (portal-unlocked). Loader still reads old **v3/v2** payloads and upgrades them —
+  re-adds standard portals + carves the beach if untouched). `ezrablocks.goals.v1`.
+  iOS clears localStorage for non-home-screen sites — **Add to Home Screen** for
+  durable progress.
 
 ## Roadmap / backlog (priority order)
-1. **Friendly creepers (greenlit, do next).** Spec agreed with the dad:
-   blocky creepers wander toward the player's builds and **slowly nibble a block
-   now and then**; they **never touch or harm the character** (no death ever).
-   He **defends by tapping them** (they *poof* harmlessly). New goal
-   **"Protect your house!"**, stars for defending; chipped blocks are just
-   rebuilt. **Paced**: one slow creeper occasionally, ramping gently with stars.
-   Gentle "uh-oh" wobble/sound for tension, nothing more. This is the key
-   engagement/"stakes" feature.
+1. ~~**Friendly creepers.**~~ ✅ **DONE (session 2)** — see Status above and
+   `js/creepers.js`. Built to the agreed spec (wander to your builds, slow
+   nibble, never harm the kid, tap to poof, "Protect your house!" goal, chipped
+   blocks rebuilt, paced + ramps with stars, "uh-oh" wobble/sound). Pending the
+   dad's playtest + deploy to `main`. Possible follow-ups if he wants more: a
+   tiny telegraph "!" above a nibbling creeper, distinct creeper color so it
+   pops against grass, sound-on/off toggle.
+1.5. ~~**The Nether (Ezra's wishes #2 & #3).**~~ ✅ **DONE (session 3)** — separate
+   Nether dimension via a portal, minimap to find it, friendly ghasts + blazes,
+   three new goals. See Status above + `js/nethermobs.js`. Follow-up ideas:
+   richer creature sounds, nether structures/treasure, minimap reposition.
 2. **Giants** — big friendly creatures to find/pet (extend `animals.js`).
 3. **Villagers** — friendly quest-givers (problem-solving; supports "an hour
    without skipping a beat").
@@ -142,83 +1962,17 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
    water transparency. Must not cost FPS; keep 16px textures.
 6. **Skeletons etc.** — only after he's hooked, still non-scary.
 
-## Open questions for the dad
-- **Ezra's third wish** — he had a third request he couldn't remember (creepers
-  + giants were the first two). Ask and slot it in.
-- **Feel tuning:** walk speed felt "slightly too fast"; confirm. Does
-  "press-to-preview, lift-to-place" feel right, or prefer a plain single tap?
+## Resolved with the dad (session 2)
+- **Ezra's three wishes are now known:** creepers (done), **ghasts**, and
+  **blaze** — both Nether mobs. The dad wants to **expand the world**, add a
+  small **minimap** (bottom) to help find a **Nether portal**, and meet friendly
+  ghasts + blazes through it. "Slightly challenging but not stressful." → the big
+  next feature (see roadmap #1.5). Make them non-scary/no-harm like everything else.
+- **Feel tuning:** movement now feels **great** (don't re-tune walk speed). The
+  old "press-to-preview, lift-to-place" is gone — **plain single tap** to build/
+  dig is the confirmed model, and the hover indicator was removed as in-the-way.
 
 ## Working style that's landed well
 Ship small, verified increments; show a screenshot each time; explain trade-offs
 plainly; recommend an order but let the dad steer; keep everything auto-saving
 and on `main`.
-
-
-## Ezra's Mine (`/mine/`) — session 2
-Live at **https://ontosam.github.io/minecraft/mine/** (own manifest + icons,
-so it can be its own home-screen app; the root `sw.js` precaches it too).
-Blocks has a ⛏️ topbar button to hop over; the Mine's grown-ups corner links
-back.
-
-**Core loop (matches the genre Ezra knows):** tap the big **mine block** (its
-face shows the block it will drop; taps-left number; hold = slow auto-tap) →
-a block flies onto a free square → **drag a block onto its twin** (or tap one,
-then its twin) to merge into the next of **20 tiers** (Dirt → … → Star Block)
-→ every block on the board earns **gold/sec** → **levels** open more squares
-(9 → 30) → new **caves** (backdrops) as you discover deeper blocks.
-
-**Healthy replacements for the paid bits:** the yellow lightning bar is a
-**Spark bar** that *fills* as you mine (full → next break is a 2-block "Super
-Swing"), never an energy limit; the x2 boost is a **Gold Rush jar** filled by
-merging (never by ads); **purple gems** (not emerald green) are earned only
-(new blocks, level-ups, quests, chests, Wishing Well on a fixed count) and buy
-Boom Blocks / Magic Merge; treasure chests open instantly with a single tap;
-board full → new blocks hop into the (unlimited) storage chest, so tapping is
-never blocked. No streaks, no daily rewards; offline gold is half-rate with
-one fixed 12 h cap (so checking in hourly never pays more than once a day).
-Grown-ups corner (hold one finger 3 s, then answer a sum written in words):
-sound, read-aloud, tier numbers, optional break reminder (default 30 min — a
-friendly card with "Done for now" first; "Keep digging" snoozes 10 min; never
-a lock), "Start over" (keeps one `.bak` save you can restore).
-
-**Safety rails added after the session-2 review:** the furnace won't melt your
-two best kinds of block and queued items can be taken back out; Boom Blocks
-are stored in their own `s.booms` counter (never in the `b<tier>` store keys);
-taps within 0.4 s of a panel/card opening are ignored (double-tap accidents);
-grey buttons still answer with a spoken reason; audio/speech unlock on
-touchend/click (iPad ignores pointerdown as a gesture).
-
-**Files** (`mine/`): `index.html`, `mine.css`, `js/data.js` (ALL content and
-numbers: tiers, caves, pickaxes+recipes, upgrades, furnace, village, shop,
-quests), `js/game.js` (pure rules, no DOM — emits events `game.on(type, data)`),
-`js/main.js` (screen: board/drag/tap-merge, dock stations + panels,
-celebrations, FX, HUD, speech, save), `js/art.js` (procedural 16px tiles +
-hand-authored 16×16 sprite icons, incl. our own mole helper "Digby"),
-`js/sound.js`, `js/fmt.js`. Save key `ezramine.save.v1`.
-`scripts/make-mine-icons.mjs` regenerates `mine/icons/`.
-
-**Stations** (unlock by level): Quests/Blocks book/Chest (1), Workshop +
-Digby helper (2: pickaxes crafted from blocks *on the board or in the chest* +
-furnace bars; Dig Deeper (7 levels); Mole Helper; Lucky Dig), Shop (3),
-Furnace (4: any block → bricks; ores → metal bars), Village (5: bricks → 6
-buildings: hut +gold, blacksmith faster furnace, well gems, bakery more
-bricks, tower more chests, castle +gold). A goal card under the HUD always
-shows the next quest (tap = read aloud / open the right station / collect).
-
-**Balance:** `node mine/tests/sim.mjs [hours] [tapsPerSec] [mergeSecs]` plays
-a robot kid. Kid pace (1.5 taps/s, 1.8 s per merge): Copper ~3 min, Ruby
-~45 min, Gold Block ~1.5 h, Star Block ~4.5 h. The main pacing knob is
-`depthNeed()` in data.js (when "Dig Deeper" becomes available); prices are
-anchored to the tier ladder (`anchored()`).
-
-**Tests:** `PORT=8123 node scripts/serve.mjs &` then
-`node mine/tests/e2e.mjs` — real touch taps/drags for merge, tap-tap, chest,
-crafting, furnace, village, quests, Gold Rush, overflow, Boom, save/reload,
-offline gold, grown-ups gate, every panel, and layout on 9 screen sizes.
-Debug handle: `window.__mine` (`game`, `speed(x)`, `openPanel(id)`, …).
-
-**Mine backlog ideas:** more caves/blocks after the Star Block (a gentle
-"new world" instead of prestige pressure), Pebble Pals (friendly critters you
-tickle for coins — replaces the original's monsters), cosmetic pickaxe paints
-for gems, Ezra-designed block painter, and linking discoveries to unlock
-blocks in Ezra's Blocks (same origin → shared localStorage).

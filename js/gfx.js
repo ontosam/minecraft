@@ -1,7 +1,7 @@
 // WebGL setup, shader programs, procedural texture atlas, and mesh helpers.
 // Targets WebGL1 (works on essentially every iPad) with no external libraries.
 
-export const ATLAS = { tile: 16, perRow: 8, size: 128 }; // 8x8 grid of 16px tiles
+export const ATLAS = { tile: 16, perRow: 16, size: 256 }; // 16x16 grid of 16px tiles
 
 // Tile indices in the atlas.
 export const TILE = {
@@ -12,7 +12,39 @@ export const TILE = {
   SNOW: 16, ICE: 17, GRAVEL: 18, BIRCH_PLANKS: 19,
   DARK_PLANKS: 20, GOLD: 21, DIAMOND: 22, BOOKSHELF: 23,
   GLOWSTONE: 24, PUMPKIN_SIDE: 25, PUMPKIN_TOP: 26, OBSIDIAN: 27,
-  BIRCH_LOG: 28,
+  BIRCH_LOG: 28, NETHERRACK: 29, NETHER_PORTAL: 30, LAVA: 31,
+  DOOR: 32, DOOR_OPEN: 33, TNT_SIDE: 34, TNT_TOP: 35,
+  RAINBOW: 36, LEVER: 37, LEVER_ON: 38, REDSTONE: 39, REDLAMP: 40, REDLAMP_ON: 41,
+  SLIME: 42, SAPLING: 43,
+  MEGA_TNT_SIDE: 44, MEGA_TNT_TOP: 45, SANDSTONE: 46, END_STONE: 47,
+  BED_FOOT: 48, BED_HEAD: 49, BED_SIDE: 50, BARRIER: 51, LANTERN: 52,
+  IRON_BLOCK: 53, GOLD_BLOCK: 54, DIAMOND_BLOCK: 55, EMERALD_BLOCK: 56, LAPIS_BLOCK: 57,
+  REDSTONE_BLOCK: 58, COAL_BLOCK: 59, AMETHYST: 60,
+  DEEPSLATE: 61, GRANITE: 62, ANDESITE: 63, DIORITE: 64, QUARTZ: 65, PRISMARINE: 66, SEA_LANTERN: 67,
+  MOSS: 68, MUSHROOM_RED: 69, MUSHROOM_BROWN: 70, CACTUS_TOP: 71, CACTUS_SIDE: 72, MUD: 73,
+  NETHER_BRICK: 74, MAGMA: 75,
+  MELON_TOP: 76, MELON_SIDE: 77, HAY_TOP: 78, HAY_SIDE: 79, NOTE_BLOCK: 80, SPONGE: 81,
+  LEGO_TOP: 82, LEGO_SIDE: 83,
+  // session 31: a big batch of recognizable Minecraft blocks…
+  CRAFT_TOP: 84, CRAFT_SIDE: 85, FURNACE: 86, CHEST: 87,
+  CHERRY_PLANKS: 88, CHERRY_LEAVES: 89, BAMBOO: 90, CRIMSON_PLANKS: 91, WARPED_PLANKS: 92,
+  SOUL_SAND: 93, BONE_BLOCK: 94, COPPER: 95, COPPER_OX: 96, SCULK: 97,
+  BLACKSTONE: 98, SMOOTH_STONE: 99, PACKED_ICE: 100, HONEY: 101, TARGET: 102,
+  TERRACOTTA: 103, MOSSY_BRICK: 104,
+  // …and a Creative ✨ group for wild builds (NEON is tinted into many colours).
+  NEON: 105, CLOUD: 106, STARRY: 107, CHECKER: 108, CANDY: 109, CHROME: 110, GLOW_CRYSTAL: 111,
+  // session 34: space-themed blocks
+  MOON_ROCK: 112, SPACE_METAL: 113, ALIEN_GOO: 114, METEOR: 115, PLASMA: 116, CRYSTAL_ORE: 117,
+  // session: a cozy cushion to lie down on
+  PILLOW_TOP: 118, PILLOW_SIDE: 119,
+  // session: a colorful puzzle cube — tap it for a color-memory mini-game
+  PUZZLE: 120,
+  // session 38: ores you mine for crafting materials (the earn-your-tools ladder)
+  COAL_ORE: 121, IRON_ORE: 122,
+  // session 40: the legendary treasure at the bottom of the Deep Vault
+  RELIC: 123,
+  // session 42: a torch — a stick with a bright flame to light dark caves
+  TORCH: 124,
 };
 
 export function initGL(canvas) {
@@ -59,10 +91,12 @@ attribute vec3 aPos;
 attribute vec2 aUV;
 attribute vec3 aColor;
 attribute float aLight;
+attribute float aBlockLight;
 uniform mat4 uProj, uView, uModel;
 varying vec2 vUV;
 varying vec3 vColor;
 varying float vLight;
+varying float vBlock;
 varying float vDist;
 void main() {
   vec4 world = uModel * vec4(aPos, 1.0);
@@ -71,6 +105,7 @@ void main() {
   vUV = aUV;
   vColor = aColor;
   vLight = aLight;
+  vBlock = aBlockLight;
   vDist = length(viewPos.xyz);
 }`;
 
@@ -79,17 +114,41 @@ precision mediump float;
 varying vec2 vUV;
 varying vec3 vColor;
 varying float vLight;
+varying float vBlock;
 varying float vDist;
 uniform sampler2D uTex;
 uniform vec3 uFogColor;
-uniform float uFogNear, uFogFar, uAlpha;
+uniform float uFogNear, uFogFar, uAlpha, uDayLight, uAmbient;
 void main() {
   vec4 tex = texture2D(uTex, vUV);
-  vec3 c = tex.rgb * vColor * vLight;
+  if (tex.a < 0.5) discard;            // cutout transparency (glass, leaves)
+  // Skylight (vLight) fades toward night; block light (vBlock, from torches and
+  // glowing blocks) stays warm. uAmbient is a per-world floor so unlit caves are
+  // dim-but-navigable, never pitch-black (and only the overworld goes truly dark).
+  float lit = max(max(vLight * uDayLight, vBlock), uAmbient);
+  vec3 c = tex.rgb * vColor * lit;
   float fog = clamp((vDist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
   c = mix(c, uFogColor, fog);
   gl_FragColor = vec4(c, uAlpha);
 }`;
+
+// --- Sky shader: a soft vertical gradient backdrop (cheap, no depth) ---
+const SKY_VS = `
+attribute vec2 aXY;
+varying float vY;
+void main() { vY = aXY.y * 0.5 + 0.5; gl_Position = vec4(aXY, 1.0, 1.0); }`;
+const SKY_FS = `
+precision mediump float;
+varying float vY;
+uniform vec3 uTop, uHorizon;
+void main() { gl_FragColor = vec4(mix(uHorizon, uTop, vY * vY), 1.0); }`;
+export function makeSkyProgram(gl) { return makeProgram(gl, SKY_VS, SKY_FS, ['aXY'], ['uTop', 'uHorizon']); }
+export function skyQuad(gl) {
+  const m = new GLMesh(gl);
+  m.setAttrib('aXY', new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]), 2);
+  m.setIndex(new Uint16Array([0, 1, 2, 0, 2, 3]));
+  return m;
+}
 
 // --- Line shader: solid color (block highlight) ---
 const LINE_VS = `
@@ -104,8 +163,8 @@ void main() { gl_FragColor = uColor; }`;
 
 export function makeWorldProgram(gl) {
   return makeProgram(gl, WORLD_VS, WORLD_FS,
-    ['aPos', 'aUV', 'aColor', 'aLight'],
-    ['uProj', 'uView', 'uModel', 'uTex', 'uFogColor', 'uFogNear', 'uFogFar', 'uAlpha']);
+    ['aPos', 'aUV', 'aColor', 'aLight', 'aBlockLight'],
+    ['uProj', 'uView', 'uModel', 'uTex', 'uFogColor', 'uFogNear', 'uFogFar', 'uAlpha', 'uDayLight', 'uAmbient']);
 }
 
 export function makeLineProgram(gl) {
@@ -182,6 +241,8 @@ function buildAtlasCanvas() {
   ctx.fillStyle = shade(0x6f4e2c, 1);
   ctx.fillRect(p[0] + 6, p[1] + 6, 4, 4);
   p = at(TILE.LEAVES); noise(ctx, p[0], p[1], 0x4f9a3a, 0.34, 8);
+  // Punch see-through gaps so leaves read as leafy (cutout, like Minecraft).
+  { const r = rng(811); for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) if (r() < 0.22) ctx.clearRect(p[0] + x, p[1] + y, 1, 1); }
   p = at(TILE.PLANKS);
   noise(ctx, p[0], p[1], 0xc99a5b, 0.12, 9);
   ctx.fillStyle = shade(0x8a6a3a, 1);
@@ -200,10 +261,13 @@ function buildAtlasCanvas() {
   ctx.fillStyle = shade(0xe7d9c9, 1);
   for (let y = 0; y < T; y += 4) ctx.fillRect(p[0], p[1] + y, T, 1);
   for (let y = 0; y < T; y += 4) for (let x = (y % 8 === 0 ? 4 : 0); x < T; x += 8) ctx.fillRect(p[0] + x, p[1] + y, 1, 4);
+  // Glass: a clear (transparent) pane with a light-blue frame + a corner shine,
+  // so you can see through it like Minecraft.
   p = at(TILE.GLASS);
-  noise(ctx, p[0], p[1], 0xbfe6f2, 0.06, 13);
-  ctx.fillStyle = shade(0x9fd0e0, 1);
-  ctx.strokeRect && (ctx.fillRect(p[0], p[1], T, 1), ctx.fillRect(p[0], p[1] + T - 1, T, 1), ctx.fillRect(p[0], p[1], 1, T), ctx.fillRect(p[0] + T - 1, p[1], 1, T));
+  ctx.clearRect(p[0], p[1], T, T);
+  ctx.fillStyle = 'rgba(206,238,247,0.96)';
+  for (let i = 0; i < T; i++) { ctx.fillRect(p[0] + i, p[1], 1, 2); ctx.fillRect(p[0] + i, p[1] + T - 2, 1, 2); ctx.fillRect(p[0], p[1] + i, 2, 1); ctx.fillRect(p[0] + T - 2, p[1] + i, 2, 1); }
+  ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(p[0] + 4, p[1] + 4, 2, 6); ctx.fillRect(p[0] + 4, p[1] + 4, 5, 2);
 
   // --- extra building blocks ---
   // Cobblestone: lumpy grey stones
@@ -263,13 +327,279 @@ function buildAtlasCanvas() {
   p = at(TILE.BIRCH_LOG); noise(ctx, p[0], p[1], 0xe7e2d4, 0.06, 55);
   ctx.fillStyle = shade(0x2a2a2a, 1); { const r = rng(550); for (let i = 0; i < 6; i++) ctx.fillRect(p[0] + Math.floor(r() * 13), p[1] + Math.floor(r() * 15), 2 + Math.floor(r() * 2), 1); }
 
+  // --- Nether blocks ---
+  p = at(TILE.NETHERRACK); noise(ctx, p[0], p[1], 0x7a2e2e, 0.3, 60);
+  { const r = rng(601); for (let i = 0; i < 14; i++) { ctx.fillStyle = shade(0x4e1c1c, 1); ctx.fillRect(p[0] + Math.floor(r() * 15), p[1] + Math.floor(r() * 15), 1 + Math.floor(r() * 2), 1); } }
+
+  p = at(TILE.NETHER_PORTAL); noise(ctx, p[0], p[1], 0x7a3fb0, 0.18, 62);
+  { const r = rng(621); for (let i = 0; i < 12; i++) { ctx.fillStyle = shade(r() < 0.5 ? 0xc59cf0 : 0x4f2580, 1); ctx.fillRect(p[0] + Math.floor(r() * 14), p[1] + Math.floor(r() * 14), 2, 2); } }
+
+  p = at(TILE.LAVA); noise(ctx, p[0], p[1], 0xe8702a, 0.16, 63);
+  { const r = rng(631); for (let i = 0; i < 9; i++) { ctx.fillStyle = shade(0xffd45a, 1); ctx.fillRect(p[0] + Math.floor(r() * 14), p[1] + Math.floor(r() * 14), 2, 1); } }
+
+  // --- Door (House kit) ---
+  // Closed: a wooden door with two panels and a brass knob.
+  p = at(TILE.DOOR); noise(ctx, p[0], p[1], 0x8a5a2a, 0.10, 70);
+  ctx.fillStyle = shade(0x5e3c1c, 1);
+  ctx.fillRect(p[0], p[1], T, 1); ctx.fillRect(p[0], p[1] + T - 1, T, 1);
+  ctx.fillRect(p[0], p[1], 1, T); ctx.fillRect(p[0] + T - 1, p[1], 1, T);
+  for (const oy of [2, 9]) { ctx.fillRect(p[0] + 3, p[1] + oy, T - 7, 1); ctx.fillRect(p[0] + 3, p[1] + oy + 4, T - 7, 1); ctx.fillRect(p[0] + 3, p[1] + oy, 1, 5); ctx.fillRect(p[0] + T - 5, p[1] + oy, 1, 5); }
+  ctx.fillStyle = shade(0xf2c63a, 1); ctx.fillRect(p[0] + T - 6, p[1] + 8, 2, 2);
+  // Open: the leaf swung aside, with a dark doorway you can see through.
+  p = at(TILE.DOOR_OPEN); noise(ctx, p[0], p[1], 0x8a5a2a, 0.10, 71);
+  ctx.fillStyle = shade(0x241a12, 1); ctx.fillRect(p[0] + 4, p[1] + 1, T - 5, T - 2);
+  ctx.fillStyle = shade(0x5e3c1c, 1);
+  ctx.fillRect(p[0], p[1], 4, 1); ctx.fillRect(p[0], p[1] + T - 1, 4, 1); ctx.fillRect(p[0] + 3, p[1], 1, T);
+  ctx.fillRect(p[0] + T - 1, p[1], 1, T); ctx.fillRect(p[0], p[1], T, 1); ctx.fillRect(p[0], p[1] + T - 1, T, 1);
+
+  // --- TNT (used by TNT World / the explosive block) ---
+  p = at(TILE.TNT_SIDE); noise(ctx, p[0], p[1], 0xc0392b, 0.10, 72);
+  ctx.fillStyle = shade(0xf2e6c0, 1); ctx.fillRect(p[0], p[1] + 6, T, 4);
+  ctx.fillStyle = shade(0x3a2a12, 1);
+  ctx.fillRect(p[0] + 2, p[1] + 7, 3, 2); ctx.fillRect(p[0] + 7, p[1] + 7, 2, 2); ctx.fillRect(p[0] + 11, p[1] + 7, 3, 2);
+  p = at(TILE.TNT_TOP); noise(ctx, p[0], p[1], 0xc0392b, 0.10, 73);
+  ctx.fillStyle = shade(0x7a2018, 1); for (let i = 0; i < T; i += 4) ctx.fillRect(p[0] + i, p[1], 1, T);
+  ctx.fillStyle = shade(0x3a2a12, 1); ctx.fillRect(p[0] + 7, p[1] + 7, 2, 2);
+
+  // --- Mega TNT (the 💎-shop block: a bigger, scarier-looking dynamite) ---
+  // Darker, angrier red than normal TNT, a fatter band, a bold white "M", and
+  // little spark dots so it clearly reads as the "mega" version Ezra bought.
+  p = at(TILE.MEGA_TNT_SIDE); noise(ctx, p[0], p[1], 0x8e1b12, 0.12, 74);
+  ctx.fillStyle = shade(0xf7efd0, 1); ctx.fillRect(p[0], p[1] + 5, T, 6);          // fat label band
+  ctx.fillStyle = shade(0x8e1b12, 1);                                               // a chunky "M"
+  ctx.fillRect(p[0] + 3, p[1] + 6, 1, 4); ctx.fillRect(p[0] + 12, p[1] + 6, 1, 4);
+  ctx.fillRect(p[0] + 5, p[1] + 7, 1, 1); ctx.fillRect(p[0] + 10, p[1] + 7, 1, 1);
+  ctx.fillRect(p[0] + 7, p[1] + 8, 2, 1);
+  ctx.fillStyle = shade(0x3a2a12, 1);
+  ctx.fillRect(p[0] + 1, p[1] + 1, 2, 2); ctx.fillRect(p[0] + 13, p[1] + 1, 2, 2);  // fuse roots
+  ctx.fillStyle = shade(0xffd24a, 1); ctx.fillRect(p[0] + 1, p[1], 1, 1); ctx.fillRect(p[0] + 14, p[1], 1, 1); // sparks
+  p = at(TILE.MEGA_TNT_TOP); noise(ctx, p[0], p[1], 0x8e1b12, 0.12, 75);
+  ctx.fillStyle = shade(0x5a1009, 1); for (let i = 0; i < T; i += 4) ctx.fillRect(p[0] + i, p[1], 1, T);
+  ctx.fillStyle = shade(0x3a2a12, 1); ctx.fillRect(p[0] + 6, p[1] + 6, 4, 4);
+  ctx.fillStyle = shade(0xffd24a, 1); ctx.fillRect(p[0] + 7, p[1] + 7, 2, 2);       // glowing fuse top
+
+  // --- Sandstone (desert building block: pale tan with soft layered bands) ---
+  p = at(TILE.SANDSTONE); noise(ctx, p[0], p[1], 0xe6d8a8, 0.08, 76);
+  ctx.fillStyle = shade(0xcab984, 1); ctx.fillRect(p[0], p[1] + 4, T, 1); ctx.fillRect(p[0], p[1] + 10, T, 1);
+  ctx.fillStyle = shade(0xf2e8c4, 1); ctx.fillRect(p[0], p[1] + 5, T, 1); ctx.fillRect(p[0], p[1] + 11, T, 1);
+
+  // --- Bed (cozy, blocky): a red blanket, a white pillow on the head ---
+  p = at(TILE.BED_FOOT); noise(ctx, p[0], p[1], 0xc23a3a, 0.08, 80);
+  ctx.fillStyle = shade(0x9c2a2a, 1); ctx.fillRect(p[0], p[1] + 7, T, 1);            // a blanket fold
+  ctx.fillStyle = shade(0xe05a5a, 1); ctx.fillRect(p[0] + 2, p[1] + 2, T - 4, 3);    // soft highlight
+  p = at(TILE.BED_HEAD); noise(ctx, p[0], p[1], 0xc23a3a, 0.08, 81);
+  ctx.fillStyle = shade(0xf4f0e6, 1); ctx.fillRect(p[0] + 2, p[1] + 2, T - 4, 6);    // pillow
+  ctx.fillStyle = shade(0xdcd6c4, 1); ctx.fillRect(p[0] + 2, p[1] + 7, T - 4, 1);
+  p = at(TILE.BED_SIDE); noise(ctx, p[0], p[1], 0xc23a3a, 0.08, 82);
+  ctx.fillStyle = shade(0x7a4a28, 1); ctx.fillRect(p[0], p[1] + T - 4, T, 4);        // wooden base
+  ctx.fillStyle = shade(0x5a3618, 1); ctx.fillRect(p[0], p[1] + T - 1, T, 1);
+
+  // --- Force Field / Barrier: mostly see-through with a faint cyan shimmer ---
+  p = at(TILE.BARRIER); ctx.clearRect(p[0], p[1], T, T);
+  ctx.fillStyle = 'rgba(110,230,240,0.85)';
+  for (let i = 0; i < T; i++) { ctx.fillRect(p[0] + i, p[1], 1, 1); ctx.fillRect(p[0] + i, p[1] + T - 1, 1, 1); ctx.fillRect(p[0], p[1] + i, 1, 1); ctx.fillRect(p[0] + T - 1, p[1] + i, 1, 1); }
+  for (let i = 2; i < T - 1; i += 4) { ctx.fillRect(p[0] + i, p[1] + i, 1, 1); ctx.fillRect(p[0] + (T - 1 - i), p[1] + i, 1, 1); }   // a faint sparkle cross
+
+  // --- Lantern: a warm glowing light block (decoration) ---
+  p = at(TILE.LANTERN); noise(ctx, p[0], p[1], 0x4a3a22, 0.12, 83);
+  ctx.fillStyle = shade(0xffe07a, 1); ctx.fillRect(p[0] + 4, p[1] + 4, T - 8, T - 8);   // glowing core
+  ctx.fillStyle = shade(0xfff4c2, 1); ctx.fillRect(p[0] + 6, p[1] + 6, 4, 4);
+  ctx.fillStyle = shade(0x2a2018, 1); ctx.fillRect(p[0] + 3, p[1], T - 6, 2); ctx.fillRect(p[0] + 3, p[1] + T - 2, T - 6, 2);   // metal caps
+
+  // --- End Stone (the pale, speckled ground of The End) ---
+  p = at(TILE.END_STONE); noise(ctx, p[0], p[1], 0xe6e6b0, 0.06, 77);
+  { const r = rng(960); for (let i = 0; i < 24; i++) { ctx.fillStyle = shade(i % 2 ? 0xcfcf86 : 0xf6f6d2, 1); ctx.fillRect(p[0] + Math.floor(r() * T), p[1] + Math.floor(r() * T), 1, 1); } }
+
+  // --- Rainbow block (a sparkly shop reward) ---
+  // Bright horizontal stripes of the rainbow, with a few twinkling sparkles.
+  p = at(TILE.RAINBOW);
+  { const bands = [0xe23b3b, 0xf08a2a, 0xf2d234, 0x4fbf4f, 0x3a86d6, 0x9959d9]; const r = rng(800);
+    for (let y = 0; y < T; y++) {
+      const col = bands[Math.min(bands.length - 1, Math.floor(y / T * bands.length))];
+      for (let x = 0; x < T; x++) { ctx.fillStyle = shade(col, 0.9 + r() * 0.2); ctx.fillRect(p[0] + x, p[1] + y, 1, 1); }
+    }
+    for (let i = 0; i < 7; i++) { ctx.fillStyle = shade(0xffffff, 1); ctx.fillRect(p[0] + Math.floor(r() * T), p[1] + Math.floor(r() * T), 1, 1); }
+  }
+
+  // --- Redstone kit (lever / wire / lamp) ---
+  // Lever OFF: stone block, handle leaning right with a pale knob.
+  p = at(TILE.LEVER); noise(ctx, p[0], p[1], 0x8f8f97, 0.16, 90);
+  ctx.fillStyle = shade(0x55555c, 1); ctx.fillRect(p[0] + 3, p[1] + 11, 10, 3);   // base plate
+  ctx.fillStyle = shade(0x6b4a2a, 1); ctx.fillRect(p[0] + 9, p[1] + 4, 2, 8);      // handle
+  ctx.fillStyle = shade(0xd0d0d6, 1); ctx.fillRect(p[0] + 8, p[1] + 3, 4, 3);      // pale knob (off)
+  // Lever ON: handle leaning left with a bright red knob (powered).
+  p = at(TILE.LEVER_ON); noise(ctx, p[0], p[1], 0x8f8f97, 0.16, 91);
+  ctx.fillStyle = shade(0x55555c, 1); ctx.fillRect(p[0] + 3, p[1] + 11, 10, 3);
+  ctx.fillStyle = shade(0x6b4a2a, 1); ctx.fillRect(p[0] + 5, p[1] + 4, 2, 8);
+  ctx.fillStyle = shade(0xff3b30, 1); ctx.fillRect(p[0] + 4, p[1] + 3, 4, 3);      // red knob (on)
+  // Redstone wire: dark block with a red dust cross.
+  p = at(TILE.REDSTONE); noise(ctx, p[0], p[1], 0x2a2a30, 0.18, 92);
+  ctx.fillStyle = shade(0xc0392b, 1); ctx.fillRect(p[0] + 7, p[1] + 1, 2, 14); ctx.fillRect(p[0] + 1, p[1] + 7, 14, 2);
+  { const r = rng(920); for (let i = 0; i < 5; i++) { ctx.fillStyle = shade(0xe8625a, 1); ctx.fillRect(p[0] + Math.floor(r() * T), p[1] + Math.floor(r() * T), 1, 1); } }
+  // Redstone lamp OFF: warm brown block with a dim grid.
+  p = at(TILE.REDLAMP); noise(ctx, p[0], p[1], 0x7a6038, 0.12, 93);
+  ctx.fillStyle = shade(0x4a3a20, 1); for (let i = 0; i < T; i += 5) { ctx.fillRect(p[0] + i, p[1], 1, T); ctx.fillRect(p[0], p[1] + i, T, 1); }
+  // Redstone lamp ON: bright glowing orange-yellow.
+  p = at(TILE.REDLAMP_ON); noise(ctx, p[0], p[1], 0xf2b53a, 0.12, 94);
+  { const r = rng(940); for (let i = 0; i < 10; i++) { ctx.fillStyle = shade(0xfff0b0, 1); ctx.fillRect(p[0] + Math.floor(r() * 14), p[1] + Math.floor(r() * 14), 2, 2); } }
+
+  // Bouncy slime block: jelly green with a soft highlight + inner blobs.
+  p = at(TILE.SLIME); noise(ctx, p[0], p[1], 0x6fcf6a, 0.14, 95);
+  ctx.fillStyle = shade(0x4aa849, 1); ctx.fillRect(p[0] + 3, p[1] + 3, 10, 10);   // inner gel square
+  ctx.fillStyle = shade(0xbff0a8, 1); ctx.fillRect(p[0] + 2, p[1] + 2, 3, 1); ctx.fillRect(p[0] + 2, p[1] + 2, 1, 3); // shine
+
+  // Sapling: a little green sprout in soil (grows into a tree over time).
+  p = at(TILE.SAPLING); noise(ctx, p[0], p[1], 0x7a5a36, 0.18, 96);
+  ctx.fillStyle = shade(0x3f7a2e, 1); ctx.fillRect(p[0] + 7, p[1] + 5, 2, 8);            // stem
+  ctx.fillStyle = shade(0x5bbf3a, 1);
+  ctx.fillRect(p[0] + 4, p[1] + 6, 3, 2); ctx.fillRect(p[0] + 9, p[1] + 6, 3, 2);        // side leaves
+  ctx.fillRect(p[0] + 6, p[1] + 2, 4, 3);                                                // top bud
+
+  // --- A big batch of recognizable Minecraft-style blocks (variety = the toy) ---
+  // Small reusable styles keep this compact.
+  const speckle = (tile, base, v, seed, d, l) => { const q = at(tile); noise(ctx, q[0], q[1], base, v, seed); const r = rng(seed * 7 + 3); for (let i = 0; i < 30; i++) { ctx.fillStyle = shade(i % 2 ? d : l, 1); ctx.fillRect(q[0] + (r() * T | 0), q[1] + (r() * T | 0), 1, 1); } };
+  const metal = (tile, base, seed) => { const q = at(tile); noise(ctx, q[0], q[1], base, 0.05, seed); ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fillRect(q[0] + 2, q[1] + 2, T - 6, 1); ctx.fillRect(q[0] + 2, q[1] + 2, 1, T - 6); ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(q[0] + 3, q[1] + T - 3, T - 5, 1); ctx.fillRect(q[0] + T - 3, q[1] + 3, 1, T - 5); };
+  const gem = (tile, base, accent, seed) => { const q = at(tile); noise(ctx, q[0], q[1], base, 0.07, seed); ctx.fillStyle = shade(accent, 1); ctx.fillRect(q[0] + 5, q[1] + 3, 2, 2); ctx.fillRect(q[0] + 9, q[1] + 8, 2, 2); ctx.fillRect(q[0] + 4, q[1] + 10, 1, 1); ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fillRect(q[0] + 3, q[1] + 3, 3, 1); };
+  const glow = (tile, base, bright, seed) => { const q = at(tile); noise(ctx, q[0], q[1], base, 0.05, seed); const r = rng(seed); for (let i = 0; i < 16; i++) { ctx.fillStyle = shade(bright, 1); ctx.fillRect(q[0] + (r() * 14 | 0), q[1] + (r() * 14 | 0), 2, 2); } };
+  const soft = (tile, base, seed) => { const q = at(tile); noise(ctx, q[0], q[1], base, 0.04, seed); };
+  // Minerals
+  metal(TILE.IRON_BLOCK, 0xd8d8de, 201); metal(TILE.GOLD_BLOCK, 0xf2c63a, 202);
+  gem(TILE.DIAMOND_BLOCK, 0x57d6c8, 0xbff7f2, 203); gem(TILE.EMERALD_BLOCK, 0x36c463, 0xa9f0c0, 204);
+  speckle(TILE.LAPIS_BLOCK, 0x274bbf, 0.12, 205, 0x16307f, 0x5b7be6);
+  speckle(TILE.REDSTONE_BLOCK, 0xb01818, 0.12, 206, 0x7a0e0e, 0xe85a4a);
+  speckle(TILE.COAL_BLOCK, 0x24232a, 0.14, 207, 0x111014, 0x4a4954);
+  gem(TILE.AMETHYST, 0x9b59d0, 0xd9b8f5, 208);
+  // Stone variants
+  speckle(TILE.DEEPSLATE, 0x3a3a42, 0.10, 209, 0x24242a, 0x55555f);
+  speckle(TILE.GRANITE, 0xa56b53, 0.12, 210, 0x7e4d3a, 0xc89077);
+  speckle(TILE.ANDESITE, 0x8f8f95, 0.10, 211, 0x70707a, 0xb0b0b6);
+  speckle(TILE.DIORITE, 0xdcdce0, 0.10, 212, 0xb4b4bc, 0xffffff);
+  soft(TILE.QUARTZ, 0xeee9dd, 213); { const q = at(TILE.QUARTZ); ctx.fillStyle = 'rgba(0,0,0,0.06)'; ctx.fillRect(q[0], q[1] + 7, T, 1); }
+  speckle(TILE.PRISMARINE, 0x3f8f86, 0.12, 214, 0x2c6a63, 0x67bdb2);
+  glow(TILE.SEA_LANTERN, 0xcfeee6, 0xffffff, 215);
+  // Nature
+  speckle(TILE.MOSS, 0x5a8f3a, 0.16, 216, 0x3f6a26, 0x7fc257);
+  { const q = at(TILE.MUSHROOM_RED); noise(ctx, q[0], q[1], 0xc23a32, 0.06, 217); ctx.fillStyle = shade(0xf4f0e6, 1); const r = rng(217); for (let i = 0; i < 7; i++) ctx.fillRect(q[0] + (r() * 13 | 0), q[1] + (r() * 13 | 0), 3, 3); }
+  soft(TILE.MUSHROOM_BROWN, 0x8a6a4a, 218);
+  { const q = at(TILE.CACTUS_TOP); noise(ctx, q[0], q[1], 0x4f9a3a, 0.10, 219); ctx.fillStyle = shade(0x3f7a2e, 1); ctx.fillRect(q[0] + 5, q[1] + 5, 6, 6); }
+  { const q = at(TILE.CACTUS_SIDE); noise(ctx, q[0], q[1], 0x4f9a3a, 0.10, 220); ctx.fillStyle = shade(0x3f7a2e, 1); ctx.fillRect(q[0], q[1], 1, T); ctx.fillRect(q[0] + T - 1, q[1], 1, T); ctx.fillStyle = shade(0x6fc257, 1); for (let y = 2; y < T; y += 5) ctx.fillRect(q[0] + 7, q[1] + y, 2, 2); }
+  speckle(TILE.MUD, 0x4a3a30, 0.10, 221, 0x352820, 0x604c3e);
+  // Nether
+  { const q = at(TILE.NETHER_BRICK); noise(ctx, q[0], q[1], 0x3a1c22, 0.08, 222); ctx.fillStyle = shade(0x200f14, 1); for (let y = 0; y < T; y += 4) ctx.fillRect(q[0], q[1] + y, T, 1); for (let y = 0; y < T; y += 8) ctx.fillRect(q[0] + 8, q[1] + y, 1, 4); for (let y = 4; y < T; y += 8) ctx.fillRect(q[0], q[1] + y, 1, 4); }
+  { const q = at(TILE.MAGMA); noise(ctx, q[0], q[1], 0x3a1810, 0.10, 223); const r = rng(223); for (let i = 0; i < 10; i++) { ctx.fillStyle = shade(i % 2 ? 0xf08a2a : 0xf2d234, 1); ctx.fillRect(q[0] + (r() * 13 | 0), q[1] + (r() * 13 | 0), 3, 2); } }
+  // Decor
+  { const q = at(TILE.MELON_TOP); noise(ctx, q[0], q[1], 0x4f9a3a, 0.08, 224); ctx.fillStyle = shade(0x2f6a22, 1); for (let i = 2; i < T; i += 4) ctx.fillRect(q[0] + i, q[1], 1, T); }
+  { const q = at(TILE.MELON_SIDE); noise(ctx, q[0], q[1], 0x3f7a2e, 0.08, 225); ctx.fillStyle = shade(0xc23a32, 1); ctx.fillRect(q[0] + 2, q[1] + 2, T - 4, T - 4); ctx.fillStyle = shade(0xe06a52, 1); for (let i = 3; i < T - 2; i += 3) ctx.fillRect(q[0] + i, q[1] + 3, 1, T - 6); }
+  { const q = at(TILE.HAY_TOP); noise(ctx, q[0], q[1], 0xd8b23a, 0.08, 226); ctx.fillStyle = shade(0x9c7a1e, 1); ctx.strokeStyle = shade(0x9c7a1e, 1); ctx.fillRect(q[0] + 6, q[1] + 6, 4, 4); ctx.fillRect(q[0] + 2, q[1] + 2, 2, 2); ctx.fillRect(q[0] + T - 4, q[1] + 2, 2, 2); ctx.fillRect(q[0] + 2, q[1] + T - 4, 2, 2); ctx.fillRect(q[0] + T - 4, q[1] + T - 4, 2, 2); }
+  { const q = at(TILE.HAY_SIDE); noise(ctx, q[0], q[1], 0xe0c04a, 0.08, 227); ctx.fillStyle = shade(0x9c7a1e, 1); ctx.fillRect(q[0], q[1] + 1, T, 1); ctx.fillRect(q[0], q[1] + T - 2, T, 1); ctx.fillStyle = shade(0xb08a24, 1); for (let x = 1; x < T; x += 3) ctx.fillRect(q[0] + x, q[1] + 3, 1, T - 6); }
+  { const q = at(TILE.NOTE_BLOCK); noise(ctx, q[0], q[1], 0x8a5a30, 0.10, 228); ctx.fillStyle = shade(0x5a3a1c, 1); ctx.strokeRect(q[0] + 0.5, q[1] + 0.5, T - 1, T - 1); ctx.fillStyle = shade(0x2a2030, 1); ctx.fillRect(q[0] + 9, q[1] + 4, 2, 7); ctx.fillRect(q[0] + 5, q[1] + 9, 5, 3); }
+  { const q = at(TILE.SPONGE); noise(ctx, q[0], q[1], 0xd8c24a, 0.10, 229); ctx.fillStyle = shade(0x9c8a2a, 1); const r = rng(229); for (let i = 0; i < 12; i++) ctx.fillRect(q[0] + (r() * 14 | 0), q[1] + (r() * 14 | 0), 2, 2); }
+
+  // --- Lego bricks: drawn neutral (white/greys) so a per-colour tint makes
+  // vivid bricks. Top = 2x2 glossy studs; side = a brick with a shiny top rim.
+  { const q = at(TILE.LEGO_TOP); ctx.fillStyle = '#ededed'; ctx.fillRect(q[0], q[1], T, T);
+    ctx.fillStyle = 'rgba(0,0,0,0.10)'; ctx.fillRect(q[0], q[1] + T - 1, T, 1); ctx.fillRect(q[0] + T - 1, q[1], 1, T);
+    const studs = [[4, 4], [12, 4], [4, 12], [12, 12]];
+    for (const [sx, sy] of studs) {
+      ctx.fillStyle = '#cfcfcf'; ctx.beginPath(); ctx.arc(q[0] + sx, q[1] + sy, 3.0, 0, 7); ctx.fill();          // stud base/shadow
+      ctx.fillStyle = '#f6f6f6'; ctx.beginPath(); ctx.arc(q[0] + sx - 0.4, q[1] + sy - 0.4, 2.1, 0, 7); ctx.fill(); // stud top
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(q[0] + sx - 0.9, q[1] + sy - 0.9, 0.9, 0, 7); ctx.fill(); // hot spot
+    }
+  }
+  { const q = at(TILE.LEGO_SIDE); ctx.fillStyle = '#e2e2e2'; ctx.fillRect(q[0], q[1], T, T);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(q[0], q[1], T, 2);                       // glossy top rim
+    ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(q[0] + 2, q[1] + 3, 2, T - 5);  // soft left highlight
+    ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(q[0], q[1] + T - 2, T, 2);    // bottom shade
+  }
+
+  // ── session 31: a big batch of recognizable Minecraft blocks ──
+  { const q = at(TILE.CRAFT_TOP); noise(ctx, q[0], q[1], 0xb98a4e, 0.12, 301); ctx.fillStyle = shade(0x6a4a22, 1); for (const i of [5, 10]) { ctx.fillRect(q[0] + i, q[1], 1, T); ctx.fillRect(q[0], q[1] + i, T, 1); } }
+  { const q = at(TILE.CRAFT_SIDE); noise(ctx, q[0], q[1], 0xc99a5b, 0.12, 302); ctx.fillStyle = shade(0x8a6a3a, 1); for (let y = 4; y < T; y += 5) ctx.fillRect(q[0], q[1] + y, T, 1); ctx.fillStyle = shade(0x5a3a1c, 1); ctx.fillRect(q[0] + 3, q[1] + 3, 3, 2); ctx.fillRect(q[0] + 9, q[1] + 9, 4, 1); }
+  { const q = at(TILE.FURNACE); noise(ctx, q[0], q[1], 0x6c6c72, 0.16, 303); ctx.fillStyle = shade(0x4a4a50, 1); ctx.fillRect(q[0] + 3, q[1] + 3, T - 6, 2); ctx.fillStyle = shade(0x2a2a2e, 1); ctx.fillRect(q[0] + 4, q[1] + 7, 8, 6); ctx.fillStyle = shade(0xff8a1a, 1); ctx.fillRect(q[0] + 5, q[1] + 10, 6, 3); ctx.fillStyle = shade(0xffd83a, 1); ctx.fillRect(q[0] + 6, q[1] + 11, 4, 2); }
+  { const q = at(TILE.CHEST); noise(ctx, q[0], q[1], 0xb07a3a, 0.12, 304); ctx.fillStyle = shade(0x6a4a22, 1); ctx.strokeRect(q[0] + 0.5, q[1] + 0.5, T - 1, T - 1); ctx.fillRect(q[0], q[1] + 5, T, 1); ctx.fillStyle = shade(0x3a2a14, 1); ctx.fillRect(q[0] + 6, q[1] + 4, 4, 4); ctx.fillStyle = shade(0xd8c050, 1); ctx.fillRect(q[0] + 7, q[1] + 5, 2, 2); }
+  { const q = at(TILE.CHERRY_PLANKS); noise(ctx, q[0], q[1], 0xe8b8c8, 0.10, 305); ctx.fillStyle = shade(0xc88aa0, 1); for (let y = 4; y < T; y += 5) ctx.fillRect(q[0], q[1] + y, T, 1); }
+  { const q = at(TILE.CHERRY_LEAVES); noise(ctx, q[0], q[1], 0xf2a8c8, 0.30, 306); const r = rng(3061); for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) if (r() < 0.22) ctx.clearRect(q[0] + x, q[1] + y, 1, 1); }
+  { const q = at(TILE.BAMBOO); noise(ctx, q[0], q[1], 0x6a9a3a, 0.10, 307); ctx.fillStyle = shade(0x4a7a24, 1); for (let x = 2; x < T; x += 5) ctx.fillRect(q[0] + x, q[1], 2, T); ctx.fillStyle = shade(0x8aba5a, 1); for (let x = 2; x < T; x += 5) { ctx.fillRect(q[0] + x, q[1] + 5, 2, 1); ctx.fillRect(q[0] + x, q[1] + 11, 2, 1); } }
+  { const q = at(TILE.CRIMSON_PLANKS); noise(ctx, q[0], q[1], 0x8a3a52, 0.10, 308); ctx.fillStyle = shade(0x5a2435, 1); for (let y = 4; y < T; y += 5) ctx.fillRect(q[0], q[1] + y, T, 1); }
+  { const q = at(TILE.WARPED_PLANKS); noise(ctx, q[0], q[1], 0x2a8a8a, 0.10, 309); ctx.fillStyle = shade(0x1a5a5a, 1); for (let y = 4; y < T; y += 5) ctx.fillRect(q[0], q[1] + y, T, 1); }
+  { const q = at(TILE.SOUL_SAND); noise(ctx, q[0], q[1], 0x4a3a2e, 0.18, 310); ctx.fillStyle = shade(0x2a2018, 1); ctx.fillRect(q[0] + 4, q[1] + 5, 2, 3); ctx.fillRect(q[0] + 10, q[1] + 5, 2, 3); ctx.fillRect(q[0] + 6, q[1] + 10, 4, 2); }
+  { const q = at(TILE.BONE_BLOCK); noise(ctx, q[0], q[1], 0xe8e4d2, 0.08, 311); ctx.fillStyle = shade(0xc8c0a0, 1); for (let x = 2; x < T; x += 4) ctx.fillRect(q[0] + x, q[1], 1, T); ctx.fillStyle = shade(0xa89870, 1); ctx.fillRect(q[0], q[1] + 1, T, 1); ctx.fillRect(q[0], q[1] + T - 2, T, 1); }
+  metal(TILE.COPPER, 0xc87a4a, 312);
+  metal(TILE.COPPER_OX, 0x4aa88a, 313);
+  { const q = at(TILE.SCULK); noise(ctx, q[0], q[1], 0x16323a, 0.18, 314); const r = rng(314); for (let i = 0; i < 12; i++) { ctx.fillStyle = shade(0x2ad8d0, 1); ctx.fillRect(q[0] + (r() * 14 | 0), q[1] + (r() * 14 | 0), 1, 1); } }
+  speckle(TILE.BLACKSTONE, 0x2a2830, 0.18, 315, 0x16141a, 0x3a3842);
+  { const q = at(TILE.SMOOTH_STONE); noise(ctx, q[0], q[1], 0xa8a8ae, 0.06, 316); ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(q[0] + 2, q[1] + 2, T - 4, 1); }
+  { const q = at(TILE.PACKED_ICE); noise(ctx, q[0], q[1], 0x8ac0f0, 0.10, 317); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(q[0] + 2, q[1] + 3, 5, 1); ctx.fillRect(q[0] + 9, q[1] + 9, 4, 1); }
+  { const q = at(TILE.HONEY); noise(ctx, q[0], q[1], 0xf0a82a, 0.12, 318); ctx.fillStyle = shade(0xc88010, 1); ctx.fillRect(q[0], q[1] + 5, T, 2); ctx.fillRect(q[0], q[1] + 11, T, 2); ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(q[0] + 3, q[1] + 2, 3, 1); }
+  { const q = at(TILE.TARGET); ctx.fillStyle = shade(0xe8e0d0, 1); ctx.fillRect(q[0], q[1], T, T); const cx = q[0] + 8, cy = q[1] + 8; for (const [r, c] of [[7, 0xd03030], [5, 0xe8e0d0], [3, 0xd03030], [1.5, 0xe8e0d0]]) { ctx.fillStyle = shade(c, 1); ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fill(); } }
+  { const q = at(TILE.TERRACOTTA); noise(ctx, q[0], q[1], 0xb06848, 0.10, 320); ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(q[0] + 2, q[1] + T - 3, T - 4, 1); }
+  { const q = at(TILE.MOSSY_BRICK); noise(ctx, q[0], q[1], 0x86868c, 0.14, 321); ctx.fillStyle = shade(0x5a5a60, 1); ctx.fillRect(q[0], q[1] + 7, T, 1); for (let x = 0; x < T; x += 8) ctx.fillRect(q[0] + x, q[1], 1, 7); for (let x = 4; x < T; x += 8) ctx.fillRect(q[0] + x, q[1] + 8, 1, T); const r = rng(321); for (let i = 0; i < 14; i++) { ctx.fillStyle = shade(0x4a7a34, 1); ctx.fillRect(q[0] + (r() * 15 | 0), q[1] + (r() * 15 | 0), 2, 2); } }
+
+  // ── Creative ✨ group: wild blocks for crazy builds ──
+  { const q = at(TILE.NEON); ctx.fillStyle = '#fbfbfb'; ctx.fillRect(q[0], q[1], T, T); ctx.fillStyle = 'rgba(0,0,0,0.10)'; for (let i = 4; i < T; i += 4) { ctx.fillRect(q[0] + i, q[1], 1, T); ctx.fillRect(q[0], q[1] + i, T, 1); } ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.fillRect(q[0] + 2, q[1] + 2, 5, 1); }
+  { const q = at(TILE.CLOUD); noise(ctx, q[0], q[1], 0xeef2ff, 0.04, 323); ctx.fillStyle = 'rgba(255,255,255,0.7)'; const r = rng(323); for (let i = 0; i < 8; i++) ctx.fillRect(q[0] + (r() * 12 | 0), q[1] + (r() * 12 | 0), 4, 3); }
+  { const q = at(TILE.STARRY); noise(ctx, q[0], q[1], 0x121a3a, 0.14, 324); const r = rng(324); for (let i = 0; i < 11; i++) { ctx.fillStyle = i % 3 ? '#ffffff' : '#aac8ff'; ctx.fillRect(q[0] + (r() * 15 | 0), q[1] + (r() * 15 | 0), 1, 1); } ctx.fillStyle = '#fff4c0'; ctx.fillRect(q[0] + 4, q[1] + 3, 2, 2); }
+  { const q = at(TILE.CHECKER); for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) { ctx.fillStyle = (((x >> 2) + (y >> 2)) & 1) ? '#1a1a1e' : '#f0f0f0'; ctx.fillRect(q[0] + x, q[1] + y, 1, 1); } }
+  { const q = at(TILE.CANDY); for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) { ctx.fillStyle = ((((x + y) >> 2) & 1)) ? '#f04a7a' : '#ffffff'; ctx.fillRect(q[0] + x, q[1] + y, 1, 1); } }
+  { const q = at(TILE.CHROME); for (let y = 0; y < T; y++) { ctx.fillStyle = shade(0xc8ccd8, 0.6 + 0.4 * Math.sin(y * 0.8)); ctx.fillRect(q[0], q[1] + y, T, 1); } ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(q[0] + 3, q[1] + 2, 2, T - 4); }
+  { const q = at(TILE.GLOW_CRYSTAL); noise(ctx, q[0], q[1], 0x3ad8e8, 0.12, 328); ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(q[0] + 5, q[1] + 3, 2, 4); ctx.fillRect(q[0] + 9, q[1] + 8, 2, 3); ctx.fillStyle = shade(0x1a98c8, 1); ctx.fillRect(q[0] + 3, q[1] + 10, 2, 2); ctx.fillRect(q[0] + 11, q[1] + 4, 2, 2); }
+
+  // ── session 34: space-themed blocks ──
+  { const q = at(TILE.MOON_ROCK); noise(ctx, q[0], q[1], 0x8e8e96, 0.16, 401); const r = rng(401); for (let i = 0; i < 5; i++) { const cx = q[0] + 2 + (r() * 11 | 0), cy = q[1] + 2 + (r() * 11 | 0); ctx.fillStyle = shade(0x5a5a62, 1); ctx.beginPath(); ctx.arc(cx, cy, 1.8, 0, 7); ctx.fill(); ctx.fillStyle = shade(0xb2b2ba, 1); ctx.fillRect(cx - 1, cy - 2, 2, 1); } }
+  metal(TILE.SPACE_METAL, 0x4a5570, 402);
+  { const q = at(TILE.ALIEN_GOO); noise(ctx, q[0], q[1], 0x3ad04a, 0.16, 403); const r = rng(403); for (let i = 0; i < 9; i++) { ctx.fillStyle = i % 2 ? 'rgba(180,255,160,0.8)' : shade(0x1a8a2a, 1); ctx.beginPath(); ctx.arc(q[0] + (r() * 14 | 0) + 1, q[1] + (r() * 14 | 0) + 1, 1.6, 0, 7); ctx.fill(); } }
+  { const q = at(TILE.METEOR); noise(ctx, q[0], q[1], 0x3a322e, 0.20, 404); ctx.strokeStyle = shade(0xff6a1a, 1); ctx.lineWidth = 1; for (const [a, b, cc, d] of [[2, 3, 8, 9], [10, 2, 13, 11], [3, 12, 9, 14]]) { ctx.beginPath(); ctx.moveTo(q[0] + a, q[1] + b); ctx.lineTo(q[0] + cc, q[1] + d); ctx.stroke(); } ctx.fillStyle = shade(0xffb030, 1); ctx.fillRect(q[0] + 7, q[1] + 7, 1, 1); }
+  glow(TILE.PLASMA, 0x7a2ad8, 0x33e0ff, 405);
+  { const q = at(TILE.CRYSTAL_ORE); noise(ctx, q[0], q[1], 0x6c6c76, 0.16, 406); for (const [gx, gy] of [[4, 4], [10, 6], [6, 11], [12, 12]]) { ctx.fillStyle = shade(0x33e0d8, 1); ctx.fillRect(q[0] + gx, q[1] + gy, 2, 2); ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(q[0] + gx, q[1] + gy, 1, 1); } }
+  // Ores: a stone-grey block with embedded nuggets you can spot while digging.
+  { const q = at(TILE.COAL_ORE); noise(ctx, q[0], q[1], 0x8f8f97, 0.12, 407); for (const [gx, gy] of [[3, 4], [9, 3], [5, 10], [11, 11], [12, 6]]) { ctx.fillStyle = shade(0x1c1b22, 1); ctx.fillRect(q[0] + gx, q[1] + gy, 3, 3); ctx.fillStyle = 'rgba(90,90,100,0.6)'; ctx.fillRect(q[0] + gx, q[1] + gy, 1, 1); } }
+  { const q = at(TILE.IRON_ORE); noise(ctx, q[0], q[1], 0x8f8f97, 0.12, 408); for (const [gx, gy] of [[4, 3], [10, 5], [3, 11], [12, 12], [7, 8]]) { ctx.fillStyle = shade(0xcea06a, 1); ctx.fillRect(q[0] + gx, q[1] + gy, 3, 2); ctx.fillStyle = 'rgba(255,236,200,0.8)'; ctx.fillRect(q[0] + gx, q[1] + gy, 1, 1); } }
+  // The legendary Relic — a radiant gem that glows gold/violet (the grand prize).
+  { const q = at(TILE.RELIC); ctx.fillStyle = shade(0x2a1840, 1); ctx.fillRect(q[0], q[1], T, T);
+    for (let r = 7; r >= 1; r--) { ctx.fillStyle = `rgba(${180 + r * 8},${120 + r * 12},${255 - r * 6},0.16)`; ctx.beginPath(); ctx.arc(q[0] + 8, q[1] + 8, r, 0, 7); ctx.fill(); }
+    ctx.fillStyle = shade(0xffd24a, 1); ctx.beginPath(); ctx.moveTo(q[0] + 8, q[1] + 2); ctx.lineTo(q[0] + 13, q[1] + 8); ctx.lineTo(q[0] + 8, q[1] + 14); ctx.lineTo(q[0] + 3, q[1] + 8); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = shade(0xfff3b0, 1); ctx.beginPath(); ctx.moveTo(q[0] + 8, q[1] + 4); ctx.lineTo(q[0] + 11, q[1] + 8); ctx.lineTo(q[0] + 8, q[1] + 8); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.fillRect(q[0] + 7, q[1] + 6, 2, 2); }
+
+  // A soft pastel cushion. Top: a rounded highlight + four corner tufts (stitch
+  // buttons). Side: the same colour with a stuffed seam line across the middle.
+  { const q = at(TILE.PILLOW_TOP); noise(ctx, q[0], q[1], 0xc7cdf0, 0.05, 420);
+    ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.arc(q[0] + 8, q[1] + 7, 4.5, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(90,96,150,0.5)'; for (const [tx, ty] of [[3, 3], [12, 3], [3, 12], [12, 12]]) ctx.fillRect(q[0] + tx, q[1] + ty, 1, 1);
+    ctx.fillStyle = 'rgba(120,126,180,0.35)'; ctx.strokeStyle = 'rgba(120,126,180,0.35)'; ctx.lineWidth = 1; ctx.strokeRect(q[0] + 1.5, q[1] + 1.5, T - 3, T - 3); }
+  { const q = at(TILE.PILLOW_SIDE); noise(ctx, q[0], q[1], 0xbcc3ea, 0.05, 421);
+    ctx.fillStyle = 'rgba(255,255,255,0.30)'; ctx.fillRect(q[0] + 1, q[1] + 2, T - 2, 3);
+    ctx.fillStyle = 'rgba(90,96,150,0.40)'; ctx.fillRect(q[0], q[1] + 7, T, 1);
+    for (let x = 2; x < T; x += 4) { ctx.fillStyle = 'rgba(120,126,180,0.5)'; ctx.fillRect(q[0] + x, q[1] + 6, 1, 1); } }
+
+  // Puzzle cube: a 2×2 of the four puzzle colours with a bright white "?" so it
+  // reads as "tap me to play!". The colours match the mini-game buttons.
+  { const q = at(TILE.PUZZLE), h = T / 2; const cols = [0xe63946, 0x43aa3a, 0x2a6fdb, 0xf2c21e];
+    const quad = [[0, 0], [h, 0], [0, h], [h, h]];
+    for (let i = 0; i < 4; i++) { ctx.fillStyle = shade(cols[i], 1); ctx.fillRect(q[0] + quad[i][0], q[1] + quad[i][1], h, h); }
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(q[0] + h - 0.5, q[1], 1, T); ctx.fillRect(q[0], q[1] + h - 0.5, T, 1);
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('?', q[0] + h, q[1] + h + 1); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; }
+
+  // Torch: a dark cave-stone backdrop with a wooden stick rising up to a bright
+  // flame at the top — reads as "a torch on the wall" even as a full cube.
+  { const q = at(TILE.TORCH); noise(ctx, q[0], q[1], 0x35302a, 0.10, 530);   // dark backdrop
+    ctx.fillStyle = shade(0x6b4a2a, 1); ctx.fillRect(q[0] + 7, q[1] + 7, 2, 8);          // wooden stick
+    ctx.fillStyle = shade(0x4a331d, 1); ctx.fillRect(q[0] + 7, q[1] + 11, 1, 4);         // stick shading
+    ctx.fillStyle = shade(0xff7a18, 1); ctx.fillRect(q[0] + 6, q[1] + 3, 4, 5);          // outer flame (orange)
+    ctx.fillStyle = shade(0xffc83a, 1); ctx.fillRect(q[0] + 6, q[1] + 4, 3, 3);          // inner flame (yellow)
+    ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(q[0] + 7, q[1] + 5, 1, 1);      // hot white core
+    ctx.fillStyle = 'rgba(255,170,40,0.45)'; ctx.fillRect(q[0] + 5, q[1] + 2, 6, 7); }    // soft glow halo
+
   return c;
 }
 
 let _atlasCanvas = null;
 
 // A small canvas showing one atlas tile, scaled up crisply (for the UI picker).
-export function blockPreview(tile, size) {
+// An optional tint [r,g,b] (0..1) multiplies the tile so colour blocks (which
+// share the neutral tile + a tint) show their real colour in the menu.
+export function blockPreview(tile, size, tint) {
   if (!_atlasCanvas) _atlasCanvas = buildAtlasCanvas();
   const t = ATLAS.tile;
   const col = tile % ATLAS.perRow, row = Math.floor(tile / ATLAS.perRow);
@@ -278,6 +608,13 @@ export function blockPreview(tile, size) {
   const ctx = c.getContext('2d');
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(_atlasCanvas, col * t, row * t, t, t, 0, 0, size, size);
+  if (tint && (tint[0] !== 1 || tint[1] !== 1 || tint[2] !== 1)) {
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = 'rgb(' + Math.round(tint[0] * 255) + ',' + Math.round(tint[1] * 255) + ',' + Math.round(tint[2] * 255) + ')';
+    ctx.fillRect(0, 0, size, size);
+    ctx.globalCompositeOperation = 'source-over';
+    // keep transparent pixels transparent (multiply leaves them be on most browsers)
+  }
   return c;
 }
 
@@ -292,6 +629,29 @@ export function makeAtlasTexture(gl) {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   return tex;
+}
+
+// A flat 1×1 dark quad laid in the ground plane — a soft blob shadow drawn
+// under each creature (with uAlpha + blending) so they feel planted in the
+// world instead of floating. Sample the NEUTRAL tile centre for a flat colour.
+export function shadowMesh(gl) { return quadMesh(gl, [0, 0, 0]); }
+
+// A flat 1×1 quad at y=0 in a solid colour — used for the blob shadow (black) and
+// the green "build here" footprint preview. Drawn in a blended pass with uAlpha.
+export function quadMesh(gl, color) {
+  const r = getUV(TILE.NEUTRAL);
+  const u = (r.u0 + r.u1) / 2, v = (r.v0 + r.v1) / 2;
+  const verts = [[-0.5, 0, 0.5], [0.5, 0, 0.5], [0.5, 0, -0.5], [-0.5, 0, -0.5]];
+  const A = { pos: [], uv: [], col: [], light: [], idx: [] };
+  for (const p of verts) { A.pos.push(p[0], p[1], p[2]); A.uv.push(u, v); A.col.push(color[0], color[1], color[2]); A.light.push(1); }
+  A.idx.push(0, 1, 2, 0, 2, 3);
+  const m = new GLMesh(gl);
+  m.setAttrib('aPos', new Float32Array(A.pos), 3);
+  m.setAttrib('aUV', new Float32Array(A.uv), 2);
+  m.setAttrib('aColor', new Float32Array(A.col), 3);
+  m.setAttrib('aLight', new Float32Array(A.light), 1);
+  m.setIndex(new Uint16Array(A.idx));
+  return m;
 }
 
 // A simple mesh: named float attribute buffers plus a uint16 index buffer.
@@ -320,8 +680,10 @@ export class GLMesh {
   draw(prog, mode) {
     const gl = this.gl;
     if (!this.count) return;
-    // Clear any attribute arrays a previous program/mesh left enabled.
-    for (let i = 0; i < 4; i++) gl.disableVertexAttribArray(i);
+    // Clear any attribute arrays a previous program/mesh left enabled. (The world
+    // program uses 5 attributes — incl. aBlockLight at loc 4 — so meshes without
+    // it, like characters, fall back to the default 0 rather than a stale buffer.)
+    for (let i = 0; i < 5; i++) gl.disableVertexAttribArray(i);
     for (const name in prog.a) {
       const loc = prog.a[name];
       const entry = this.attribs[name];
