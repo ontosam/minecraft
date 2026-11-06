@@ -820,3 +820,28 @@ html.small .buy img { width: 24px; height: 24px; }
 html.small .row { gap: 8px; padding: 8px; }
 html.small .row > img { width: 46px; height: 46px; }
 html.small .row .info small { font-size: 13px; }
+
+/* Checkout on short landscape screens: card on the left, keypad + Buy on the right */
+@media (orientation: landscape) and (max-height: 820px) {
+  .co-box {
+    width: min(780px, 100%); display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px;
+    grid-template-areas: "head head" "item pad" "card pad" "msg buy"; align-items: start;
+  }
+  .co-head { grid-area: head; }
+  .co-item { grid-area: item; }
+  .co-card { grid-area: card; margin: 10px auto 4px; }
+  #co-msg { grid-area: msg; align-self: center; margin: 4px 0; }
+  #co-pad { grid-area: pad; margin-top: 0; }
+  #co-pad button { height: 52px; }
+  #co-buy { grid-area: buy; margin-top: 8px; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .co-head { padding: 6px 12px; margin-bottom: 8px; }
+  #co-close { width: 38px; height: 38px; }
+  .co-item img { width: 40px; height: 40px; }
+  .co-card { max-width: 220px; padding: 10px; }
+  #co-digits { font-size: 16px; margin-top: 8px; }
+  #co-pad { gap: 5px; }
+  #co-pad button { height: 40px; font-size: 20px; }
+  #co-buy { height: 50px; font-size: 20px; }
+}

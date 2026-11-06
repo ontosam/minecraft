@@ -1769,9 +1769,14 @@ crafting). Still no copied names/art/text: every sprite is new and original
 trademarks in the mine, no ads (boosters cost coins), pretend store + parent
 controls kept. Same branch, mirrored to `main`. **sw v49→v50.** Save key
 unchanged (`ezramine.save.v1`); state is now **`v: 2`** and `migrateV1()` carries
-Ezra's v1 progress over (coins/bricks/level/blocks/village/shaft, old pick →
-a worn pickaxe, ruby bars + Boom Blocks → emeralds, `s.migrated` → Pip says
-"your mine got an upgrade").
+Ezra's v1 progress over: coins/bricks/level/blocks (2 squares always left free),
+village (capped at the new max; Lookout Tower → its bricks back), Dig Deeper →
+Mine Shaft, a running Gold Rush, old furnace blocks, board treasure chest → a
+golden chest, ruby bars + Boom Blocks → emeralds, old pick → a worn pickaxe
+**plus a matching sword**, **2 Logs** to try the Workbench, and `s.monOff` so
+monsters are sized for the new pace (`monsterLevel()`). The original v1 save is
+kept as `ezramine.save.v1.v1bak`. `s.migrated` → Pip's "your mine got an
+upgrade" tour (chest → Workbench planks/sticks → monster → done).
 - **Core loop (`game.js tapMine/openChest`):** 10 taps bare hand (8 stone pick,
   `PICK_TAPS`) → a **wooden chest** drops on a random empty square → tap it to
   open into the block. Board **starts at 6 squares**, +1 per level to 20
@@ -1807,9 +1812,20 @@ a worn pickaxe, ruby bars + Boom Blocks → emeralds, `s.migrated` → Pip says
   (`swordURL/pickURL/armorURL/itemURL/emeraldURL/monsterURL/guideURL/heroURL`).
 - **Balance (`node mine/tests/sim.mjs 12`):** robot kid with energy off: Ruby
   ~14 min, Emerald Ore ~1h10, Star Block ~4h40; `ENERGY=1` and never buying:
-  Emerald ~2h17, Star ~5h33 (waits ~2.5 h for energy); `BOOST=1` buys coin
-  boosters: Star ~3h14.
-- **Verified:** `node mine/tests/e2e.mjs` = **161 checks** (the whole tutorial
+  Emerald ~2h15, Star ~5h39; `BOOST=1` buys coin boosters: Star ~3h14. Bakery:
+  energy regen × 0.8 per level (floor 3 s).
+- **Review fixes:** a 4-dimension review workflow (rules, screen, safety,
+  parity) + skeptic verification confirmed 25 findings, all fixed: the migrated
+  tour no longer loops on Logs (Shop always sells Log + Coal; Pip points there
+  when the mine is too deep), full board → Pip says merge/store to make room,
+  Village crash on over-max levels, energy kept when armor comes off, Shop
+  buttons light up as soon as affordable, leggings art, a 350 ms tap guard after
+  a panel closes (✕ sits over ⭐ PASS in landscape), Energy Refill that filled
+  itself while typing → "already full, no charge" (not "declined"), grown-ups
+  gate = two-digit sums in words + wrong answer → hold again + 30 s pause after 2
+  misses + pointer capture, two-column checkout on short landscape screens,
+  Undo Start over keeps the grown-ups' history/card total.
+- **Verified:** `node mine/tests/e2e.mjs` = **178 checks** (the whole tutorial
   with real taps, tap-tap merge, chest store/unstore, workbench drag + shifted
   shapes + fill, furnace + take-out + no-coal, 29-merge village + shaft, quests
   tabs + goal card, boosters, gps 0 early, board-full, treasure chest, level-up

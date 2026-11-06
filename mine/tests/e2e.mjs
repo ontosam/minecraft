@@ -259,6 +259,17 @@ ok(hp0 - (await J(`__mine.game.s.monster.hp`)) === 2 * (await E(`__mine.game.att
 await E(`(() => { const g = __mine.game; g.s.monster = null; g.s.boosts.damage = 0; })()`);
 ok(await E(`document.getElementById('btn-rush').classList.contains('active') === false`) || true, 'boost button updates');
 
+await E(`(() => { const s = __mine.game.s; s.maxTier = 14; for (let t = 1; t <= 14; t++) s.seen[t] = 1; s.board = Array(20).fill(null); __mine.renderBoard(); __mine.openPanel('shop', 'blocks'); })()`); await p.sleep(300);
+ok(await E(`!!document.querySelector('#panel-body .row[data-tier="2"]') && !!document.querySelector('#panel-body .row[data-tier="4"]')`), 'the Shop always sells Logs and Coal');
+await E(`(() => { const s = __mine.game.s; s.gold = 0; })()`); await p.sleep(500);
+ok(await E(`!!document.querySelector('#panel-body .row[data-tier="2"] .buy.off')`), 'with no gold the Log button is grey');
+await E(`(() => { __mine.game.s.gold = 600; })()`); await p.sleep(700);
+ok(await E(`!document.querySelector('#panel-body .row[data-tier="2"] .buy.off')`), '...and lights up as soon as he can afford it');
+await E(`__mine.closePanel()`);
+st = await J(`(() => { const g = __mine.game, s = g.s; s.equip.helmet = 'diamond_helmet'; s.equip.chest = 'diamond_chest'; s.energy = g.energyMax(); const e0 = s.energy; g.unequip('chest'); g.equip('diamond_chest'); const r = [e0, s.energy]; s.village.bakery = 0; const secs = []; for (let lv = 0; lv <= 6; lv++) { s.village.bakery = lv; secs.push(g.energyRegenSecs()); } s.village.bakery = 0; s.equip.helmet = null; s.equip.chest = null; return { r, secs }; })()`);
+ok(st.r[0] === st.r[1], 'taking armor off and on again does not lose energy');
+ok(st.secs.every((x, k) => k === 0 || x < st.secs[k - 1]), 'every Bakery level makes energy come back faster (' + st.secs.join(', ') + ' s)');
+
 console.log('10. Gold comes from later blocks; full board → chest; treasure chests');
 await E(`(() => { const g = __mine.game, s = g.s; s.boosts = { damage: 0, gold: 0, block: 0 }; s.village = {}; s.iap = {}; })()`);
 await setBoard([{ t: 1 }, { t: 2 }, { t: 3 }]);
@@ -300,19 +311,33 @@ ok((await tut()) === 'done', 'the tutorial does not come back');
 await dismiss();
 
 console.log('13. Ezra’s old (v1) save carries over');
-await E(`(() => { __mine.noSave(); localStorage.setItem('ezramine.save.v1', JSON.stringify({ v: 1, gold: 98765, bricks: 50, gems: 9, level: 9, pick: 3, maxTier: 12,
-  board: [{t:12},{t:10},{t:6},{t:6},{t:2},{t:1},null,{t:9}], store: { b3: 2, 'i:iron': 3, 'i:ruby': 2 }, booms: 1,
-  seen: {1:1,2:1,6:1,10:1,12:1}, stats: { merges: 120, mined: 300, taps: 1800 }, village: { hut: 2 }, up: { depth: 3 }, settings: { sound: true, speak: true, nums: true, rest: 30, energy: true, cardLimit: 0 }, purchases: [], iap: {} })); })()`);
+await E(`(() => { __mine.noSave(); localStorage.removeItem('ezramine.save.v1.v1bak'); localStorage.setItem('ezramine.save.v1', JSON.stringify({ v: 1, gold: 98765, bricks: 50, gems: 9, level: 9, pick: 3, maxTier: 12,
+  board: [{t:12},{t:10},{t:6},{t:6},{t:2},{t:1},null,{t:9},{chest:1},{boom:1}], store: { b3: 2, 'i:iron': 3, 'i:ruby': 2 }, booms: 1, boostLeft: 120,
+  furnace: [{ k: 'b8', left: 3, total: 5 }],
+  seen: {1:1,2:1,6:1,10:1,12:1}, stats: { merges: 120, mined: 300, taps: 1800 }, village: { hut: 2, forge: 6, tower: 2 }, up: { depth: 3 }, settings: { sound: true, speak: true, nums: true, rest: 30, energy: true, cardLimit: 0 }, purchases: [], iap: {} })); })()`);
 await p.goto(BASE); await p.sleep(700);
 await dismiss();
 st = await S();
-ok(st.v === 2 && st.level === 9 && st.gold >= 98765 && st.bricks === 50, 'coins, bricks and level kept');
-ok(st.gems === 9 + 2 + 1, 'old ruby bars and Boom Blocks became emeralds');
-ok(st.equip.pick === 'iron_pick' && st.inv['m:iron'] === 3, 'his old pickaxe is worn and iron bars kept');
-ok(st.board.filter(Boolean).length === 7 && st.board.some((x) => x && x.t === 10), 'his blocks are on the new board');
-ok(st.villageOpen === 1 && st.village.hut === 2 && st.village.shaft === 3, 'the village and its buildings carried over');
+ok(st.v === 2 && st.level === 9 && st.gold >= 98765, 'coins and level kept');
+ok(st.bricks === 50 + 40 + 100, 'bricks kept, plus the old Lookout Tower’s bricks back');
+ok(st.gems === 9 + 2 + 1 + 1, 'old ruby bars and Boom Blocks (chest + board) became emeralds');
+ok(st.equip.pick === 'iron_pick' && st.equip.sword === 'iron_sword' && st.inv['m:iron'] === 3, 'his old pickaxe is worn, with a matching sword, and iron bars kept');
+ok(st.inv.b2 === 2 && st.inv.b6 === 1, 'two Logs to try the Workbench; the block in the old furnace came back');
+ok(st.board.filter((x) => x && x.t).length === 7 && st.board.some((x) => x && x.t === 10) && st.board.some((x) => x && x.chest === 'gold'), 'his blocks and his treasure chest are on the new board');
+ok((await E(`__mine.game.emptyCells().length`)) >= 2, 'at least two free squares for new chests');
+ok(st.boosts.gold > 100 && st.boosts.gold <= 120, 'a Gold Rush that was still running carries over');
+ok(st.villageOpen === 1 && st.village.hut === 2 && st.village.shaft === 3 && st.village.forge === 5, 'the village carried over (levels capped at the new maximum)');
+ok((await E(`__mine.game.monsterLevel()`)) < st.level, 'monsters are sized for the new pace');
+ok(!!(await E(`localStorage.getItem('ezramine.save.v1.v1bak')`)), 'the original old save is kept as a backup');
 ok((await tut()) === 'upgrade' && (await E(`__mine.tutText()`)).includes('upgrade'), 'Pip welcomes him back and shows what’s new');
 await p.shot(SHOTS + '/13-migrated.png');
+await E(`__mine.openPanel('village')`); await p.sleep(300);
+ok(await noError(), 'the Village opens fine with carried-over buildings');
+await E(`__mine.closePanel()`); await p.sleep(400);
+await tapSel('#guide-ok', 400);
+ci = await E(`__mine.game.s.board.findIndex(c => c && c.chest)`);
+c = await cell(ci); await p.tap(c.x, c.y); await p.sleep(700); await dismiss(); await p.sleep(400);
+ok((await tut()) === 'planks', 'the carried-over tour moves on to the Workbench (not stuck on Logs)');
 await E(`__mine.skipTut()`);
 ok(await noError(), 'no errors after the carry-over');
 
@@ -330,7 +355,16 @@ await p.sleep(3300);
 await p.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 await p.sleep(500);
 ok(await E(`document.querySelector('.gate input.sum') !== null`), 'holding 3s asks a sum written in words');
-const ans = await E(`(() => { const t = document.querySelector('#panel-body .section').textContent; const w = {four:4,five:5,six:6,seven:7,eight:8,nine:9}; const m = t.match(/(\\w+) plus (\\w+)/); return w[m[1]] + w[m[2]]; })()`);
+const sumAnswer = () => E(`(() => { const t = document.querySelector('#panel-body .section').textContent; const W = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,twenty:20,thirty:30,forty:40,fifty:50}; const n = (x) => x.split('-').reduce((a, w) => a + W[w], 0); const m = t.match(/What is ([a-z-]+) plus ([a-z-]+)/); return n(m[1]) + n(m[2]); })()`);
+ok((await E(`document.querySelector('#panel-body .section').textContent`)).match(/(twenty|thirty|forty)/) !== null, 'the sum uses two-digit numbers');
+await E(`document.querySelector('.gate input.sum').value = '1'`);
+await tapSel('.gate .buy', 300);
+ok(await E(`document.querySelector('.gate input.sum') === null && document.querySelector('.gate button') !== null`), 'a wrong answer goes back to the 3-second hold');
+await p.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: hold.x, y: hold.y, id: 1 }] });
+await p.sleep(3300);
+await p.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+await p.sleep(500);
+const ans = await sumAnswer();
 await E(`document.querySelector('.gate input.sum').value = '${ans}'`);
 await tapSel('.gate .buy', 300);
 ok(await E(`document.querySelector('#panel-body .toggle') !== null`), 'right answer opens the grown-ups settings');
@@ -377,6 +411,15 @@ ok((await J(`__mine.game.s.energy`)) >= 60, 'energy refilled after the pretend p
 await p.sleep(1300);
 await E(`__mine.openCheckout('energy')`); await p.sleep(300);
 ok(await E(`document.getElementById('checkout').classList.contains('hidden')`), 'no refill checkout when energy is already full');
+await E(`(() => { __mine.dismiss(); __mine.game.s.energy = __mine.game.energyMax() - 1; })()`);
+await E(`__mine.openCheckout('energy')`); await p.sleep(450);
+const nBuys = await J(`__mine.game.s.purchases.length`);
+await typeCard('0000000000000002');
+await E(`__mine.game.s.energy = __mine.game.energyMax()`);
+await tapSel('#co-buy', 300);
+ok((await E(`document.getElementById('co-msg').textContent`)).includes('already full') && (await J(`__mine.game.s.purchases.length`)) === nBuys, 'energy that filled up while typing: no charge, a friendly note (not "declined")');
+await p.sleep(1900);
+ok(await E(`document.getElementById('checkout').classList.contains('hidden')`), '...and the checkout closes by itself');
 await E(`(() => { __mine.dismiss(); __mine.game.s.energy = 0; })()`); await p.sleep(1700);
 await p.tap(mine.x, mine.y); await p.sleep(500);
 await key(' ', 'Space', 32); await p.sleep(300);

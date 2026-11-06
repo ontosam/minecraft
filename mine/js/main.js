@@ -47,7 +47,10 @@ function loadSave() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const obj = JSON.parse(raw);
+    // The first version's save gets converted: keep the original, just in case.
+    if (obj && !(obj.v >= 2) && !localStorage.getItem(SAVE_KEY + '.v1bak')) localStorage.setItem(SAVE_KEY + '.v1bak', raw);
+    return obj;
   } catch (e) {
     try { localStorage.setItem(SAVE_KEY + '.broken', localStorage.getItem(SAVE_KEY) || ''); } catch (e2) { /* ignore */ }
     return null;
@@ -186,7 +189,7 @@ function gearURL(id, size = 96) {
   if (g.slot === 'pick') return pickURL(g.mat, size);
   if (g.slot === 'bow') return itemURL('bow', size);
   if (g.slot === 'orb') return itemURL('orb', size);
-  return armorURL(g.slot === 'chest' ? 'chestplate' : g.slot, g.mat, size);
+  return armorURL(g.slot === 'chest' ? 'chestplate' : g.slot === 'legs' ? 'leggings' : g.slot, g.mat, size);
 }
 function invURL(k, size = 96) {
   if (k[0] === 'b') return tierURL(Number(k.slice(1)), size);
@@ -985,7 +988,7 @@ function outOfEnergy() {
   buttons.push({ text: 'Wait' });
   celebrate({
     title: 'OUT OF ENERGY!', img: iconURL('bolt', 160), name: 'Your pickaxe is tired!',
-    text: `You get +1 energy every ${game.energyRegenSecs()} seconds — or fill it up now!`,
+    text: `You get +1 energy every ${Math.round(game.energyRegenSecs())} seconds — or fill it up now!`,
     buttons, say: 'Out of energy!', noKeys: true, escCloses: true,
   });
 }
@@ -1063,6 +1066,7 @@ function coKey(k) {
   if (co.digits.length === 4 && !co.digits.startsWith('0000')) { co.digits = ''; renderDigits(); coDecline('That’s not your game card — it starts with 0000.'); return; }
   if (co.digits.length) coMsg(co.digits.length < CARD_DIGITS ? `${CARD_DIGITS - co.digits.length} more numbers` : 'Now tap Buy!');
   renderDigits();
+  if (co.digits.length === CARD_DIGITS) $('co-buy').scrollIntoView({ block: 'nearest' });
 }
 function coDecline(text) {
   sound.play('deny');
@@ -1070,12 +1074,20 @@ function coDecline(text) {
   speak(text);
   const c = document.querySelector('.co-card'); c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake');
 }
+// Energy filled itself up while he was typing: nothing to buy, no charge.
+function refillNotNeeded() {
+  co.digits = ''; renderDigits();
+  const msg = 'Your energy is already full! ⚡ No need to buy.';
+  coMsg(msg); speak(msg);
+  setTimeout(() => { if (co && co.state === 'enter') closeCheckout(); }, 1600);
+}
 function coBuy() {
   if (!co || co.state !== 'enter') return;
   const it = storeItem(co.id);
   if (co.digits.length < CARD_DIGITS) { coDecline(`Type all ${CARD_DIGITS} numbers on your card`); return; }
   if (!validateCard(co.digits)) { co.digits = ''; renderDigits(); coDecline('Card declined. Check the number and try again.'); return; }
   if (game.declineReason(it.price) === 'limit') { co.digits = ''; renderDigits(); coDecline('Card declined — not enough money left on this card.'); return; }
+  if (it.refill && !game.refillUseful()) { refillNotNeeded(); return; }
   const last4 = co.digits.slice(-4);
   co.digits = ''; // the number is never kept
   renderDigits();
@@ -1084,6 +1096,7 @@ function coBuy() {
   sound.play('process');
   setTimeout(() => {
     if (!co) return;
+    if (it.refill && !game.refillUseful()) { co.state = 'enter'; $('checkout').classList.remove('busy'); refillNotNeeded(); return; }
     const ok = game.grant(co.id, last4, Date.now());
     if (!ok) { co.state = 'enter'; $('checkout').classList.remove('busy'); coDecline('Card declined. Try again.'); return; }
     co.state = 'done';
@@ -1115,6 +1128,7 @@ function initCheckout() {
 // ------------------------------------------------------------------ panels
 let panelOpen = null, panelKey = '', panelTab = null;
 let uiOpenedAt = 0; // taps right after a panel/card opens are ignored (no double-tap accidents)
+let uiClosedAt = 0; // ...and taps right after one closes don't land on what was underneath
 const PANELS = {};
 
 function openPanel(id, tab) {
@@ -1139,6 +1153,7 @@ function closePanel() {
   if (PANELS[panelOpen].onClose) PANELS[panelOpen].onClose();
   panelOpen = null;
   $('panel').classList.add('hidden');
+  uiClosedAt = performance.now();
   updateStations();
 }
 function refreshPanel(force) {
@@ -1478,7 +1493,11 @@ PANELS.furnace = {
 // --- Shop: blocks + boosters (coins) ---------------------------------------
 PANELS.shop = {
   title: () => 'Shop', icon: () => iconURL('cart', 96),
-  key() { const s = game.s; return [panelTab, s.maxTier, game.emptyCells().length > 0, Math.floor(Math.log10(s.gold + 1) * 4), s.boosts.damage > 0, s.boosts.gold > 0, s.boosts.block > 0].join('|'); },
+  key() {
+    const s = game.s;
+    const can = game.shopTiers().filter((t) => s.gold >= game.shopPrice(t)).length;
+    return [panelTab, s.maxTier, game.emptyCells().length > 0, can, s.gold >= game.boosterPrice(), s.boosts.damage > 0, s.boosts.gold > 0, s.boosts.block > 0].join('|');
+  },
   render(body) {
     const s = game.s, tab = panelTab || 'boost';
     const tabs = $('panel-tabs');
@@ -1501,9 +1520,14 @@ PANELS.shop = {
       return;
     }
     if (!game.emptyCells().length) body.appendChild(el('div', 'note', 'Your board is full — merge some blocks first!'));
-    for (const t of game.shopTiers().slice().reverse().slice(0, 8)) {
+    // the 8 biggest you can buy, plus Logs (for crafting) and Coal (furnace fuel)
+    const all = game.shopTiers(), list = all.slice().reverse().slice(0, 8);
+    for (const t of [4, 2]) if (all.includes(t) && !list.includes(t)) list.push(t);
+    for (const t of list) {
       const price = game.shopPrice(t);
-      body.appendChild(row(tierURL(t, 96), TIERS[t].name, TIERS[t].gps ? `Makes ${fmt(TIERS[t].gps)} gold/s` : 'A crafting block', buyButton(fmt(price), COIN(), s.gold >= price && game.emptyCells().length > 0, () => game.buyBlock(t))));
+      const r = row(tierURL(t, 96), TIERS[t].name, TIERS[t].gps ? `Makes ${fmt(TIERS[t].gps)} gold/s` : t === 2 ? 'For crafting planks and sticks' : 'A building block', buyButton(fmt(price), COIN(), s.gold >= price && game.emptyCells().length > 0, () => game.buyBlock(t)));
+      r.dataset.tier = t;
+      body.appendChild(r);
     }
   },
 };
@@ -1536,7 +1560,7 @@ PANELS.village = {
     body.appendChild(el('div', 'note', 'Every merge gives you a brick 🧱. Build houses that help you mine!'));
     for (const b of BUILDINGS) {
       const lv = game.villageLv(b.id);
-      const sub = el('div'); sub.appendChild(el('small', '', b.desc)); sub.appendChild(el('div', 'stars', '★'.repeat(lv) + '☆'.repeat(b.max - lv)));
+      const sub = el('div'); sub.appendChild(el('small', '', b.desc)); sub.appendChild(el('div', 'stars', '★'.repeat(Math.min(lv, b.max)) + '☆'.repeat(Math.max(0, b.max - lv))));
       const gate = game.buildingGate(b);
       let btn;
       if (gate === 'max') btn = buyButton('Done!', null, false, () => {}, 'max');
@@ -1648,8 +1672,15 @@ PANELS.chest = {
 
 // --- Grown-ups corner (behind a press-and-hold gate)
 let gateOpen = false;
-const SUMS = [['seven plus five', 12], ['nine plus six', 15], ['eight plus seven', 15], ['six plus eight', 14], ['nine plus four', 13]];
-let gateStep = 0, gateSum = SUMS[0];
+// Two-digit sums written in words (too hard to guess for a six-year-old).
+const ONES = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty'];
+const numWords = (n) => TENS[Math.floor(n / 10)] + (n % 10 ? '-' + ONES[n % 10] : '');
+function newSum() {
+  const a = 21 + Math.floor(Math.random() * 29), b = 21 + Math.floor(Math.random() * 29);
+  return [`${numWords(a)} plus ${numWords(b)}`, a + b];
+}
+let gateStep = 0, gateSum = newSum(), gateMisses = 0, gateLockUntil = 0;
 PANELS.parent = {
   title: () => 'Grown-ups', icon: () => iconURL('gear', 96),
   key() { return gateOpen + ':' + gateStep + JSON.stringify(settings()); },
@@ -1657,6 +1688,13 @@ PANELS.parent = {
   render(body) {
     if (!gateOpen && gateStep === 0) {
       const g = el('div', 'gate');
+      const wait = Math.ceil((gateLockUntil - performance.now()) / 1000);
+      if (wait > 0) {
+        g.appendChild(el('div', 'note', `Not quite! Try again in ${wait} seconds.`));
+        body.appendChild(g);
+        setTimeout(() => { if (panelOpen === 'parent') refreshPanel(true); }, 1000);
+        return;
+      }
       g.appendChild(el('div', 'note', 'For grown-ups: press and hold the circle with one finger for 3 seconds.'));
       const b = el('button', '', 'Hold');
       let t0 = 0, raf = 0, pid = null, fingers = 0;
@@ -1672,6 +1710,7 @@ PANELS.parent = {
         fingers++;
         if (pid !== null || fingers > 1) { reset(); return; } // two fingers = not a grown-up hold
         pid = e.pointerId; t0 = performance.now(); tick();
+        try { b.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
       });
       const up = (e) => {
         fingers = Math.max(0, fingers - 1);
@@ -1679,12 +1718,12 @@ PANELS.parent = {
         const held = performance.now() - t0;
         reset();
         if (held >= 3000) { // open on release, so the lifting finger can't press anything
-          gateStep = 1; gateSum = SUMS[Math.floor(Math.random() * SUMS.length)];
+          gateStep = 1; gateSum = newSum();
           uiOpenedAt = performance.now(); refreshPanel(true);
         } else b.textContent = 'Hold';
       };
       b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
-      b.addEventListener('pointerleave', (e) => { if (e.pointerId === pid) reset(); });
+      b.addEventListener('pointerleave', (e) => { if (e.pointerId === pid) { fingers = Math.max(0, fingers - 1); reset(); b.textContent = 'Hold'; } });
       g.appendChild(b);
       body.appendChild(g);
       return;
@@ -1696,8 +1735,13 @@ PANELS.parent = {
       const go = el('button', 'buy', 'OK');
       go.style.cssText = 'width:auto;height:58px;border-radius:16px;font-size:20px;background:linear-gradient(#8ef06a,#4fbf4a)';
       const check = () => {
-        if (Number(inp.value.trim()) === gateSum[1]) { gateOpen = true; sound.play('done'); refreshPanel(true); }
-        else { sound.play('deny'); inp.value = ''; }
+        if (Number(inp.value.trim()) === gateSum[1]) { gateOpen = true; gateMisses = 0; sound.play('done'); refreshPanel(true); }
+        else { // wrong: back to the hold, and a little wait after two misses
+          sound.play('deny');
+          gateMisses++;
+          if (gateMisses >= 2) { gateMisses = 0; gateLockUntil = performance.now() + 30000; }
+          gateStep = 0; refreshPanel(true);
+        }
       };
       go.addEventListener('click', check);
       inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') check(); });
@@ -1765,7 +1809,11 @@ PANELS.parent = {
       const rs = el('button', 'buy', 'Restore');
       rs.addEventListener('click', () => {
         if (!window.confirm('Go back to the game from before “Start over”?')) return;
-        try { localStorage.setItem(SAVE_KEY, bak); localStorage.removeItem(SAVE_KEY + '.bak'); } catch (e) { /* ignore */ }
+        try {
+          const o = JSON.parse(bak); // keep the grown-ups' settings, history and card total
+          o.settings = game.s.settings; o.purchases = game.s.purchases; o.cardSpent = game.s.cardSpent;
+          localStorage.setItem(SAVE_KEY, JSON.stringify(o)); localStorage.removeItem(SAVE_KEY + '.bak');
+        } catch (e) { /* ignore */ }
         skipSave = true; location.reload();
       });
       body.appendChild(row(null, 'Undo “Start over”', 'Brings back the earlier game', rs));
@@ -1817,10 +1865,23 @@ function chestOrMine(chestText = 'Open the chest!', mineText = 'Dig another bloc
   if (panelOpen) return closeFirst();
   const ci = chestCell();
   if (ci >= 0) return { text: chestText, at: cellEls[ci] };
+  if (!game.emptyCells().length) return makeRoom();
   return { text: mineText, at: $('mine') };
+}
+// A full board: new blocks would skip the board, so make a free square first.
+function makeRoom() {
+  const p = pairOnBoard();
+  if (p) return { text: 'Your board is full! Merge two the same to make room.', at: cellEls[p[0]], to: cellEls[p[1]] };
+  const i = game.s.board.findIndex((c, k) => c && !c.chest && game.isOpen(k));
+  return { text: 'Your board is full! Drag a block onto your Chest.', at: cellEls[i], to: stationEls.chest };
 }
 // Everything a Wooden Sword needs starts with a Log in the Chest.
 function getLog() {
+  if (panelOpen === 'shop' && game.dropTier() > 2) {
+    if (panelTab !== 'blocks') { panelTab = 'blocks'; refreshPanel(true); }
+    const b = q('#panel-body .row[data-tier="2"] .buy');
+    if (b) return { text: 'Tap to buy a Log!', at: b };
+  }
   if (panelOpen) return closeFirst();
   const s = game.s;
   const li = s.board.findIndex((c, i) => c && !c.chest && c.t === 2 && game.isOpen(i));
@@ -1828,6 +1889,8 @@ function getLog() {
   const dirt = [];
   s.board.forEach((c, i) => { if (c && !c.chest && c.t === 1 && game.isOpen(i)) dirt.push(i); });
   if (dirt.length >= 2) return { text: 'Merge two Dirt to make a Log!', at: cellEls[dirt[0]], to: cellEls[dirt[1]] };
+  // A deep mine doesn't drop Dirt any more: Logs come from the Shop.
+  if (game.dropTier() > 2 && !dirt.length && stationOpen('shop')) return { text: 'Buy a Log in the Shop!', at: stationEls.shop };
   return chestOrMine('Open the chest!', 'Dig more Dirt to make a Log!');
 }
 // What can he make right now on the way to `id`? (null = he needs a Log first)
@@ -1895,9 +1958,9 @@ const TUT_STEPS = [
       return p ? { text: 'Two the same! Drag one onto the other!', at: cellEls[p[0]], to: cellEls[p[1]] } : chestOrMine();
     },
   },
-  { id: 'log', done: (s) => count('b2') > 0 || (s.stats.craftBy.planks || 0) > 0 || !!s.equip.sword, go: getLog },
-  { id: 'planks', done: (s) => (s.stats.craftBy.planks || 0) > 0 || !!s.equip.sword, go: () => recipeGo('planks') },
-  { id: 'stick', done: (s) => (s.stats.craftBy.stick || 0) > 0 || !!s.equip.sword, go: () => recipeGo('stick') },
+  { id: 'log', done: (s) => count('b2') > 0 || (s.stats.craftBy.planks || 0) > 0, go: getLog },
+  { id: 'planks', done: (s) => (s.stats.craftBy.planks || 0) > 0, go: () => recipeGo('planks') },
+  { id: 'stick', done: (s) => (s.stats.craftBy.stick || 0) > 0, go: () => recipeGo('stick') },
   { id: 'sword', done: (s) => (s.stats.craftBy.wood_sword || 0) > 0 || !!s.equip.sword, go: () => recipeGo('wood_sword') },
   { id: 'wear', done: (s) => !!s.equip.sword, go: () => gearGo('sword', 'Put your sword on! Open your Hero.', 'Tap the sword to hold it!') },
   {
@@ -2103,6 +2166,10 @@ function init() {
   applyCave(false);
   updateHud(1);
 
+  // A second tap on ✕ must not press the button that was under it.
+  document.addEventListener('click', (e) => {
+    if (performance.now() - uiClosedAt < 350 && !e.target.closest('#panel, #celebrate, #checkout')) { e.stopImmediatePropagation(); e.preventDefault(); }
+  }, true);
   // Swallow taps that land within 0.4s of a panel/card opening (double taps).
   for (const id of ['panel', 'celebrate', 'checkout']) {
     $(id).addEventListener('click', (e) => {

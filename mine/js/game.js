@@ -77,8 +77,16 @@ export function migrateV1(old) {
   for (const k of ['gold', 'bricks', 'gems', 'level', 'iap', 'purchases', 'cardSpent', 'settings', 'lastSeen', 'won', 'seenSt']) if (old[k] !== undefined) s[k] = old[k];
   s.gold = Number(s.gold) || 0; s.level = Math.max(1, Number(s.level) || 1);
   const blocks = [];
-  for (const c of old.board || []) if (c && c.t) blocks.push(V1_TIER[c.t] || 1);
+  let oldChests = 0;
+  for (const c of old.board || []) {
+    if (!c) continue;
+    if (c.t) blocks.push(V1_TIER[c.t] || 1);
+    else if (c.boom) s.gems += 1;          // a Boom Block on the board → an emerald
+    else if (c.chest) oldChests++;          // a treasure chest → a golden chest
+  }
   const add = (k, n) => { s.inv[k] = (s.inv[k] || 0) + n; };
+  // blocks that were melting in the old furnace go back into the chest
+  for (const f of old.furnace || []) { const m = f && /^b(\d+)$/.exec(f.k || ''); if (m) add('b' + (V1_TIER[Number(m[1])] || 1), 1); }
   for (const k in old.store || {}) {
     const n = old.store[k] || 0;
     if (/^b\d+$/.test(k)) add('b' + (V1_TIER[Number(k.slice(1))] || 1), n);
@@ -87,20 +95,35 @@ export function migrateV1(old) {
     else if (k === 'i:ruby' || k === 'i:copper') s.gems += n;
   }
   s.gems += old.booms || 0;
+  // Keep the biggest blocks on the board, but always leave 2 squares free so
+  // new chests have somewhere to land; the rest wait in the storage chest.
   const open = UNLOCK_ORDER.slice(0, openCells(s.level));
-  blocks.sort((a, b) => b - a).forEach((t, k) => { if (k < open.length) s.board[open[k]] = { t }; else add('b' + t, 1); });
+  const room = Math.max(0, open.length - 2 - Math.min(oldChests, 1));
+  blocks.sort((a, b) => b - a).forEach((t, k) => { if (k < room) s.board[open[k]] = { t }; else add('b' + t, 1); });
+  if (oldChests) s.board[open[room]] = { chest: 'gold' };
+  s.gold += Math.max(0, oldChests - 1) * 1500 * s.level;
   for (const t in old.seen || {}) s.seen[V1_TIER[t] || 1] = 1;
   s.maxTier = V1_TIER[old.maxTier] || 1;
   for (let t = 1; t <= s.maxTier; t++) s.seen[t] = 1;
   const pick = old.pick || 0; // old pickaxe level -> a real pickaxe, already worn
   const pm = pick >= 5 ? 'diamond' : pick >= 4 ? 'gold' : pick >= 3 ? 'iron' : pick >= 1 ? 'stone' : null;
-  if (pm) s.equip.pick = pm + '_pick';
+  // ...and a sword to match, so the monsters at his level aren't a slog
+  if (pm) { s.equip.pick = pm + '_pick'; s.equip.sword = pm + '_sword'; s.stats.equipBy = { pick: 1, sword: 1 }; }
+  // Two Logs to try the new Workbench with (his mine is too deep to drop Dirt now).
+  add('b2', 2);
   s.stats.merges = (old.stats && old.stats.merges) || 0;
   s.stats.mined = (old.stats && old.stats.mined) || 0;
   s.stats.taps = (old.stats && old.stats.taps) || 0;
   s.villageOpen = s.stats.merges >= VILLAGE_MERGES ? 1 : 0;
-  for (const id in old.village || {}) if (BUILDINGS.some((b) => b.id === id)) s.village[id] = old.village[id];
+  for (const id in old.village || {}) {
+    const b = BUILDINGS.find((x) => x.id === id), lv = Math.max(0, Math.floor(Number(old.village[id]) || 0));
+    if (b) s.village[id] = Math.min(lv, b.max);
+    else if (id === 'tower') for (let k = 0; k < lv; k++) s.bricks += Math.round(40 * Math.pow(2.5, k)); // bricks back
+  }
   if (old.up && old.up.depth) s.village.shaft = Math.min(old.up.depth, 6);
+  s.boosts.gold = Math.max(0, Number(old.boostLeft) || 0); // a Gold Rush still running
+  // Old levels came about twice as fast; monsters are sized for the new pace.
+  s.monOff = Math.floor((s.level - 1) / 2);
   s.energy = typeof old.energy === 'number' ? old.energy : ENERGY.max;
   s.mineHp = PICK_TAPS[pm || 'none'];
   s.migrated = 1;
@@ -142,6 +165,7 @@ export class Game {
 
   // ---------------------------------------------------------------- derived
   villageLv(id) { return this.s.village[id] || 0; }
+  monsterLevel() { return Math.max(1, this.s.level - (this.s.monOff || 0)); }
   gearMat(slot) { const id = this.s.equip[slot]; return id && GEAR[id] ? GEAR[id].mat : null; }
   tapsPerBlock() { return PICK_TAPS[this.gearMat('pick') || 'none']; }
   attack() {
@@ -201,7 +225,10 @@ export class Game {
   // ------------------------------------------------------------- energy
   energyOn() { return !(this.s.settings && this.s.settings.energy === false) && !this.s.iap.unlimited; }
   energyMax() { return (this.s.iap.pass ? ENERGY.passMax : ENERGY.max) + ENERGY.perArmor * this.armor(); }
-  energyRegenSecs() { return Math.max(6, (this.s.iap.pass ? ENERGY.passRegenSecs : ENERGY.regenSecs) - 2 * this.villageLv('bakery')); }
+  energyRegenSecs() {
+    const base = this.s.iap.pass ? ENERGY.passRegenSecs : ENERGY.regenSecs;
+    return Math.max(3, Math.round(base * Math.pow(0.8, this.villageLv('bakery')) * 10) / 10); // every Bakery level helps
+  }
   secsToNextEnergy() { return Math.max(0, this.energyRegenSecs() - this.s.energyT); }
   refillUseful() { return this.energyOn() && this.s.energy < this.energyMax(); }
   refillEnergy() { this.s.energy = Math.max(this.s.energy, this.energyMax()); this.s.energyT = 0; this.emit('energy', { full: true }); }
@@ -278,7 +305,7 @@ export class Game {
       const open = Object.keys(MONSTERS).filter((k) => MONSTERS[k].unlock <= s.level);
       id = s.stats.kills === 0 ? 'grumble' : open[Math.floor(this.rand() * open.length)];
     }
-    const hp = monsterHp(id, s.level);
+    const hp = monsterHp(id, this.monsterLevel());
     s.monster = { id, hp, max: hp };
     s.monsterIn = MONSTER_EVERY[0] + Math.floor(this.rand() * (MONSTER_EVERY[1] - MONSTER_EVERY[0] + 1));
     this.emit('monster', { id, hp });
@@ -301,7 +328,7 @@ export class Game {
     const first = s.stats.kills === 0;
     s.stats.kills++;
     s.stats.killBy[m.id] = (s.stats.killBy[m.id] || 0) + 1;
-    const coins = Math.round(monsterCoins(m.id, s.level) * (s.equip.orb ? ORB_GOLD : 1));
+    const coins = Math.round(monsterCoins(m.id, this.monsterLevel()) * (s.equip.orb ? ORB_GOLD : 1));
     s.gold += coins;
     const loot = [];
     const give = (k, n = 1) => { this.addInv(k, n); loot.push({ k, n }); };
@@ -479,7 +506,6 @@ export class Game {
     s.equip[g.slot] = gearId;
     s.stats.equipBy[g.slot] = (s.stats.equipBy[g.slot] || 0) + 1;
     if (g.slot === 'pick') s.mineHp = Math.min(s.mineHp, this.tapsPerBlock());
-    if (s.energy > this.energyMax()) s.energy = this.energyMax();
     this.emit('equip', { slot: g.slot, id: gearId });
     return true;
   }
@@ -489,7 +515,6 @@ export class Game {
     s.equip[slot] = null;
     this.addInv('g:' + id);
     if (slot === 'pick') s.mineHp = Math.min(s.mineHp, this.tapsPerBlock()) || this.tapsPerBlock();
-    if (s.energy > this.energyMax()) s.energy = this.energyMax();
     this.emit('equip', { slot, id: null });
     return true;
   }
@@ -601,7 +626,7 @@ export class Game {
     if (m === 'armorWorn') return this.armorWorn();
     if (m.startsWith('craft:')) return s.stats.craftBy[m.slice(6)] || 0;
     if (m.startsWith('kill:')) return s.stats.killBy[m.slice(5)] || 0;
-    if (m.startsWith('equip:')) return s.stats.equipBy[m.slice(6)] || 0;
+    if (m.startsWith('equip:')) { const k = m.slice(6); return Math.max(s.stats.equipBy[k] || 0, s.equip[k] ? 1 : 0); }
     return s.stats[m] || 0;
   }
   questList(tab) {
