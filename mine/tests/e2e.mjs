@@ -172,7 +172,7 @@ await E(`[...document.querySelectorAll('#panel-body .buy')].find(b => b.textCont
 await tapSel('#panel-body .craft-btn', 400);
 ok((await J(`__mine.game.s.inv['g:wood_pick']`)) === 1, '"Fill it for me" + CRAFT makes a Wooden Pickaxe');
 await E(`(() => { const s = __mine.game.s; s.grid = Array(9).fill(null); s.grid[4] = 'm:planks'; s.grid[0] = 'm:stick'; })()`);
-await E(`__mine.closePanel()`); await p.sleep(200);
+await E(`__mine.closePanel()`); await p.sleep(550);
 st = await S();
 ok(st.grid.every((x) => !x) && st.inv['m:stick'] >= 1, 'closing the Workbench puts leftovers back in the chest');
 
@@ -223,7 +223,7 @@ await E(`document.querySelector('#panel-body .row .buy').click()`); await p.slee
 st = await S();
 ok(st.village.shaft === 1 && st.bricks === 100 + 2 - 30, 'bricks build the Mine Shaft');
 ok((await E(`__mine.game.dropTier()`)) === drop0 + 1 || (await E(`__mine.game.dropTier()`)) === drop0, 'the shaft makes blocks come out bigger (capped by your best block)');
-await E(`__mine.closePanel()`);
+await E(`__mine.closePanel()`); await p.sleep(550);
 
 console.log('8. Quests: goal card, three tabs');
 await E(`(() => { const s = __mine.game.s; s.claimed = { t: {}, a: {}, h: {} }; })()`); await p.sleep(400);
@@ -239,7 +239,7 @@ await p.shot(SHOTS + '/10-hunt.png');
 await E(`[...document.querySelectorAll('#panel-tabs .tab')][1].click()`); await p.sleep(300);
 const readyBtn = await J(`(() => { const b = [...document.querySelectorAll('#panel-body .buy')].find(b => b.textContent.includes('Collect')); if (!b) return null; const r = b.getBoundingClientRect(); return {x: r.left + r.width/2, y: r.top + r.height/2}; })()`);
 if (readyBtn) { const gg = (await S()).gold; await p.tap(readyBtn.x, readyBtn.y); await p.sleep(400); ok((await S()).gold > gg || (await S()).gems >= 0, 'collecting an achievement pays out'); }
-await E(`__mine.closePanel()`);
+await E(`__mine.closePanel()`); await p.sleep(550);
 
 console.log('9. Boosters (coins, never ads)');
 await E(`(() => { const s = __mine.game.s; s.level = 6; s.gold = 1e7; s.boosts = { damage: 0, gold: 0, block: 0 }; __mine.layout(); })()`); await p.sleep(400);
@@ -250,7 +250,7 @@ const price = await E(`__mine.game.boosterPrice('damage')`);
 await E(`document.querySelector('#panel-body .row:nth-child(2) .buy').click()`); await p.sleep(300);
 st = await S();
 ok(st.boosts.damage > 0 && st.gold === 1e7 - price, `Damage x2 bought with ${price} coins`);
-await E(`__mine.closePanel()`);
+await E(`__mine.closePanel()`); await p.sleep(550);
 await E(`(() => { const g = __mine.game; g.spawnMonster('gloop'); })()`); await p.sleep(400);
 await dismiss();
 const hp0 = await J(`__mine.game.s.monster.hp`);
@@ -265,7 +265,7 @@ await E(`(() => { const s = __mine.game.s; s.gold = 0; })()`); await p.sleep(500
 ok(await E(`!!document.querySelector('#panel-body .row[data-tier="2"] .buy.off')`), 'with no gold the Log button is grey');
 await E(`(() => { __mine.game.s.gold = 600; })()`); await p.sleep(700);
 ok(await E(`!document.querySelector('#panel-body .row[data-tier="2"] .buy.off')`), '...and lights up as soon as he can afford it');
-await E(`__mine.closePanel()`);
+await E(`__mine.closePanel()`); await p.sleep(550);
 st = await J(`(() => { const g = __mine.game, s = g.s; s.equip.helmet = 'diamond_helmet'; s.equip.chest = 'diamond_chest'; s.energy = g.energyMax(); const e0 = s.energy; g.unequip('chest'); g.equip('diamond_chest'); const r = [e0, s.energy]; s.village.bakery = 0; const secs = []; for (let lv = 0; lv <= 6; lv++) { s.village.bakery = lv; secs.push(g.energyRegenSecs()); } s.village.bakery = 0; s.equip.helmet = null; s.equip.chest = null; return { r, secs }; })()`);
 ok(st.r[0] === st.r[1], 'taking armor off and on again does not lose energy');
 ok(st.secs.every((x, k) => k === 0 || x < st.secs[k - 1]), 'every Bakery level makes energy come back faster (' + st.secs.join(', ') + ' s)');
@@ -369,7 +369,7 @@ await E(`document.querySelector('.gate input.sum').value = '${ans}'`);
 await tapSel('.gate .buy', 300);
 ok(await E(`document.querySelector('#panel-body .toggle') !== null`), 'right answer opens the grown-ups settings');
 await p.shot(SHOTS + '/14-parent.png');
-await E(`__mine.closePanel()`);
+await E(`__mine.closePanel()`); await p.sleep(550);
 // two wrong answers: the gate rests, even across a reload
 for (let k = 0; k < 2; k++) {
   await E(`__mine.openPanel('parent')`); await p.sleep(300);
@@ -380,7 +380,7 @@ for (let k = 0; k < 2; k++) {
   await p.sleep(400);
   await E(`document.querySelector('.gate input.sum').value = '1'`);
   await tapSel('.gate .buy', 300);
-  await E(`__mine.closePanel()`); await p.sleep(200);
+  await E(`__mine.closePanel()`); await p.sleep(550);
 }
 await E(`__mine.openPanel('parent')`); await p.sleep(300);
 ok((await E(`document.getElementById('panel-body').textContent`)).includes('Try again in'), 'two wrong answers: the gate rests for a while');
@@ -418,7 +418,7 @@ await typeCard('0000111122223333');
 await tapSel('#co-buy', 300);
 ok((await E(`document.getElementById('co-msg').textContent`)).includes('not enough money'), 'the grown-ups card limit declines politely');
 await E(`(() => { document.getElementById('co-close').click(); __mine.game.s.settings.cardLimit = 0; })()`);
-await E(`__mine.closePanel()`); await p.sleep(200);
+await E(`__mine.closePanel()`); await p.sleep(550);
 await E(`(() => { __mine.dismiss(); __mine.game.s.energy = 0; __mine.game.s.mineHp = 3; })()`); await p.sleep(200);
 await p.tap(mine.x, mine.y); await p.sleep(600);
 ok(await E(`document.getElementById('cel-title').textContent === 'OUT OF ENERGY!'`), 'out of energy shows the refill prompt');
@@ -468,7 +468,7 @@ for (const id of ['craft', 'hero', 'furnace', 'shop', 'village', 'quests', 'book
   await E(`__mine.openPanel('${id}')`); await p.sleep(200);
   ok(await E(`document.getElementById('panel-body').children.length > 0`), `${id} panel has content`);
   await p.shot(`${SHOTS}/17-${id}.png`);
-  await E(`__mine.closePanel()`);
+  await E(`__mine.closePanel()`); await p.sleep(550);
 }
 ok(await noError(), 'no error overlay after every panel');
 

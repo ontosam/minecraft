@@ -335,6 +335,10 @@ function initHud() {
   goldShown = game.s.gold;
   for (const id of ['gold', 'gps', 'bricks', 'gems', 'lvl', 'xptext', 'cave-name', 'rush-time']) hud[id] = $(id);
 }
+// Taking armor off can leave a little extra energy: show it as full, not "102/60".
+const energyCapShown = () => Math.max(game.energyMax(), Math.floor(game.s.energy));
+// Energy comes back every N seconds (one decimal once it's quick, so each Bakery level shows).
+const regenText = () => { const r = game.energyRegenSecs(); return r < 4 ? String(r) : String(Math.round(r)); };
 function setText(id, v) { if (hud[id].textContent !== v) hud[id].textContent = v; }
 
 function updateHud(dt) {
@@ -367,7 +371,7 @@ function updateHud(dt) {
   en.classList.toggle('inf', !on);
   en.classList.toggle('out', on && s.energy < 1);
   $('energybar').firstElementChild.style.width = (on ? Math.min(100, (s.energy / game.energyMax()) * 100) : 100) + '%';
-  const emx = Math.max(game.energyMax(), Math.floor(s.energy)); // armor off can leave a little extra
+  const emx = energyCapShown();
   const et = on ? (s.energy >= 1 ? `${Math.floor(s.energy)}/${emx}` : `+1 in ${Math.ceil(game.secsToNextEnergy())}s`) : '∞';
   const num = $('energy-num'); if (num.textContent !== et) num.textContent = et;
   $('mine').classList.toggle('empty', on && s.energy < 1 && !s.monster);
@@ -989,7 +993,7 @@ function outOfEnergy() {
   buttons.push({ text: 'Wait' });
   celebrate({
     title: 'OUT OF ENERGY!', img: iconURL('bolt', 160), name: 'Your pickaxe is tired!',
-    text: `You get +1 energy every ${Math.round(game.energyRegenSecs())} seconds — or fill it up now!`,
+    text: `You get +1 energy every ${regenText()} seconds — or fill it up now!`,
     buttons, say: 'Out of energy!', noKeys: true, escCloses: true,
   });
 }
@@ -1218,7 +1222,7 @@ PANELS.store = {
     }
     if (tab === 'energy') {
       body.appendChild(el('div', 'note', game.energyOn()
-        ? `⚡ Energy: ${Math.floor(s.energy)} / ${game.energyMax()}. Every block you break uses 1. You get +1 every ${Math.round(game.energyRegenSecs())} seconds.`
+        ? `⚡ Energy: ${Math.floor(s.energy)} / ${energyCapShown()}. Every block you break uses 1. You get +1 every ${regenText()} seconds.`
         : '⚡ Your energy never runs out!'));
     }
     const energyOff = s.settings && s.settings.energy === false;
@@ -1687,9 +1691,10 @@ function newSum() {
 // remembered across reloads so closing the app doesn't skip the wait.
 const GATE_KEY = 'ezramine.gate';
 const gateMem = (() => { try { return JSON.parse(localStorage.getItem(GATE_KEY)) || {}; } catch (e) { return {}; } })();
-let gateStep = 0, gateSum = newSum(), gateMisses = gateMem.misses || 0, gateStrikes = gateMem.strikes || 0, gateLockUntil = gateMem.until || 0;
+let gateStep = 0, gateSum = newSum(), gateMisses = gateMem.misses || 0, gateStrikes = gateMem.strikes || 0, gateLockUntil = Math.min(gateMem.until || 0, Date.now() + 300000);
 const gateSave = () => { try { localStorage.setItem(GATE_KEY, JSON.stringify({ misses: gateMisses, strikes: gateStrikes, until: gateLockUntil })); } catch (e) { /* ignore */ } };
-const gateWait = () => Math.max(0, Math.ceil((gateLockUntil - Date.now()) / 1000));
+// (capped at 5 minutes from now, so a clock that jumps backwards can't stretch it)
+const gateWait = () => { gateLockUntil = Math.min(gateLockUntil, Date.now() + 300000); return Math.max(0, Math.ceil((gateLockUntil - Date.now()) / 1000)); };
 PANELS.parent = {
   title: () => 'Grown-ups', icon: () => iconURL('gear', 96),
   key() { return gateOpen + ':' + gateStep + ':' + gateWait() + JSON.stringify(settings()); },
@@ -2176,10 +2181,12 @@ function init() {
   applyCave(false);
   updateHud(1);
 
-  // A second tap on ✕ must not press the button that was under it.
-  document.addEventListener('click', (e) => {
-    if (performance.now() - uiClosedAt < 450 && !e.target.closest('#panel, #celebrate, #checkout')) { e.stopImmediatePropagation(); e.preventDefault(); }
-  }, true);
+  // A second tap on ✕ must not press what was under it (buttons use click; the board and mine use pointer events).
+  for (const ev of ['pointerdown', 'click']) {
+    document.addEventListener(ev, (e) => {
+      if (performance.now() - uiClosedAt < 450 && !e.target.closest('#panel, #celebrate, #checkout')) { e.stopImmediatePropagation(); e.preventDefault(); }
+    }, true);
+  }
   // Swallow taps that land within 0.4s of a panel/card opening (double taps).
   for (const id of ['panel', 'celebrate', 'checkout']) {
     $(id).addEventListener('click', (e) => {
