@@ -86,7 +86,10 @@ export function migrateV1(old) {
   }
   const add = (k, n) => { s.inv[k] = (s.inv[k] || 0) + n; };
   // blocks that were melting in the old furnace go back into the chest
-  for (const f of old.furnace || []) { const m = f && /^b(\d+)$/.exec(f.k || ''); if (m) add('b' + (V1_TIER[Number(m[1])] || 1), 1); }
+  for (const f of old.furnace || []) { // v1 kept { t, left, total }
+    const m = f && /^b(\d+)$/.exec(f.k || ''), t = f && (Number(f.t) || (m && Number(m[1])));
+    if (t) add('b' + (V1_TIER[t] || 1), 1);
+  }
   for (const k in old.store || {}) {
     const n = old.store[k] || 0;
     if (/^b\d+$/.test(k)) add('b' + (V1_TIER[Number(k.slice(1))] || 1), n);
@@ -227,7 +230,7 @@ export class Game {
   energyMax() { return (this.s.iap.pass ? ENERGY.passMax : ENERGY.max) + ENERGY.perArmor * this.armor(); }
   energyRegenSecs() {
     const base = this.s.iap.pass ? ENERGY.passRegenSecs : ENERGY.regenSecs;
-    return Math.max(3, Math.round(base * Math.pow(0.8, this.villageLv('bakery')) * 10) / 10); // every Bakery level helps
+    return Math.max(2, Math.round(base * Math.pow(0.8, this.villageLv('bakery')) * 10) / 10); // every Bakery level helps
   }
   secsToNextEnergy() { return Math.max(0, this.energyRegenSecs() - this.s.energyT); }
   refillUseful() { return this.energyOn() && this.s.energy < this.energyMax(); }

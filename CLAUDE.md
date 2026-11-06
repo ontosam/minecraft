@@ -1824,8 +1824,13 @@ upgrade" tour (chest → Workbench planks/sticks → monster → done).
   itself while typing → "already full, no charge" (not "declined"), grown-ups
   gate = two-digit sums in words + wrong answer → hold again + 30 s pause after 2
   misses + pointer capture, two-column checkout on short landscape screens,
-  Undo Start over keeps the grown-ups' history/card total.
-- **Verified:** `node mine/tests/e2e.mjs` = **178 checks** (the whole tutorial
+  Undo Start over keeps the grown-ups' history/card total. A second verify
+  workflow then caught: v1 furnace entries are `{t,left,total}` (now carried),
+  Pass + Bakery floor (now 2 s), Pip's Shop hint ("You got a Log! Tap ✖"),
+  gate rest persisted (`ezramine.gate`, 30 s → doubling, max 5 min), one-time
+  purchases kept by Start over/Undo, 450 ms close guard, refill timer bound to
+  its own checkout, Processing overlay after a scrolled checkout.
+- **Verified:** `node mine/tests/e2e.mjs` = **181 checks** (the whole tutorial
   with real taps, tap-tap merge, chest store/unstore, workbench drag + shifted
   shapes + fill, furnace + take-out + no-coal, 29-merge village + shaft, quests
   tabs + goal card, boosters, gps 0 early, board-full, treasure chest, level-up

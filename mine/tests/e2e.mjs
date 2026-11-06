@@ -97,7 +97,7 @@ await p.shot(SHOTS + '/04-sword-recipe.png');
 await tapSel('#panel-body .craft-btn', 450);
 st = await S();
 ok(st.inv['g:wood_sword'] === 1 && !st.inv['m:planks'] && !st.inv['m:stick'], '2 Planks + Stick → Wooden Sword');
-await tapSel('#panel-close', 400);
+await tapSel('#panel-close', 550);
 ok((await tut()) === 'wear', 'step 8: put the sword on');
 await tapSel('.station[data-id="hero"]', 500);
 ok(await E(`document.querySelectorAll('#panel-body .slot').length === 8`), 'the Hero has 8 gear slots');
@@ -123,7 +123,7 @@ await dismiss();
 ok((await tut()) === 'pick', 'step 10: wear the pickaxe');
 await tapSel('.station[data-id="hero"]', 500);
 await tapSel('#panel-body .token[data-key="g:stone_pick"]', 400);
-await tapSel('#panel-close', 500);
+await tapSel('#panel-close', 550);
 ok((await J(`__mine.game.tapsPerBlock()`)) === 8, 'stone pickaxe: 8 taps a block');
 ok((await tut()) === 'bye', 'Pip says well done');
 await tapSel('#guide-ok', 300);
@@ -149,7 +149,7 @@ ok((await J(`__mine.game.s.inv.b1`)) === 1 && !(await J(`__mine.game.s.board[${o
 await tapSel('.station[data-id="chest"]', 450);
 await tapSel('#panel-body .item', 350);
 ok(!(await J(`__mine.game.s.inv.b1`)) && (await J(`__mine.game.s.board`)).some((c) => c && c.t === 1), 'tapped back onto the board');
-await tapSel('#panel-close', 300);
+await tapSel('#panel-close', 550);
 
 console.log('5. Workbench: drag onto the table, shapes can move, fill-it-for-me');
 await E(`(() => { const s = __mine.game.s; s.inv = { 'm:planks': 6, b2: 1 }; s.grid = Array(9).fill(null); })()`);
@@ -313,7 +313,7 @@ await dismiss();
 console.log('13. Ezra’s old (v1) save carries over');
 await E(`(() => { __mine.noSave(); localStorage.removeItem('ezramine.save.v1.v1bak'); localStorage.setItem('ezramine.save.v1', JSON.stringify({ v: 1, gold: 98765, bricks: 50, gems: 9, level: 9, pick: 3, maxTier: 12,
   board: [{t:12},{t:10},{t:6},{t:6},{t:2},{t:1},null,{t:9},{chest:1},{boom:1}], store: { b3: 2, 'i:iron': 3, 'i:ruby': 2 }, booms: 1, boostLeft: 120,
-  furnace: [{ k: 'b8', left: 3, total: 5 }],
+  furnace: [{ t: 8, left: 3, total: 5 }],
   seen: {1:1,2:1,6:1,10:1,12:1}, stats: { merges: 120, mined: 300, taps: 1800 }, village: { hut: 2, forge: 6, tower: 2 }, up: { depth: 3 }, settings: { sound: true, speak: true, nums: true, rest: 30, energy: true, cardLimit: 0 }, purchases: [], iap: {} })); })()`);
 await p.goto(BASE); await p.sleep(700);
 await dismiss();
@@ -370,6 +370,27 @@ await tapSel('.gate .buy', 300);
 ok(await E(`document.querySelector('#panel-body .toggle') !== null`), 'right answer opens the grown-ups settings');
 await p.shot(SHOTS + '/14-parent.png');
 await E(`__mine.closePanel()`);
+// two wrong answers: the gate rests, even across a reload
+for (let k = 0; k < 2; k++) {
+  await E(`__mine.openPanel('parent')`); await p.sleep(300);
+  const hb = await center('.gate button');
+  await p.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: hb.x, y: hb.y, id: 1 }] });
+  await p.sleep(3300);
+  await p.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await p.sleep(400);
+  await E(`document.querySelector('.gate input.sum').value = '1'`);
+  await tapSel('.gate .buy', 300);
+  await E(`__mine.closePanel()`); await p.sleep(200);
+}
+await E(`__mine.openPanel('parent')`); await p.sleep(300);
+ok((await E(`document.getElementById('panel-body').textContent`)).includes('Try again in'), 'two wrong answers: the gate rests for a while');
+await E(`__mine.closePanel(); __mine.save()`);
+await p.goto(BASE); await p.sleep(600);
+await E(`__mine.openPanel('parent')`); await p.sleep(300);
+ok((await E(`document.getElementById('panel-body').textContent`)).includes('Try again in'), 'closing and reopening the app does not skip the rest');
+await E(`(() => { __mine.closePanel(); localStorage.removeItem('ezramine.gate'); })()`);
+await p.goto(BASE); await p.sleep(600);
+await E(`__mine.dismiss()`);
 
 console.log('15. Pretend store + game card');
 await E(`(() => { __mine.dismiss(); __mine.closePanel(); const s = __mine.game.s; s.gems = 1; s.purchases = []; s.cardSpent = 0; s.iap = {}; s.settings.cardLimit = 0; s.settings.energy = true; s.energy = 30; s.monster = null; })()`);
@@ -433,10 +454,11 @@ ok(!(await E(`__mine.game.energyOn()`)) && (await E(`document.getElementById('en
 ok((await J(`__mine.game.s.purchases.length`)) === 5, 'purchase history has every pretend purchase');
 
 console.log('16. Start over keeps the grown-ups settings');
-await E(`(() => { __mine.noSave(); localStorage.removeItem('ezramine.save.v1'); localStorage.setItem('ezramine.save.v1.keep', JSON.stringify({ settings: { sound: true, speak: true, nums: true, rest: 30, energy: false, cardLimit: 25 }, cardSpent: 3.5, purchases: [{ id: 'gems20', name: 'Handful of Emeralds', price: 0.99, t: 1, last4: '1111' }] })); })()`);
+await E(`(() => { __mine.noSave(); localStorage.removeItem('ezramine.save.v1'); localStorage.setItem('ezramine.save.v1.keep', JSON.stringify({ settings: { sound: true, speak: true, nums: true, rest: 30, energy: false, cardLimit: 25 }, cardSpent: 3.5, purchases: [{ id: 'gems20', name: 'Handful of Emeralds', price: 0.99, t: 1, last4: '1111' }], iap: { pass: 1 } })); })()`);
 await p.goto(BASE); await p.sleep(600);
 st = await S();
 ok(st.level === 1 && st.settings.cardLimit === 25 && st.settings.energy === false && st.purchases.length === 1 && !(await E(`localStorage.getItem('ezramine.save.v1.keep')`)), 'a fresh game keeps the card limit, energy setting and history');
+ok(st.iap.pass === 1, '...and a Super Miner Pass that was already bought');
 ok((await tut()) === 'hello', 'and Pip starts the lessons again');
 await E(`__mine.skipTut()`);
 

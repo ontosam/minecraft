@@ -667,6 +667,7 @@ html.small #energy-plus { width: 32px; height: 32px; font-size: 18px; line-heigh
   background: rgba(247, 244, 251, .97); border-radius: 20px; font-size: 24px;
 }
 #checkout.busy #co-busy, #checkout.done #co-done { display: flex; }
+#checkout.busy .co-box, #checkout.done .co-box { overflow: hidden; }
 #co-done small { font-size: 18px; opacity: .8; }
 .spinner { width: 64px; height: 64px; border-radius: 50%; border: 8px solid #ddd; border-top-color: #8a4ae0; animation: spin .8s linear infinite; }
 .tick { width: 84px; height: 84px; border-radius: 50%; background: #4fbf4a; color: #fff; font-size: 54px; font-weight: 900; display: flex; align-items: center; justify-content: center; animation: pop .4s ease-out; }

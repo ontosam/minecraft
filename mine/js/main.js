@@ -367,7 +367,8 @@ function updateHud(dt) {
   en.classList.toggle('inf', !on);
   en.classList.toggle('out', on && s.energy < 1);
   $('energybar').firstElementChild.style.width = (on ? Math.min(100, (s.energy / game.energyMax()) * 100) : 100) + '%';
-  const et = on ? (s.energy >= 1 ? `${Math.floor(s.energy)}/${game.energyMax()}` : `+1 in ${Math.ceil(game.secsToNextEnergy())}s`) : '∞';
+  const emx = Math.max(game.energyMax(), Math.floor(s.energy)); // armor off can leave a little extra
+  const et = on ? (s.energy >= 1 ? `${Math.floor(s.energy)}/${emx}` : `+1 in ${Math.ceil(game.secsToNextEnergy())}s`) : '∞';
   const num = $('energy-num'); if (num.textContent !== et) num.textContent = et;
   $('mine').classList.toggle('empty', on && s.energy < 1 && !s.monster);
   const pb = $('btn-pass'), pt = s.iap.pass ? '⭐ SUPER MINER' : '⭐ PASS';
@@ -1079,7 +1080,8 @@ function refillNotNeeded() {
   co.digits = ''; renderDigits();
   const msg = 'Your energy is already full! ⚡ No need to buy.';
   coMsg(msg); speak(msg);
-  setTimeout(() => { if (co && co.state === 'enter') closeCheckout(); }, 1600);
+  const mine = co;
+  setTimeout(() => { if (co === mine && co.state === 'enter') closeCheckout(); }, 1600);
 }
 function coBuy() {
   if (!co || co.state !== 'enter') return;
@@ -1092,6 +1094,7 @@ function coBuy() {
   co.digits = ''; // the number is never kept
   renderDigits();
   co.state = 'busy';
+  document.querySelector('.co-box').scrollTop = 0;
   $('checkout').classList.add('busy');
   sound.play('process');
   setTimeout(() => {
@@ -1215,7 +1218,7 @@ PANELS.store = {
     }
     if (tab === 'energy') {
       body.appendChild(el('div', 'note', game.energyOn()
-        ? `⚡ Energy: ${Math.floor(s.energy)} / ${game.energyMax()}. Every block you break uses 1. You get +1 every ${game.energyRegenSecs()} seconds.`
+        ? `⚡ Energy: ${Math.floor(s.energy)} / ${game.energyMax()}. Every block you break uses 1. You get +1 every ${Math.round(game.energyRegenSecs())} seconds.`
         : '⚡ Your energy never runs out!'));
     }
     const energyOff = s.settings && s.settings.energy === false;
@@ -1680,19 +1683,24 @@ function newSum() {
   const a = 21 + Math.floor(Math.random() * 29), b = 21 + Math.floor(Math.random() * 29);
   return [`${numWords(a)} plus ${numWords(b)}`, a + b];
 }
-let gateStep = 0, gateSum = newSum(), gateMisses = 0, gateLockUntil = 0;
+// Wrong answers: after two misses the gate rests (30 s, then 1, 2, 4… up to 5 min),
+// remembered across reloads so closing the app doesn't skip the wait.
+const GATE_KEY = 'ezramine.gate';
+const gateMem = (() => { try { return JSON.parse(localStorage.getItem(GATE_KEY)) || {}; } catch (e) { return {}; } })();
+let gateStep = 0, gateSum = newSum(), gateMisses = gateMem.misses || 0, gateStrikes = gateMem.strikes || 0, gateLockUntil = gateMem.until || 0;
+const gateSave = () => { try { localStorage.setItem(GATE_KEY, JSON.stringify({ misses: gateMisses, strikes: gateStrikes, until: gateLockUntil })); } catch (e) { /* ignore */ } };
+const gateWait = () => Math.max(0, Math.ceil((gateLockUntil - Date.now()) / 1000));
 PANELS.parent = {
   title: () => 'Grown-ups', icon: () => iconURL('gear', 96),
-  key() { return gateOpen + ':' + gateStep + JSON.stringify(settings()); },
+  key() { return gateOpen + ':' + gateStep + ':' + gateWait() + JSON.stringify(settings()); },
   onClose() { gateOpen = false; gateStep = 0; },
   render(body) {
     if (!gateOpen && gateStep === 0) {
       const g = el('div', 'gate');
-      const wait = Math.ceil((gateLockUntil - performance.now()) / 1000);
-      if (wait > 0) {
-        g.appendChild(el('div', 'note', `Not quite! Try again in ${wait} seconds.`));
+      const wait = gateWait();
+      if (wait > 0) { // the panel's own refresh redraws this as the seconds tick down
+        g.appendChild(el('div', 'note', `Not quite! Try again in ${wait > 90 ? Math.ceil(wait / 60) + ' minutes' : wait + ' seconds'}.`));
         body.appendChild(g);
-        setTimeout(() => { if (panelOpen === 'parent') refreshPanel(true); }, 1000);
         return;
       }
       g.appendChild(el('div', 'note', 'For grown-ups: press and hold the circle with one finger for 3 seconds.'));
@@ -1735,11 +1743,12 @@ PANELS.parent = {
       const go = el('button', 'buy', 'OK');
       go.style.cssText = 'width:auto;height:58px;border-radius:16px;font-size:20px;background:linear-gradient(#8ef06a,#4fbf4a)';
       const check = () => {
-        if (Number(inp.value.trim()) === gateSum[1]) { gateOpen = true; gateMisses = 0; sound.play('done'); refreshPanel(true); }
-        else { // wrong: back to the hold, and a little wait after two misses
+        if (Number(inp.value.trim()) === gateSum[1]) { gateOpen = true; gateMisses = 0; gateStrikes = 0; gateSave(); sound.play('done'); refreshPanel(true); }
+        else { // wrong: back to the hold, and a rest after two misses
           sound.play('deny');
           gateMisses++;
-          if (gateMisses >= 2) { gateMisses = 0; gateLockUntil = performance.now() + 30000; }
+          if (gateMisses >= 2) { gateMisses = 0; gateLockUntil = Date.now() + Math.min(300, 30 * Math.pow(2, gateStrikes)) * 1000; gateStrikes++; }
+          gateSave();
           gateStep = 0; refreshPanel(true);
         }
       };
@@ -1795,7 +1804,7 @@ PANELS.parent = {
         try {
           save(); localStorage.setItem(SAVE_KEY + '.bak', localStorage.getItem(SAVE_KEY) || '');
           // the grown-ups' settings, card limit and purchase history carry over
-          localStorage.setItem(SAVE_KEY + '.keep', JSON.stringify({ settings: game.s.settings, cardSpent: game.s.cardSpent, purchases: game.s.purchases }));
+          localStorage.setItem(SAVE_KEY + '.keep', JSON.stringify({ settings: game.s.settings, cardSpent: game.s.cardSpent, purchases: game.s.purchases, iap: game.s.iap }));
           localStorage.removeItem(SAVE_KEY);
         } catch (e) { /* ignore */ }
         skipSave = true;
@@ -1812,6 +1821,7 @@ PANELS.parent = {
         try {
           const o = JSON.parse(bak); // keep the grown-ups' settings, history and card total
           o.settings = game.s.settings; o.purchases = game.s.purchases; o.cardSpent = game.s.cardSpent;
+          o.iap = Object.assign({}, o.iap || {}, game.s.iap || {}); // bought "forever" items stay
           localStorage.setItem(SAVE_KEY, JSON.stringify(o)); localStorage.removeItem(SAVE_KEY + '.bak');
         } catch (e) { /* ignore */ }
         skipSave = true; location.reload();
@@ -1877,20 +1887,20 @@ function makeRoom() {
 }
 // Everything a Wooden Sword needs starts with a Log in the Chest.
 function getLog() {
-  if (panelOpen === 'shop' && game.dropTier() > 2) {
+  const s = game.s;
+  const li = s.board.findIndex((c, i) => c && !c.chest && c.t === 2 && game.isOpen(i));
+  if (panelOpen === 'shop' && game.dropTier() > 2 && li < 0 && game.emptyCells().length) {
     if (panelTab !== 'blocks') { panelTab = 'blocks'; refreshPanel(true); }
     const b = q('#panel-body .row[data-tier="2"] .buy');
     if (b) return { text: 'Tap to buy a Log!', at: b };
   }
-  if (panelOpen) return closeFirst();
-  const s = game.s;
-  const li = s.board.findIndex((c, i) => c && !c.chest && c.t === 2 && game.isOpen(i));
+  if (panelOpen) return closeFirst(li >= 0 && panelOpen === 'shop' ? 'You got a Log! Tap ✖ to close the Shop.' : undefined);
   if (li >= 0) return { text: 'Logs make tools! Drag the Log onto your Chest.', at: cellEls[li], to: stationEls.chest };
   const dirt = [];
   s.board.forEach((c, i) => { if (c && !c.chest && c.t === 1 && game.isOpen(i)) dirt.push(i); });
   if (dirt.length >= 2) return { text: 'Merge two Dirt to make a Log!', at: cellEls[dirt[0]], to: cellEls[dirt[1]] };
   // A deep mine doesn't drop Dirt any more: Logs come from the Shop.
-  if (game.dropTier() > 2 && !dirt.length && stationOpen('shop')) return { text: 'Buy a Log in the Shop!', at: stationEls.shop };
+  if (game.dropTier() > 2 && stationOpen('shop') && game.emptyCells().length) return { text: 'Buy a Log in the Shop!', at: stationEls.shop };
   return chestOrMine('Open the chest!', 'Dig more Dirt to make a Log!');
 }
 // What can he make right now on the way to `id`? (null = he needs a Log first)
@@ -2168,7 +2178,7 @@ function init() {
 
   // A second tap on ✕ must not press the button that was under it.
   document.addEventListener('click', (e) => {
-    if (performance.now() - uiClosedAt < 350 && !e.target.closest('#panel, #celebrate, #checkout')) { e.stopImmediatePropagation(); e.preventDefault(); }
+    if (performance.now() - uiClosedAt < 450 && !e.target.closest('#panel, #celebrate, #checkout')) { e.stopImmediatePropagation(); e.preventDefault(); }
   }, true);
   // Swallow taps that land within 0.4s of a panel/card opening (double taps).
   for (const id of ['panel', 'celebrate', 'checkout']) {
@@ -2262,6 +2272,7 @@ function init() {
         if (keep.settings) Object.assign(game.s.settings, keep.settings);
         if (keep.cardSpent >= 0) game.s.cardSpent = keep.cardSpent;
         if (Array.isArray(keep.purchases)) game.s.purchases = keep.purchases;
+        if (keep.iap && typeof keep.iap === 'object') game.s.iap = Object.assign({}, keep.iap);
         localStorage.removeItem(SAVE_KEY + '.keep');
         sound.enabled = settings().sound;
       }
