@@ -1731,11 +1731,13 @@ charge.) Same branch, mirrored to `main`.
   station, the Gold Rush jar when not full, and the OUT OF ENERGY card.
   `game.grant(id,last4,now)` applies items (refuses one-time repeats and
   anything over the card limit).
-- **Energy (`ENERGY` in data.js):** every broken block uses 1 (mole too); max
-  60 (pass 90), +1 per 20 s (pass 12 s), refills while away. Tapping with 0
-  → **OUT OF ENERGY!** card: Refill $0.99 / Use 5 💜 / Wait. Replaces the
-  old Spark *bar* (the Super Swing still happens silently every 11th break).
-  Sim: energy on & never buying → Star Block ~11 h vs ~4 h without the limit
+- **Energy (`ENERGY` in data.js):** every block *Ezra* breaks uses 1 (Digby
+  digs for free but rests while Ezra is at 0); max 60 (pass 90), +1 per 20 s
+  (pass 12 s), refills while away. Tapping with 0 → **OUT OF ENERGY!** card:
+  Refill $0.99 / Use 5 💜 / Wait (keyboard can't press Refill; Esc closes).
+  Refills are refused when they'd do nothing. Replaces the old Spark *bar*
+  (the Super Swing still happens silently every 11th break). Sim: energy on &
+  never buying → Star Block ~5 h vs ~4 h without the limit
   (`ENERGY=1 node mine/tests/sim.mjs 24 1.5 1.8`).
 - **Grown-ups corner additions:** **Energy limit On/Off**, **Pretend card limit**
   (None/$10/$25/$50 → "Card declined — not enough money left on this card"),
@@ -1745,8 +1747,17 @@ charge.) Same branch, mirrored to `main`.
   (now big); the 0.4 s tap-grace guard now uses `stopImmediatePropagation`
   and the backdrop/checkout close also honours it; the CDP driver now kills its
   browser if a test crashes (stray browsers were starving the CPU).
-  **e2e: 103 checks** (+15 store/energy: decline, buy, last-4-only, limit,
-  out-of-energy → refill checkout, unlimited ∞, pass badge, history).
+  **e2e: 110 checks** (store/energy: wrong card caught after 4 digits, buy,
+  last-4-only, number wiped from the page, limit, out-of-energy → refill
+  checkout, no useless refills, Esc/Space safety, Digby doesn't drain energy,
+  unlimited ∞, pass badge, history, Start over keeps grown-up settings).
+  A focused store review (2 reviewers + skeptic) found 10 real issues — all
+  fixed: Digby drained energy, keyboard pressed Refill, refills sold when full,
+  Start over wiped grown-up settings (now kept via `ezramine.save.v1.keep`),
+  repeating empty sound, easy-to-lose digits (no "C", stray taps don't close
+  once typing), rewards hidden under checkout (now play after it closes; #fx
+  z-index 66), earned jar usable during a bought boost, pass doubles offline
+  gold, bigger energy "+". **sw v48→v49.**
 
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world

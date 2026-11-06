@@ -236,10 +236,11 @@ ok(await E(`document.getElementById('panel-title').textContent === 'Gem Store'`)
 let pr = await center('#panel-body .row .price');
 await p.tap(pr.x, pr.y); await p.sleep(400);
 ok(await E(`!document.getElementById('checkout').classList.contains('hidden')`), 'tapping a price opens checkout');
-await typeCard('4111111111111111');
+await typeCard('4111');
+await p.sleep(200);
+ok((await J(`__mine.game.s.gems`)) === 1 && (await E(`document.getElementById('co-msg').textContent`)).includes('not your game card'), 'a real-looking card is caught after 4 numbers (no gems)');
+ok((await J(`__mine.checkout().digits`)) === 0, 'the wrong numbers are wiped');
 let buy = await center('#co-buy');
-await p.tap(buy.x, buy.y); await p.sleep(300);
-ok((await J(`__mine.game.s.gems`)) === 1 && (await E(`document.getElementById('co-msg').textContent`)).includes('declined'), 'a real-looking card number is declined (no gems)');
 await typeCard('0000000012345678');
 await p.tap(buy.x, buy.y); await p.sleep(400);
 ok(await E(`document.getElementById('checkout').classList.contains('busy')`), 'shows Processing…');
@@ -249,6 +250,7 @@ const hist = await J(`__mine.game.s.purchases`);
 ok(hist.length === 1 && hist[0].last4 === '5678' && !JSON.stringify(await J('__mine.game.s')).includes('000000001234'), 'only the last 4 digits are kept');
 await p.sleep(1400);
 ok(await E(`document.getElementById('checkout').classList.contains('hidden')`), 'checkout closes after the purchase');
+ok((await E(`document.getElementById('co-digits').textContent`)) === '', 'no card number left on the page after closing');
 // card limit
 await E(`(() => { __mine.game.s.settings.cardLimit = 10; __mine.game.s.cardSpent = 9.5; })()`);
 await E(`__mine.openCheckout('gems20')`); await p.sleep(450);
@@ -272,6 +274,24 @@ buy = await center('#co-buy');
 await p.tap(buy.x, buy.y); await p.sleep(2200);
 ok((await J(`__mine.game.s.energy`)) >= 60, 'energy refilled after the pretend purchase');
 await p.sleep(1300);
+// refill refused when energy is already full
+await E(`__mine.openCheckout('energy')`); await p.sleep(300);
+ok(await E(`document.getElementById('checkout').classList.contains('hidden')`), 'no refill checkout when energy is already full');
+// Esc on the out-of-energy card just closes it (never opens checkout)
+await E(`(() => { __mine.dismiss(); __mine.game.s.energy = 0; })()`); await p.sleep(1700);
+await p.tap(mine.x, mine.y); await p.sleep(500);
+await p.send('Input.dispatchKeyEvent', { type: 'keyDown', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 });
+await p.send('Input.dispatchKeyEvent', { type: 'keyUp', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 });
+await p.sleep(300);
+ok(await E(`document.getElementById('checkout').classList.contains('hidden') && document.getElementById('cel-title').textContent === 'OUT OF ENERGY!'`), 'Space does not press Refill on the energy card');
+await p.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+await p.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+await p.sleep(300);
+ok(await E(`document.getElementById('checkout').classList.contains('hidden') && document.getElementById('celebrate').classList.contains('hidden')`), 'Esc closes the energy card without opening checkout');
+// Digby digs for free: a minute of helper work leaves energy alone
+await E(`(() => { const g = __mine.game; g.s.energy = 5; g.s.energyT = 0; g.s.up.helper = 12; g.s.board = Array(30).fill(null); __mine.renderBoard(); for (let k = 0; k < 600; k++) g.tick(0.1); })()`);
+ok((await J(`__mine.game.s.energy`)) >= 5 && (await J(`__mine.game.s.stats.mined`)) > 0, 'Digby the mole does not use up energy');
+await E(`(() => { __mine.game.s.up.helper = 0; __mine.dismiss(); })()`);
 // pass, unlimited, mystery chest (rules only)
 await E(`(() => { const g = __mine.game; g.grant('pass', '0001', Date.now()); g.grant('unlimited', '0001', Date.now()); g.grant('mystery', '0001', Date.now()); __mine.dismiss(); })()`);
 await p.sleep(300);
@@ -280,6 +300,13 @@ ok(!(await E(`__mine.game.energyOn()`)) && (await E(`document.getElementById('en
 ok((await J(`__mine.game.s.purchases.length`)) === 5, 'purchase history has every pretend purchase');
 await E(`__mine.openPanel('parent')`); await p.sleep(200);
 await E(`__mine.closePanel()`);
+
+console.log('15d. Start over keeps the grown-ups settings');
+await E(`(() => { __mine.noSave(); localStorage.removeItem('ezramine.save.v1'); localStorage.setItem('ezramine.save.v1.keep', JSON.stringify({ settings: { sound: true, speak: true, nums: true, rest: 30, energy: false, cardLimit: 25 }, cardSpent: 3.5, purchases: [{ id: 'gems20', name: 'Handful of Gems', price: 0.99, t: 1, last4: '1111' }] })); })()`);
+await p.goto(BASE); await p.sleep(600);
+st = await J(`__mine.game.s`);
+ok(st.level === 1 && st.settings.cardLimit === 25 && st.settings.energy === false && st.purchases.length === 1 && !(await E(`localStorage.getItem('ezramine.save.v1.keep')`)), 'a fresh game keeps the card limit, energy setting and history');
+await E(`__mine.dismiss()`);
 
 console.log('15. Every panel renders');
 for (const id of ['workshop', 'furnace', 'shop', 'village', 'quests', 'book', 'chest', 'store']) {

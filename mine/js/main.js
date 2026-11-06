@@ -412,7 +412,7 @@ function mineTap() {
   sound.resume();
   lastAction = performance.now();
   hideHand();
-  game.tapMine(false);
+  return game.tapMine(false);
 }
 
 function initMine() {
@@ -426,7 +426,7 @@ function initMine() {
     mineTap();
     stop();
     // Holding the block keeps mining slowly (easier on little fingers).
-    holdT = setTimeout(() => { repeatT = setInterval(mineTap, 330); }, 450);
+    holdT = setTimeout(() => { repeatT = setInterval(() => { const r = mineTap(); if (r && r.noEnergy) stop(); }, 330); }, 450);
   });
   const up = (e) => { down.delete(e.pointerId); if (!down.size) stop(); };
   for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) m.addEventListener(ev, up);
@@ -830,21 +830,19 @@ function onGameEvent(type, d) {
       if (r.gems) setTimeout(() => coinsTo(c, r.gems, 'gems'), 300);
       break;
     }
-    case 'noEnergy': {
-      sound.play('empty');
-      const m = $('mine'); m.classList.remove('hit'); void m.offsetWidth; m.classList.add('hit');
-      outOfEnergy();
-      break;
-    }
+    case 'noEnergy': outOfEnergy(); break;
     case 'energy': {
       const c = elCenter($('energy'));
       burst(c.x, c.y, ['#ffd23f', '#fff2a0', '#fff'], 14, 70);
       break;
     }
-    case 'purchased': onPurchased(d.item, d.got); break;
+    case 'purchased':
+      if (co) co.reward = { item: d.item, got: d.got }; // shown when the checkout closes
+      else onPurchased(d.item, d.got);
+      break;
     case 'deny': {
       sound.play('deny');
-      const msg = { cost: 'Not enough yet — keep mining!', gems: 'You need more gems 💜', full: 'Your board is full!', nopairs: 'No matching blocks right now', toobig: 'Boom Blocks only work on smaller blocks', furnace: 'The furnace is full — wait a moment!', rush: 'Merge more blocks to fill the jar!', max: 'That one is already the biggest!', precious: 'That’s one of your best blocks — too special to melt!' }[d.reason];
+      const msg = { cost: 'Not enough yet — keep mining!', gems: 'You need more gems 💜', full: 'Your board is full!', nopairs: 'No matching blocks right now', toobig: 'Boom Blocks only work on smaller blocks', furnace: 'The furnace is full — wait a moment!', rush: 'Merge more blocks to fill the jar!', max: 'That one is already the biggest!', precious: 'That’s one of your best blocks — too special to melt!', energyfull: 'Your energy is already full! ⚡' }[d.reason];
       if (msg) hint(msg);
       if (d.i !== undefined) animCell(d.i, 'invalid');
       break;
@@ -911,6 +909,8 @@ function outOfEnergy() {
   const now = performance.now();
   if (now - lastNoEnergy < 1500) return;
   lastNoEnergy = now;
+  sound.play('empty');
+  const m = $('mine'); m.classList.remove('hit'); void m.offsetWidth; m.classList.add('hit');
   if (celOpen || coOpen() || panelOpen) { hint('Out of energy! ⚡'); return; }
   const s = game.s;
   const buttons = [{ text: 'Refill ' + money(storeItem('energy').price), fn: () => openCheckout('energy') }];
@@ -919,7 +919,7 @@ function outOfEnergy() {
   celebrate({
     title: 'OUT OF ENERGY!', img: iconURL('bolt', 160), name: 'Your pickaxe is tired!',
     text: `You get +1 energy every ${game.energyRegenSecs()} seconds — or fill it up now!`,
-    buttons, say: 'Out of energy!',
+    buttons, say: 'Out of energy!', noKeys: true, escCloses: true,
   });
 }
 
@@ -962,6 +962,7 @@ function openCheckout(id) {
   if (!it) return;
   sound.resume();
   if (game.owns(id)) { toast('You already have this! ✓'); return; }
+  if (it.refill && !game.refillUseful()) { toast('Your energy is already full! ⚡'); return; }
   co = { id, digits: '', state: 'enter' };
   $('co-img').src = storeIcon(it, 96);
   $('co-name').textContent = it.name;
@@ -978,8 +979,12 @@ function openCheckout(id) {
 }
 function closeCheckout() {
   if (!co || co.state === 'busy') return;
+  const reward = co.reward;
   co = null;
+  $('co-digits').innerHTML = ''; // never leave a typed number on the page
   $('checkout').classList.add('hidden');
+  // 7. the fun part happens where he can see it — after the checkout closes
+  if (reward) setTimeout(() => onPurchased(reward.item, reward.got), 60);
 }
 function coKey(k) {
   if (!co || co.state !== 'enter') return;
@@ -987,6 +992,8 @@ function coKey(k) {
   else if (k === 'clear') co.digits = '';
   else if (co.digits.length < CARD_DIGITS) co.digits += k;
   sound.play('key');
+  // A game card always starts 0000 — catch a wrong card after 4 numbers, not 16.
+  if (co.digits.length === 4 && !co.digits.startsWith('0000')) { co.digits = ''; renderDigits(); coDecline('That’s not your game card — it starts with 0000.'); return; }
   if (co.digits.length) coMsg(co.digits.length < CARD_DIGITS ? `${CARD_DIGITS - co.digits.length} more numbers` : 'Now tap Buy!');
   renderDigits();
 }
@@ -1004,6 +1011,7 @@ function coBuy() {
   if (game.declineReason(it.price) === 'limit') { co.digits = ''; renderDigits(); coDecline('Card declined — not enough money left on this card.'); return; }
   const last4 = co.digits.slice(-4);
   co.digits = ''; // the number is never kept
+  renderDigits();
   co.state = 'busy';
   $('checkout').classList.add('busy');
   sound.play('process');
@@ -1020,14 +1028,21 @@ function coBuy() {
 }
 function initCheckout() {
   const pad = $('co-pad');
-  for (const k of ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'del']) {
-    const b = el('button', '', k === 'del' ? '⌫' : k === 'clear' ? 'C' : k);
+  for (const k of ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del']) {
+    const b = el('button', '', k === 'del' ? '⌫' : k);
+    if (!k) { b.style.visibility = 'hidden'; pad.appendChild(b); continue; }
     b.addEventListener('click', () => coKey(k));
     pad.appendChild(b);
   }
   $('co-buy').addEventListener('click', coBuy);
   $('co-close').addEventListener('click', () => { sound.play('close'); closeCheckout(); });
-  $('checkout').addEventListener('click', (e) => { if (e.target === $('checkout') && performance.now() - uiOpenedAt > 400) closeCheckout(); });
+  let coDownOnBg = false;
+  $('checkout').addEventListener('pointerdown', (e) => { coDownOnBg = e.target === $('checkout'); });
+  $('checkout').addEventListener('click', (e) => {
+    // a stray tap beside the box only closes it before any numbers are typed
+    if (e.target === $('checkout') && coDownOnBg && co && !co.digits.length && performance.now() - uiOpenedAt > 400) closeCheckout();
+    coDownOnBg = false;
+  });
 }
 
 // ------------------------------------------------------------------ panels
@@ -1110,7 +1125,8 @@ const aff = (ok) => (ok ? '1' : '0');
 // --- Store (pretend money)
 PANELS.store = {
   title: () => 'Gem Store', icon: () => gemURL(96),
-  key() { const s = game.s; return [panelTab, s.iap.pass, s.iap.unlimited, s.gems >= ENERGY.gemRefill, Math.floor(s.energy)].join('|'); },
+  // (energy only matters on the Energy tab — rebuilding on every Digby break would eat taps)
+  key() { const s = game.s; return [panelTab, s.iap.pass, s.iap.unlimited, s.gems >= ENERGY.gemRefill, (panelTab === 'energy') ? game.refillUseful() + ':' + Math.floor(s.energy / 10) : ''].join('|'); },
   render(body) {
     const s = game.s;
     const tab = panelTab || 'gems';
@@ -1125,9 +1141,15 @@ PANELS.store = {
         ? `⚡ Energy: ${Math.floor(s.energy)} / ${game.energyMax()}. Every block you break uses 1. You get +1 every ${game.energyRegenSecs()} seconds.`
         : '⚡ Your energy never runs out!'));
     }
+    const energyOff = s.settings && s.settings.energy === false;
+    if (tab === 'energy' && energyOff) body.appendChild(el('div', 'note', 'A grown-up switched energy off, so you never need it! ⚡'));
     for (const it of STORE.filter((x) => x.tab === tab)) {
+      if (energyOff && (it.refill || it.unlimited)) continue;
       const owned = game.owns(it.id);
-      const btn = owned ? buyButton('Owned ✓', null, false, () => {}, 'max') : buyButton(money(it.price), null, true, () => openCheckout(it.id), 'price');
+      let btn;
+      if (owned) btn = buyButton('Owned ✓', null, false, () => {}, 'max');
+      else if (it.refill && !game.refillUseful()) btn = buyButton(game.energyOn() ? 'Full ✓' : '∞', null, false, () => {}, 'max');
+      else btn = buyButton(money(it.price), null, true, () => openCheckout(it.id), 'price');
       const r = row(storeIcon(it), it.name, storeWhat(it), btn);
       r.classList.add('store-row');
       if (owned) r.classList.add('owned');
@@ -1135,8 +1157,10 @@ PANELS.store = {
       body.appendChild(r);
     }
     if (tab === 'energy' && game.energyOn()) {
+      const full = !game.refillUseful();
       body.appendChild(row(iconURL('bolt', 96), 'Refill with gems', `Use ${ENERGY.gemRefill} gems to fill your energy`,
-        buyButton(String(ENERGY.gemRefill), GEM(), s.gems >= ENERGY.gemRefill, () => game.refillWithGems(), '', 'You need more gems 💜')));
+        full ? buyButton('Full ✓', null, false, () => {}, 'max')
+          : buyButton(String(ENERGY.gemRefill), GEM(), s.gems >= ENERGY.gemRefill, () => game.refillWithGems(), '', 'You need more gems 💜')));
     }
   },
 };
@@ -1527,7 +1551,12 @@ PANELS.parent = {
     rb.style.background = 'linear-gradient(#ffb0a8,#e0403a)';
     rb.addEventListener('click', () => {
       if (window.confirm('Start a brand new game? Ezra’s mine will start over (you can undo this once from this screen).')) {
-        try { save(); localStorage.setItem(SAVE_KEY + '.bak', localStorage.getItem(SAVE_KEY) || ''); localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ }
+        try {
+          save(); localStorage.setItem(SAVE_KEY + '.bak', localStorage.getItem(SAVE_KEY) || '');
+          // the grown-ups' settings, card limit and purchase history carry over
+          localStorage.setItem(SAVE_KEY + '.keep', JSON.stringify({ settings: game.s.settings, cardSpent: game.s.cardSpent, purchases: game.s.purchases }));
+          localStorage.removeItem(SAVE_KEY);
+        } catch (e) { /* ignore */ }
         skipSave = true;
         location.reload();
       }
@@ -1610,7 +1639,7 @@ function goldPops(dt) {
   popT = 0;
   const filled = [];
   game.s.board.forEach((c, i) => { if (c && c.t) filled.push(i); });
-  if (!filled.length || document.hidden || celOpen) return;
+  if (!filled.length || document.hidden || celOpen || panelOpen) return;
   const mult = game.goldMult();
   for (let k = 0; k < Math.min(2, filled.length); k++) {
     const i = filled[Math.floor(Math.random() * filled.length)];
@@ -1691,12 +1720,13 @@ function init() {
   $('btn-settings').addEventListener('click', () => { sound.resume(); openPanel('parent'); });
   $('btn-rush').addEventListener('click', () => {
     sound.resume();
+    if (game.rushReady()) { game.startRush(); return; } // adds on top of any boost running
     if (game.s.boostLeft > 0) return;
-    if (game.rushReady()) game.startRush(); else openPanel('store', 'boost');
+    openPanel('store', 'boost');
   });
   initCheckout();
   for (const id of ['pill-gems', 'pill-bricks']) $(id).addEventListener('click', () => { sound.resume(); openPanel('store', 'gems'); });
-  $('energy-plus').addEventListener('click', () => { sound.resume(); openPanel('store', 'energy'); });
+  $('energy').addEventListener('click', () => { sound.resume(); openPanel('store', 'energy'); });
   $('btn-pass').addEventListener('click', () => { sound.resume(); openPanel('store', 'pass'); });
   for (const [id, msg] of [['pill-gold', 'Gold comes from the blocks on your board!']]) {
     $(id).addEventListener('click', () => { hint(msg); speak(msg); });
@@ -1723,7 +1753,10 @@ function init() {
       const m = $('mine'); m.classList.remove('hit'); void m.offsetWidth;
       mineTap();
     } else if (e.key === 'Escape') {
-      if (celOpen) { if (!(celCurrent && celCurrent.noKeys)) { const ok = $('cel-ok'); if (ok) ok.click(); } } else closePanel();
+      if (celOpen) {
+        if (celCurrent && celCurrent.escCloses) { clearTimeout(celTimer); nextCelebration(); }
+        else if (!(celCurrent && celCurrent.noKeys)) { const ok = $('cel-ok'); if (ok) ok.click(); }
+      } else closePanel();
     }
   });
   // No pinch / double-tap zoom on iPad.
@@ -1761,6 +1794,16 @@ function init() {
   } else {
     game.s.lastSeen = Date.now();
     game.s.settings = Object.assign({}, SETTINGS_DEFAULT);
+    try { // after "Start over": bring back the grown-ups' settings + history
+      const keep = JSON.parse(localStorage.getItem(SAVE_KEY + '.keep') || 'null');
+      if (keep) {
+        if (keep.settings) Object.assign(game.s.settings, keep.settings);
+        if (keep.cardSpent >= 0) game.s.cardSpent = keep.cardSpent;
+        if (Array.isArray(keep.purchases)) game.s.purchases = keep.purchases;
+        localStorage.removeItem(SAVE_KEY + '.keep');
+        sound.enabled = settings().sound;
+      }
+    } catch (e) { /* ignore */ }
   }
 
   if ('serviceWorker' in navigator && location.protocol === 'https:') {

@@ -104,8 +104,11 @@ export class Game {
   energyRegenSecs() { return this.s.iap.pass ? ENERGY.passRegenSecs : ENERGY.regenSecs; }
   secsToNextEnergy() { return Math.max(0, this.energyRegenSecs() - this.s.energyT); }
   refillEnergy() { this.s.energy = Math.max(this.s.energy, this.energyMax()); this.s.energyT = 0; this.emit('energy', { full: true }); }
+  // A refill only makes sense when energy is on and not already full.
+  refillUseful() { return this.energyOn() && this.s.energy < this.energyMax(); }
   refillWithGems() {
     const s = this.s;
+    if (!this.refillUseful()) { this.emit('deny', { reason: 'energyfull' }); return false; }
     if (s.gems < ENERGY.gemRefill) { this.emit('deny', { reason: 'gems' }); return false; }
     s.gems -= ENERGY.gemRefill;
     this.refillEnergy();
@@ -190,7 +193,7 @@ export class Game {
     // Block breaks!
     s.mineHp = this.pickaxe.taps;
     s.stats.mined++;
-    if (this.energyOn()) s.energy = Math.max(0, s.energy - 1);
+    if (this.energyOn() && !auto) s.energy = Math.max(0, s.energy - 1); // Digby digs for free
     this.addXP(MINE_XP);
     const superSwing = s.spark >= SPARK_FULL;
     if (superSwing) { s.spark = 0; s.stats.supers++; } else s.spark++;
@@ -642,7 +645,7 @@ export class Game {
     if (s.energy < this.energyMax()) s.energy = Math.min(this.energyMax(), s.energy + Math.floor(away / this.energyRegenSecs()));
     if (away < 300) return 0;
     const secs = Math.min(away, offlineCapSecs());
-    const g = OFFLINE_RATE * this.baseGps() * (1 + 0.1 * this.villageLv('hut')) * (1 + 0.25 * this.villageLv('castle')) * secs;
+    const g = OFFLINE_RATE * this.baseGps() * (1 + 0.1 * this.villageLv('hut')) * (1 + 0.25 * this.villageLv('castle')) * (s.iap.pass ? 2 : 1) * secs;
     s.gold += g;
     return g;
   }
@@ -659,6 +662,7 @@ export class Game {
   grant(id, last4, now) {
     const s = this.s, it = storeItem(id);
     if (!it || this.owns(id) || this.declineReason(it.price)) return false;
+    if (it.refill && !this.refillUseful()) return false;
     s.purchases.push({ id, name: it.name, price: it.price, t: now || 0, last4: String(last4 || '').slice(-4) });
     if (s.purchases.length > 200) s.purchases.splice(0, s.purchases.length - 200);
     s.cardSpent = Math.round((s.cardSpent + it.price) * 100) / 100;

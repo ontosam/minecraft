@@ -392,7 +392,7 @@ body.rush #board { box-shadow: 0 0 0 4px #ffd23f, 0 0 24px 6px rgba(255, 210, 63
 @keyframes shake { 25% { transform: translate(-3px, 2px); } 50% { transform: translate(3px, -2px); } 75% { transform: translate(-2px, -1px); } }
 
 /* ---------- FX ---------- */
-#fx { position: fixed; inset: 0; pointer-events: none; z-index: 25; overflow: hidden; }
+#fx { position: fixed; inset: 0; pointer-events: none; z-index: 66; overflow: hidden; } /* above panels + cards, below checkout */
 .particle { position: absolute; width: 10px; height: 10px; border-radius: 2px; will-change: transform, opacity; }
 .flycoin { position: absolute; width: 34px; height: 34px; will-change: transform; }
 .floatnum {
@@ -616,13 +616,14 @@ html.small #btn-pass { font-size: 12px; padding: 3px 8px; border-width: 2px; }
 #energybar { position: relative; flex: 1; height: 22px; border-radius: 11px; border: 3px solid var(--ink); background: #3b2f45; overflow: hidden; }
 #energybar i { display: block; height: 100%; width: 0%; background: linear-gradient(#fff2a0, #ffd23f 55%, #e8a81e); transition: width .2s; }
 #energy-num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 14px; color: #fff; text-shadow: 0 2px 0 var(--ink), 1px 0 0 var(--ink), -1px 0 0 var(--ink); }
-#energy-plus { width: 30px; height: 30px; border-radius: 50%; border: 3px solid var(--ink); background: #4fbf4a; color: #fff; font-size: 22px; font-weight: 900; line-height: 20px; flex: 0 0 auto; }
+#energy { cursor: pointer; }
+#energy-plus { width: 40px; height: 40px; border-radius: 50%; border: 3px solid var(--ink); background: #4fbf4a; color: #fff; font-size: 22px; font-weight: 900; line-height: 20px; flex: 0 0 auto; }
 #energy.out #energybar { animation: sparkglow .5s ease-in-out infinite alternate; }
 #energy.inf #energybar i { background: linear-gradient(#e6ffd9, #8ef06a); }
 #mine.empty { filter: grayscale(.8) brightness(.75); }
 html.small #energy img { width: 22px; height: 22px; }
 html.small #energybar { height: 18px; border-width: 2px; }
-html.small #energy-plus { width: 24px; height: 24px; font-size: 17px; line-height: 15px; border-width: 2px; }
+html.small #energy-plus { width: 32px; height: 32px; font-size: 18px; line-height: 22px; border-width: 2px; }
 
 .row .price { min-width: 110px; background: linear-gradient(#8ef06a, #4fbf4a); }
 .row.store-row { position: relative; }
