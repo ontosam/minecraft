@@ -1167,6 +1167,9 @@ PANELS.parent = {
       }
     });
     body.appendChild(row(null, 'Start a new game', 'Erases all progress', rb));
+    const link = el('button', 'buy', 'Open');
+    link.addEventListener('click', () => { save(); location.href = '../'; });
+    body.appendChild(row(null, 'Ezra’s Blocks', 'The 3D building game', link));
   },
 };
 

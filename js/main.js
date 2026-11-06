@@ -302,6 +302,8 @@ function wireUI() {
 
   refreshGoalsButton();
   document.getElementById('btn-goals').addEventListener('pointerdown', (e) => { e.preventDefault(); buildGoals(); document.getElementById('goals').classList.remove('hidden'); });
+  // Hop over to the sibling game, Ezra's Mine (progress here saves on pagehide).
+  document.getElementById('btn-mine').addEventListener('click', () => { if (saveDirty) saveGame(); goals.save(); location.href = 'mine/'; });
   document.getElementById('goals-close').addEventListener('pointerdown', (e) => { e.preventDefault(); document.getElementById('goals').classList.add('hidden'); });
   document.getElementById('goals').addEventListener('pointerdown', (e) => { if (e.target.id === 'goals') document.getElementById('goals').classList.add('hidden'); });
 }

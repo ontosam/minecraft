@@ -9,6 +9,15 @@ Safari/Chrome and installs to the iPad home screen as a PWA.
 > The dad is non-technical — explain choices simply and keep things forgiving
 > and non-scary (always daytime, no death).
 
+## Two games in one repo
+1. **Ezra's Blocks** (root `/`) — the 3D builder described below.
+2. **Ezra's Mine** (`/mine/`, session 2) — an *original* tap-and-merge idle
+   mining game, made because Ezra loves the mobile game "Minetap" and kept
+   asking to buy things in it. Same genre/mechanics, **our own name, art,
+   text and characters** (we must not copy Minetap's name/art, nor Minecraft
+   trademarks like Creeper/Nether/Redstone/Glowstone), and **no ads, no real
+   money, no energy limits**. See **Ezra's Mine** section at the bottom.
+
 ## Status (end of session 1)
 Playable: third-person character with a follow-camera, walk/look, **tap to
 build/dig where you touch**, ~30 block types via a categorized pop-up picker,
@@ -91,13 +100,15 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
 ## Debug & testing (no browser-in-the-loop otherwise)
 - `window.__ezra = { world, player, animals, cam(), target(), rayHit(x,y),
   sel(), goals }` — exposed for support/automated demos.
-- **Headless verification** (how every change this session was checked): drive
+- **Headless verification** (how every change was checked): drive
   the bundled Chromium via the **DevTools Protocol** over a WebSocket (Node 22
   has global `WebSocket`/`fetch`), dispatch real input, read `__ezra`, and
-  `Page.captureScreenshot`. Browser binary:
-  `/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell`
+  `Page.captureScreenshot`. A reusable driver is committed at
+  `mine/tests/cdp.mjs` (`launch({width,height,touch})` → `tap/drag/eval/shot`).
+  Browser binary moves between sandbox images — `ls /opt/pw-browsers/`; in
+  session 2 it was
+  `/opt/pw-browsers/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell`
   with `--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader`.
-  Example test scripts lived in `/tmp/*.mjs` (not committed).
 - **Video:** record the canvas with in-page `MediaRecorder` (canvas-only, no
   UI). The bundled ffmpeg (`/opt/pw-browsers/ffmpeg-1011/ffmpeg-linux`) is
   minimal: **VP8/WebM only**, no JPEG decode, no `pipe:` protocol.
@@ -141,3 +152,60 @@ is *why* the engine is hand-written with no libraries. Don't add npm deps.
 Ship small, verified increments; show a screenshot each time; explain trade-offs
 plainly; recommend an order but let the dad steer; keep everything auto-saving
 and on `main`.
+
+
+## Ezra's Mine (`/mine/`) — session 2
+Live at **https://ontosam.github.io/minecraft/mine/** (own manifest + icons,
+so it can be its own home-screen app; the root `sw.js` precaches it too).
+Blocks has a ⛏️ topbar button to hop over; the Mine's grown-ups corner links
+back.
+
+**Core loop (matches the genre Ezra knows):** tap the big **mine block** (its
+face shows the block it will drop; taps-left number; hold = slow auto-tap) →
+a block flies onto a free square → **drag a block onto its twin** (or tap one,
+then its twin) to merge into the next of **20 tiers** (Dirt → … → Star Block)
+→ every block on the board earns **gold/sec** → **levels** open more squares
+(9 → 30) → new **caves** (backdrops) as you discover deeper blocks.
+
+**Healthy replacements for the paid bits:** the yellow lightning bar is a
+**Spark bar** that *fills* as you mine (full → next break is a 2-block "Super
+Swing"), never an energy limit; the x2 boost is a **Gold Rush jar** filled by
+merging (never by ads); **purple gems** (not emerald green) are earned only
+(new blocks, level-ups, quests, chests, Wishing Well on a fixed count) and buy
+Boom Blocks / Magic Merge; treasure chests open instantly with a single tap;
+board full → new blocks hop into the (unlimited) storage chest, so tapping is
+never blocked. No streaks, no daily rewards, offline gold is capped and
+gentle. Grown-ups corner (hold 3s): sound, read-aloud, tier numbers, optional
+break reminder (default 30 min — a friendly card, never a lock), reset.
+
+**Files** (`mine/`): `index.html`, `mine.css`, `js/data.js` (ALL content and
+numbers: tiers, caves, pickaxes+recipes, upgrades, furnace, village, shop,
+quests), `js/game.js` (pure rules, no DOM — emits events `game.on(type, data)`),
+`js/main.js` (screen: board/drag/tap-merge, dock stations + panels,
+celebrations, FX, HUD, speech, save), `js/art.js` (procedural 16px tiles +
+hand-authored 16×16 sprite icons, incl. our own mole helper "Digby"),
+`js/sound.js`, `js/fmt.js`. Save key `ezramine.save.v1`.
+`scripts/make-mine-icons.mjs` regenerates `mine/icons/`.
+
+**Stations** (unlock by level): Quests/Blocks book/Chest (1), Workshop +
+Digby helper (2: pickaxes crafted from blocks *on the board or in the chest* +
+furnace bars; Dig Deeper; Mole Helper; Lucky Dig), Shop (3), Furnace (4:
+any block → bricks; ores → metal bars), Village (5: bricks → 6 buildings).
+
+**Balance:** `node mine/tests/sim.mjs [hours] [tapsPerSec] [mergeSecs]` plays
+a robot kid. Kid pace (1.5 taps/s, 1.8 s per merge): Copper ~3 min, Ruby
+~45 min, Gold Block ~1.5 h, Star Block ~4.5 h. The main pacing knob is
+`depthNeed()` in data.js (when "Dig Deeper" becomes available); prices are
+anchored to the tier ladder (`anchored()`).
+
+**Tests:** `PORT=8123 node scripts/serve.mjs &` then
+`node mine/tests/e2e.mjs` — real touch taps/drags for merge, tap-tap, chest,
+crafting, furnace, village, quests, Gold Rush, overflow, Boom, save/reload,
+offline gold, grown-ups gate, every panel, and layout on 9 screen sizes.
+Debug handle: `window.__mine` (`game`, `speed(x)`, `openPanel(id)`, …).
+
+**Mine backlog ideas:** more caves/blocks after the Star Block (a gentle
+"new world" instead of prestige pressure), Pebble Pals (friendly critters you
+tickle for coins — replaces the original's monsters), cosmetic pickaxe paints
+for gems, Ezra-designed block painter, and linking discoveries to unlock
+blocks in Ezra's Blocks (same origin → shared localStorage).
