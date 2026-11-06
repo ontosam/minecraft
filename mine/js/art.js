@@ -82,25 +82,35 @@ export const TILE_PAINTERS = {
     const r = rng(51); for (let i = 0; i < 8; i++) px(ctx, Math.floor(r() * 16), Math.floor(r() * 16), rgb(0xc7b47a));
     bevel(ctx);
   },
-  gravel(ctx) {
-    noise(ctx, 0x847f7a, 0.3, 45);
-    const r = rng(451); for (let i = 0; i < 12; i++) px(ctx, Math.floor(r() * 15), Math.floor(r() * 15), rgb(r() < 0.5 ? 0x5f5a56 : 0xa9a39d), 2, 2);
+  gravel(ctx) { // warm, sandy-brown pebbles
+    noise(ctx, 0xa08a6a, 0.22, 45);
+    const r = rng(451);
+    for (let i = 0; i < 14; i++) {
+      const x = Math.floor(r() * 14), y = Math.floor(r() * 14), c = [0x6e5a44, 0xc9b28a, 0x857058][Math.floor(r() * 3)];
+      px(ctx, x, y, rgb(c), 2, 2); px(ctx, x, y, rgb(c, 1.2));
+    }
     bevel(ctx);
   },
-  stone(ctx) {
-    noise(ctx, STONE, 0.18, 4);
-    const r = rng(41); for (let i = 0; i < 5; i++) { const x = Math.floor(r() * 12), y = Math.floor(r() * 15); px(ctx, x, y, rgb(0x6f6f77), 3 + Math.floor(r() * 2), 1); }
-    bevel(ctx);
+  stone(ctx) { // smooth, pale blue-grey
+    noise(ctx, 0xa9adb8, 0.08, 4);
+    const r = rng(41); for (let i = 0; i < 4; i++) { const x = Math.floor(r() * 11), y = 2 + Math.floor(r() * 12); px(ctx, x, y, rgb(0x8a8e99), 4 + Math.floor(r() * 2), 1); }
+    bevel(ctx, 1.15, 0.75);
   },
-  cobble(ctx) {
-    noise(ctx, 0x8a8a90, 0.22, 40);
+  cobble(ctx) { // dark mortar with chunky rounded stones
+    noise(ctx, 0x4a4a52, 0.15, 40);
+    const stones = [[1, 1, 5, 4], [7, 1, 4, 3], [12, 1, 3, 5], [1, 6, 3, 4], [5, 5, 5, 5], [11, 7, 4, 4], [1, 11, 5, 4], [7, 11, 3, 4], [11, 12, 4, 3]];
     const r = rng(401);
-    for (let i = 0; i < 11; i++) { const x = Math.floor(r() * 14), y = Math.floor(r() * 14); px(ctx, x, y, rgb(r() < 0.5 ? 0x67676e : 0xb0b0b8), 2 + Math.floor(r() * 2), 2 + Math.floor(r() * 2)); }
+    for (const [x, y, w, h] of stones) {
+      const base = [0x8e8e96, 0x9a9aa2, 0x828289][Math.floor(r() * 3)];
+      px(ctx, x, y, rgb(base), w, h);
+      px(ctx, x, y, rgb(base, 1.18), w, 1); px(ctx, x, y + h - 1, rgb(base, 0.78), w, 1);
+    }
     bevel(ctx);
   },
   mossy(ctx) {
     TILE_PAINTERS.cobble(ctx);
-    const r = rng(77); for (let i = 0; i < 26; i++) px(ctx, Math.floor(r() * 16), Math.floor(r() * 16), rgb(r() < 0.5 ? 0x4f9a3a : 0x6abe4f));
+    const r = rng(77);
+    for (let i = 0; i < 30; i++) { const y = Math.floor(Math.pow(r(), 1.6) * 16); px(ctx, Math.floor(r() * 16), y, rgb(r() < 0.5 ? 0x4f9a3a : 0x6abe4f)); }
   },
   coal(ctx) { noise(ctx, STONE, 0.16, 60); flecks(ctx, [0x2a2a2e, 0x3a3a40], 6, 601); bevel(ctx); },
   copper(ctx) { noise(ctx, STONE, 0.16, 61); flecks(ctx, [0xd9824a, 0xb8642f, 0x5fb89a], 6, 611); bevel(ctx); },
@@ -335,23 +345,23 @@ export const ICONS = {
     '................',
     '................',
   ],
-  boom: [ // a friendly bundle of "boom sticks" (blasts nearby blocks)
-    '..........F.....',
-    '.........fF.....',
-    '........kfk.....',
-    '.......k........',
-    '...kkkkkkkkkk...',
-    '..krrrkrrrkrrk..',
-    '..kprrkprrkprk..',
-    '..kWWWWWWWWWWk..',
-    '..kWkkWWkWkkWk..',
-    '..kWWWWWWWWWWk..',
-    '..krrrkrrrkrrk..',
-    '..krrRkrrRkrRk..',
-    '..kRRRkRRRkRRk..',
-    '...kkkkkkkkkk...',
-    '................',
-    '................',
+  boom: [ // the Boom Block: a round pink boom-ball with a star and a sparkly fuse
+    '...........F.F..',
+    '..........FwF...',
+    '.........kkF.F..',
+    '........kk......',
+    '.....kkkkkk.....',
+    '...kkppppppkk...',
+    '..kppwppppppRk..',
+    '..kpwppppppppk..',
+    '.kpppppYpppppRk.',
+    '.kppppYYYppppRk.',
+    '.kppYYYYYYYppRk.',
+    '.kpppYYYYYppRRk.',
+    '..kppYpppYpRRk..',
+    '..kRppppppRRRk..',
+    '...kkRRRRRRkk...',
+    '.....kkkkkk.....',
   ],
   house: [
     '................',
@@ -593,9 +603,11 @@ export function buildingURL(roof, wall, size = 96) {
 }
 
 // Pickaxe head colours for each pickaxe level (wood -> rainbow).
+// One entry per pickaxe in data.js PICKAXES:
+// wood, stone, copper, iron, gold, diamond, amethyst, star.
 export const PICK_COLORS = [
-  [0xc99a5b, 0x8a6a3a], [0xb9b9c2, 0x6a6a72], [0xe0b49a, 0xa87a62], [0xf6c935, 0xd99a1e],
-  [0x59d6e8, 0x2f9fb8], [0x9a6ae0, 0x6a40b0], [0xff7ab0, 0xc0407a], [0xfff4c0, 0xe8c24a],
+  [0xc99a5b, 0x8a6a3a], [0xb9b9c2, 0x6a6a72], [0xe08a50, 0xa85a2a], [0xe6e6ee, 0x9a9aa6],
+  [0xf6c935, 0xd99a1e], [0x59d6e8, 0x2f9fb8], [0x9a6ae0, 0x6a40b0], [0xfff4c0, 0xe8c24a],
 ];
 
 function drawSprite(ctx, rows, recolor) {

@@ -102,7 +102,7 @@ const anchored = (tier, secs) => Math.round(gpsOf(tier) * secs / 10) * 10 || 10;
 export const UPGRADES = {
   depth: { // the mine block drops bigger blocks
     name: 'Dig Deeper', desc: 'New blocks come out bigger', icon: 'pickaxe',
-    max: 12, cost: (lv) => anchored(depthNeed(lv), 150),
+    max: 7, cost: (lv) => anchored(depthNeed(lv), 150), // 7 levels: the last needs the Star Block (depthNeed(6) = 20)
     // can never drop within DROP_GAP tiers of your best block (keeps merging fun)
   },
   helper: { // a friendly mole who taps the mine block for you
@@ -140,7 +140,7 @@ export const BUILDINGS = [
     cost: (lv) => Math.round(20 * Math.pow(2.3, lv)), max: 6, unlock: 3 },
   { id: 'well', name: 'Wishing Well', desc: 'Merging gives gems more often', roof: 0x4a8ff0, wall: 0xb9b9c2,
     cost: (lv) => Math.round(30 * Math.pow(2.4, lv)), max: 8, unlock: 5 },
-  { id: 'bakery', name: 'Bakery', desc: 'Earn longer while you’re away', roof: 0xf2913a, wall: 0xf3eee6,
+  { id: 'bakery', name: 'Bakery', desc: 'The furnace makes more bricks', roof: 0xf2913a, wall: 0xf3eee6,
     cost: (lv) => Math.round(25 * Math.pow(2.2, lv)), max: 6, unlock: 4 },
   { id: 'tower', name: 'Lookout Tower', desc: 'Treasure chests come more often', roof: 0x9a6ae0, wall: 0x9c7142,
     cost: (lv) => Math.round(40 * Math.pow(2.5, lv)), max: 5, unlock: 7 },
@@ -177,7 +177,7 @@ export const QUESTS = [
   { text: 'Make Cobblestone', metric: 'tier', n: 4, reward: { gold: 400, bricks: 5 } },
   { text: 'Get a Mole Helper', metric: 'helper', n: 1, reward: { gold: 500 } },
   { text: 'Mine 50 blocks', metric: 'mined', n: 50, reward: { bricks: 10 } },
-  { text: 'Build a Miner’s Hut', metric: 'build', n: 1, reward: { gems: 1 } },
+  { text: 'Build a Miner’s Hut', metric: 'hut', n: 1, reward: { gems: 1 } },
   { text: 'Make Mossy Stone', metric: 'tier', n: 5, reward: { gold: 2000 } },
   { text: 'Open a treasure chest', metric: 'chests', n: 1, reward: { gold: 1500 } },
   { text: 'Make Coal', metric: 'tier', n: 6, reward: { bricks: 15 } },
@@ -211,5 +211,8 @@ export const QUESTS = [
   { text: 'Make the Star Block!', metric: 'tier', n: 20, reward: { gems: 10 } },
 ];
 
-// Offline earnings: blocks keep earning while you're away, up to a cap.
-export function offlineCapSecs(bakeryLv) { return (60 + bakeryLv * 30) * 60; }
+// Offline earnings: blocks keep earning (at half speed) while you're away,
+// up to one generous fixed cap — so popping back often never pays more than
+// coming back tomorrow.
+export const OFFLINE_RATE = 0.5;
+export function offlineCapSecs() { return 12 * 3600; }

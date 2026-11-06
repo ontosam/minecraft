@@ -400,7 +400,7 @@ body.rush #board { box-shadow: 0 0 0 4px #ffd23f, 0 0 24px 6px rgba(255, 210, 63
 .flyblock { position: absolute; will-change: transform; filter: drop-shadow(0 6px 4px rgba(0, 0, 0, .4)); }
 
 #toast {
-  position: fixed; left: 50%; top: 22%; transform: translate(-50%, -20px); z-index: 40;
+  position: fixed; left: 50%; top: 22%; transform: translate(-50%, -20px); z-index: 55;
   padding: 12px 22px; border-radius: 18px; border: 3px solid var(--ink);
   background: var(--cream); color: var(--ink); font-weight: 900; font-size: 20px;
   opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none;
@@ -471,9 +471,16 @@ body.rush #board { box-shadow: 0 0 0 4px #ffd23f, 0 0 24px 6px rgba(255, 210, 63
   flex: 0 0 auto;
 }
 .buy img { width: 30px; height: 30px; }
-.buy:disabled { background: #cbbfae; opacity: .75; }
+.buy.off { background: #cbbfae; opacity: .75; }
+.buy.alt { background: linear-gradient(#e2e2f0, #b9b9d0); min-width: 100px; font-size: 17px; }
+.buy.nope { animation: nope .3s; }
+input.sum {
+  width: 160px; height: 64px; border-radius: 16px; border: 3px solid var(--ink); text-align: center;
+  font-size: 32px; font-weight: 900; font-family: inherit; color: var(--ink); background: #fff;
+  -webkit-user-select: text; user-select: text;
+}
 .buy.max { background: linear-gradient(#ffe680, #f6c935); }
-.buy:active:not(:disabled) { transform: translateY(2px); }
+.buy:active:not(.off) { transform: translateY(2px); }
 
 .grid-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
 .item {
@@ -531,6 +538,7 @@ body.rush #board { box-shadow: 0 0 0 4px #ffd23f, 0 0 24px 6px rgba(255, 210, 63
 #error-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0, 0, 0, .75); z-index: 100; padding: 20px; }
 #error-overlay .box { background: #fff; color: #222; border-radius: 16px; padding: 20px; max-width: 640px; }
 #error-overlay pre { white-space: pre-wrap; font-size: 12px; margin-top: 10px; max-height: 50vh; overflow: auto; }
+#error-overlay button { margin-top: 14px; padding: 12px 22px; border-radius: 14px; border: 3px solid #222; background: #8ef06a; font-size: 20px; font-weight: 900; }
 
 /* ---------- Landscape: board in the middle, stations either side ---------- */
 @media (orientation: landscape) {

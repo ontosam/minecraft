@@ -174,9 +174,19 @@ merging (never by ads); **purple gems** (not emerald green) are earned only
 (new blocks, level-ups, quests, chests, Wishing Well on a fixed count) and buy
 Boom Blocks / Magic Merge; treasure chests open instantly with a single tap;
 board full → new blocks hop into the (unlimited) storage chest, so tapping is
-never blocked. No streaks, no daily rewards, offline gold is capped and
-gentle. Grown-ups corner (hold 3s): sound, read-aloud, tier numbers, optional
-break reminder (default 30 min — a friendly card, never a lock), reset.
+never blocked. No streaks, no daily rewards; offline gold is half-rate with
+one fixed 12 h cap (so checking in hourly never pays more than once a day).
+Grown-ups corner (hold one finger 3 s, then answer a sum written in words):
+sound, read-aloud, tier numbers, optional break reminder (default 30 min — a
+friendly card with "Done for now" first; "Keep digging" snoozes 10 min; never
+a lock), "Start over" (keeps one `.bak` save you can restore).
+
+**Safety rails added after the session-2 review:** the furnace won't melt your
+two best kinds of block and queued items can be taken back out; Boom Blocks
+are stored in their own `s.booms` counter (never in the `b<tier>` store keys);
+taps within 0.4 s of a panel/card opening are ignored (double-tap accidents);
+grey buttons still answer with a spoken reason; audio/speech unlock on
+touchend/click (iPad ignores pointerdown as a gesture).
 
 **Files** (`mine/`): `index.html`, `mine.css`, `js/data.js` (ALL content and
 numbers: tiers, caves, pickaxes+recipes, upgrades, furnace, village, shop,
@@ -189,8 +199,11 @@ hand-authored 16×16 sprite icons, incl. our own mole helper "Digby"),
 
 **Stations** (unlock by level): Quests/Blocks book/Chest (1), Workshop +
 Digby helper (2: pickaxes crafted from blocks *on the board or in the chest* +
-furnace bars; Dig Deeper; Mole Helper; Lucky Dig), Shop (3), Furnace (4:
-any block → bricks; ores → metal bars), Village (5: bricks → 6 buildings).
+furnace bars; Dig Deeper (7 levels); Mole Helper; Lucky Dig), Shop (3),
+Furnace (4: any block → bricks; ores → metal bars), Village (5: bricks → 6
+buildings: hut +gold, blacksmith faster furnace, well gems, bakery more
+bricks, tower more chests, castle +gold). A goal card under the HUD always
+shows the next quest (tap = read aloud / open the right station / collect).
 
 **Balance:** `node mine/tests/sim.mjs [hours] [tapsPerSec] [mergeSecs]` plays
 a robot kid. Kid pace (1.5 taps/s, 1.8 s per merge): Copper ~3 min, Ruby

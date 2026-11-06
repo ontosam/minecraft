@@ -47,7 +47,7 @@ function sprite(rows, recolor) {
 function render(size) {
   const out = Buffer.alloc(size * size * 4);
   const tile = fakeCtx(16, 16); TILE_PAINTERS.gold_ore(tile);
-  const [main, dark] = PICK_COLORS[4];
+  const [main, dark] = PICK_COLORS[5]; // the diamond pickaxe
   const pick = sprite(ICONS.pickaxe, { l: 0xd7fbf5, s: main, S: dark });
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     const u = x / size, v = y / size, i = (y * size + x) * 4;

@@ -88,11 +88,12 @@ await p.sleep(200);
 const ws = await J(`__mine.station('workshop')`);
 await p.tap(ws.x, ws.y); await p.sleep(300);
 await p.shot(SHOTS + '/06-workshop.png');
-const craft = await J(`(() => { const b = [...document.querySelectorAll('#panel-body .buy')].find(b => b.textContent.includes('Craft')); const r = b.getBoundingClientRect(); return {x: r.left + r.width/2, y: r.top + r.height/2, dis: b.disabled}; })()`);
+const craft = await J(`(() => { const b = [...document.querySelectorAll('#panel-body .buy')].find(b => b.textContent.includes('Craft')); const r = b.getBoundingClientRect(); return {x: r.left + r.width/2, y: r.top + r.height/2, dis: b.classList.contains('off')}; })()`);
 ok(!craft.dis, 'Craft button enabled with 2 Stone + 100 gold');
 await p.tap(craft.x, craft.y); await p.sleep(300);
 st = await J(`__mine.game.s`);
 ok(st.pick === 1 && st.gold < 1000 && !st.board.some((c) => c && c.t === 3), `Stone Pickaxe crafted, stones and gold used (pick ${st.pick}, gold ${Math.round(st.gold)})`);
+ok(await E(`[...document.querySelectorAll('.cell')].every((e, i) => { const c = __mine.game.s.board[i]; const has = !!e.querySelector('.blk'); return has === !!(c && c.t); })`), 'board drawing matches state after crafting (no ghost blocks)');
 await dismiss();
 await E(`__mine.closePanel()`);
 
@@ -161,7 +162,7 @@ await E(`(() => { const g = __mine.game; g.s.level = 7; g.s.gold = 5000; g.s.boa
 await p.goto(BASE); await p.sleep(600);
 st = await J(`__mine.game.s`);
 ok(st.level === 7 && st.board.some((c) => c && c.t === 8), 'level and board restored after reload');
-ok(st.gold > 5000 + 780 * 3000, `gold earned while away (${Math.round(st.gold)})`);
+ok(st.gold > 5000 + 780 * 0.5 * 3000, `gold earned while away, at half speed (${Math.round(st.gold)})`);
 ok(await E(`document.getElementById('cel-title').textContent === 'Welcome back!'`), 'Welcome back card shown');
 await p.shot(SHOTS + '/13-welcome.png');
 await dismiss();
@@ -170,12 +171,58 @@ console.log('14. Grown-ups corner gate');
 const gear = await center('#btn-settings');
 await p.tap(gear.x, gear.y); await p.sleep(300);
 const hold = await center('.gate button');
+// a two-finger tap must NOT open it
+await p.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: hold.x, y: hold.y, id: 1 }, { x: hold.x + 20, y: hold.y, id: 2 }] });
+await p.sleep(100);
+await p.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+await p.sleep(3300);
+ok(await E(`document.querySelector('.gate input') === null && document.querySelector('#panel-body .toggle') === null`), 'two-finger tap does not open the gate');
 await p.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: hold.x, y: hold.y, id: 1 }] });
 await p.sleep(3300);
 await p.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-await p.sleep(300);
-ok(await E(`document.querySelector('#panel-body .toggle') !== null`), 'settings visible after holding 3s');
+await p.sleep(500);
+ok(await E(`document.querySelector('.gate input.sum') !== null`), 'holding 3s asks a sum written in words');
+const ans = await E(`(() => { const t = document.querySelector('#panel-body .section').textContent; const w = {four:4,five:5,six:6,seven:7,eight:8,nine:9}; const m = t.match(/(\\w+) plus (\\w+)/); return w[m[1]] + w[m[2]]; })()`);
+await E(`(() => { const i = document.querySelector('.gate input.sum'); i.value = '${'${ans}'}'; })()`.replace('${ans}', ans));
+const okb = await center('.gate .buy');
+await p.tap(okb.x, okb.y); await p.sleep(300);
+ok(await E(`document.querySelector('#panel-body .toggle') !== null`), 'right answer opens the grown-ups settings');
 await p.shot(SHOTS + '/14-parent.png');
+await E(`__mine.closePanel()`);
+
+console.log('15a. Review fixes');
+// Boom Block in the chest must not crash the Chest or Furnace panels
+await E(`(() => { const g = __mine.game; g.s.level = 8; g.s.maxTier = 9; g.s.board = Array(30).fill(null); const o = [...Array(30).keys()].filter(i => g.isOpen(i)); g.s.board[o[0]] = {boom:1}; g.s.board[o[1]] = {t:2}; g.s.store = {}; g.s.booms = 0; __mine.renderBoard(); })()`);
+const ro = await openIdx();
+c0 = await cell(ro[0]);
+await p.drag(c0.x, c0.y, chest.x, chest.y, 16, 16); await p.sleep(400);
+ok((await J(`__mine.game.s.booms`)) === 1, 'Boom Block stored in the chest');
+await E(`__mine.openPanel('chest')`); await p.sleep(200);
+await E(`__mine.closePanel(); __mine.openPanel('furnace')`); await p.sleep(200);
+await E(`__mine.closePanel()`);
+ok(await E(`getComputedStyle(document.getElementById('error-overlay')).display === 'none'`), 'chest + furnace panels open fine with a stored Boom Block');
+// Furnace refuses your best blocks; Take out works
+await E(`(() => { const g = __mine.game; g.s.maxTier = 9; g.s.board = Array(30).fill(null); const o = [...Array(30).keys()].filter(i => g.isOpen(i)); g.s.board[o[0]] = {t:9}; g.s.board[o[1]] = {t:3}; g.s.furnace = []; __mine.renderBoard(); })()`);
+c0 = await cell(ro[0]); c1 = await cell(ro[1]);
+await p.drag(c0.x, c0.y, furn.x, furn.y, 16, 16); await p.sleep(300);
+st = await J(`__mine.game.s`);
+ok(st.board[ro[0]] && st.board[ro[0]].t === 9 && st.furnace.length === 0, 'furnace refuses your best block');
+await p.drag(c1.x, c1.y, furn.x, furn.y, 16, 16); await p.sleep(300);
+ok((await J(`__mine.game.s.furnace.length`)) === 1, 'small block goes into the furnace');
+await E(`__mine.openPanel('furnace')`); await p.sleep(500);
+const tko = await J(`(() => { const b = [...document.querySelectorAll('#panel-body .buy')].find(b => b.textContent.includes('Take out')); const r = b.getBoundingClientRect(); return {x: r.left + r.width/2, y: r.top + r.height/2}; })()`);
+await p.tap(tko.x, tko.y); await p.sleep(300);
+st = await J(`__mine.game.s`);
+ok(st.furnace.length === 0 && st.board.some((c) => c && c.t === 3), 'Take out puts the block back on the board');
+await E(`__mine.closePanel()`);
+// double-tap on a station leaves the panel open
+await p.sleep(500);
+const wsb = await J(`__mine.station('workshop')`);
+await p.tap(wsb.x, wsb.y, 40); await p.sleep(80); await p.tap(wsb.x, wsb.y, 40); await p.sleep(400);
+ok(await E(`!document.getElementById('panel').classList.contains('hidden')`), 'double-tapping a station keeps its panel open');
+// a grey button still answers
+const grey = await J(`(() => { const b = document.querySelector('#panel-body .buy.off'); if (!b) return null; const r = b.getBoundingClientRect(); return {x: r.left + r.width/2, y: r.top + r.height/2}; })()`);
+if (grey) { await p.tap(grey.x, grey.y); await p.sleep(200); ok(await E(`document.getElementById('toast').classList.contains('show')`), 'tapping a grey button explains why'); }
 await E(`__mine.closePanel()`);
 
 console.log('15. Every panel renders');
@@ -185,6 +232,21 @@ for (const id of ['workshop', 'furnace', 'shop', 'village', 'quests', 'book', 'c
   await p.shot(`${SHOTS}/15-${id}.png`);
   await E(`__mine.closePanel()`);
 }
+
+console.log('15b. Break reminder ignores the keyboard; narrow window keeps the board on screen');
+await E(`(() => { __mine.dismiss(); __mine.game.s.settings.rest = 0.02; })()`);
+await p.sleep(2500);
+ok(await E(`document.getElementById('cel-title').textContent === 'Great mining today!'`), 'break reminder appears');
+await p.send('Input.dispatchKeyEvent', { type: 'keyDown', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 });
+await p.send('Input.dispatchKeyEvent', { type: 'keyUp', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 });
+await p.sleep(300);
+ok(await E(`!document.getElementById('celebrate').classList.contains('hidden') && document.getElementById('cel-title').textContent === 'Great mining today!'`), 'Space does not dismiss the break card');
+await E(`(() => { __mine.game.s.settings.rest = 30; __mine.dismiss(); })()`);
+await p.viewport(320, 1180);
+await E(`window.dispatchEvent(new Event('resize'))`); await p.sleep(400);
+ok(await E(`(() => { const b = document.getElementById('board').getBoundingClientRect(); return b.right <= innerWidth + 1 && b.left >= -1; })()`), 'board fits after the window gets narrow');
+await p.viewport(820, 1180);
+await E(`window.dispatchEvent(new Event('resize'))`); await p.sleep(300);
 
 const errs = p.logs.filter((l) => /EXCEPTION|error/i.test(l) && !/favicon/.test(l));
 ok(errs.length === 0, 'no console errors' + (errs.length ? ': ' + errs.join(' | ') : ''));

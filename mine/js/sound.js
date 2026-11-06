@@ -17,7 +17,8 @@ export class Sound {
       this.master.gain.value = 0.9;
       this.master.connect(this.ctx.destination);
     }
-    if (this.ctx.state === 'suspended') this.ctx.resume();
+    // 'suspended' at start, 'interrupted' after a call/Siri on iPad: try again.
+    if (this.ctx.state !== 'running') { const r = this.ctx.resume(); if (r && r.catch) r.catch(() => {}); }
   }
 
   tone(freq, dur, type = 'sine', gain = 0.16, slideTo = 0, delay = 0) {

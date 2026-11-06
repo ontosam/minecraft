@@ -5,7 +5,7 @@
 import { Game, SAVE_KEY, N_CELLS, UNLOCK_ORDER } from './game.js';
 import {
   TIERS, MAX_TIER, COLS, ROWS, caveFor, PICKAXES, PICK_RECIPES, UPGRADES, INGOTS,
-  BUILDINGS, shopPrice, POWERS, QUESTS, xpNeeded, SPARK_FULL, RUSH_FULL, depthNeed,
+  BUILDINGS, shopPrice, POWERS, QUESTS, xpNeeded, SPARK_FULL, RUSH_FULL, depthNeed, openCells,
 } from './data.js';
 import {
   tileURL, iconURL, pickaxeURL, tileColors, crackURL, barURL, gemURL, buildingURL,
@@ -110,6 +110,7 @@ function layout() {
   root.setProperty('--mine', mine + 'px');
 
   const cols = portrait ? COLS : ROWS, rows = portrait ? ROWS : COLS;
+  root.setProperty('--cell', '36px'); // let the board area take its natural size first
   const wrap = $('board-wrap').getBoundingClientRect();
   const gap = Math.max(5, Math.min(10, Math.round(Math.min(wrap.width, wrap.height) / 90)));
   const cw = (wrap.width - 12 - gap * (cols + 1)) / cols;
@@ -145,7 +146,7 @@ function renderCell(i) {
     }
     return;
   }
-  if (wasLocked) { e.classList.remove('unlock-anim'); void e.offsetWidth; e.classList.add('unlock-anim'); }
+  if (wasLocked) { e.classList.remove('unlock-anim'); void e.offsetWidth; e.classList.add('unlock-anim'); setTimeout(() => e.classList.remove('unlock-anim'), 600); }
   if (!c) return;
   if (c.chest) { const b = el('div', 'chest-blk'); b.appendChild(img(iconURL('chest', 96))); e.appendChild(b); return; }
   if (c.boom) { const b = el('div', 'boom-blk'); b.appendChild(img(iconURL('boom', 96))); e.appendChild(b); return; }
@@ -239,6 +240,7 @@ function toast(text, icon) {
 }
 let hintTimer = 0;
 function hint(text, ms = 2600) {
+  if (panelOpen) { toast(text); return; }   // the board's hint line is hidden under panels
   const h = $('hint');
   h.textContent = text;
   h.classList.add('show');
@@ -248,7 +250,7 @@ function hint(text, ms = 2600) {
 
 // ------------------------------------------------------------------ celebrations
 const celQueue = [];
-let celOpen = false, celTimer = 0;
+let celOpen = false, celTimer = 0, celCurrent = null;
 function celebrate(opts) { celQueue.push(opts); if (!celOpen) nextCelebration(); }
 function nextCelebration() {
   const c = celQueue.shift();
@@ -283,6 +285,8 @@ function nextCelebration() {
     celTimer = setTimeout(() => nextCelebration(), c.auto);
   }
   $('celebrate').classList.remove('hidden');
+  uiOpenedAt = performance.now();
+  celCurrent = c;
   if (c.sound) sound.play(c.sound);
   if (c.say) speak(c.say);
 }
@@ -375,6 +379,9 @@ function initGoal() {
     if (!a) return;
     if (a.ready) { game.claimQuest(a.i); goalKey = ''; return; }
     speak(a.q.text);
+    const go = { pick: 'workshop', helper: 'workshop', smelts: 'furnace', build: 'village', hut: 'village', castle: 'village' }[a.q.metric];
+    const st = go && STATIONS.find((x) => x.id === go);
+    if (st && game.s.level >= st.unlock) { openPanel(go); return; }
     hint(`${a.q.text} (${fmt(a.have)} / ${fmt(a.q.n)})`);
   });
 }
@@ -401,15 +408,18 @@ function mineTap() {
 function initMine() {
   const m = $('mine');
   let holdT = 0, repeatT = 0;
+  const down = new Set();
   const stop = () => { clearTimeout(holdT); clearInterval(repeatT); holdT = repeatT = 0; };
   m.addEventListener('pointerdown', (e) => {
     e.preventDefault();
+    down.add(e.pointerId);
     mineTap();
     stop();
     // Holding the block keeps mining slowly (easier on little fingers).
     holdT = setTimeout(() => { repeatT = setInterval(mineTap, 330); }, 450);
   });
-  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) m.addEventListener(ev, stop);
+  const up = (e) => { down.delete(e.pointerId); if (!down.size) stop(); };
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) m.addEventListener(ev, up);
   m.addEventListener('contextmenu', (e) => e.preventDefault());
 }
 
@@ -464,7 +474,7 @@ function updateStations() {
       if (bd) { if (r) bd.textContent = String(r); else bd.remove(); }
     }
     if (st.id === 'chest') {
-      const n2 = game.storedBlocks() + (s.store.boom || 0);
+      const n2 = game.storedBlocks() + (s.booms || 0);
       b.querySelector('span').textContent = n2 ? `Chest (${n2})` : 'Chest';
     }
     if (st.id === 'mole') {
@@ -479,6 +489,7 @@ function updateStations() {
 // ------------------------------------------------------------------ drag & tap on the board
 const ghost = $('drag-ghost');
 let drag = null; // { id, src, x0, y0, active, target, station }
+let flying = false; // a tap-tap block is on its way to its twin
 
 function pointToCell(x, y) {
   // Magnet drop: the nearest open cell whose centre is within ~0.8 of a cell.
@@ -496,7 +507,8 @@ function pointToStation(x, y) {
     const b = stationEls[id];
     if (game.s.level < STATIONS.find((s) => s.id === id).unlock) continue;
     const r = b.getBoundingClientRect();
-    if (x >= r.left - 12 && x <= r.right + 12 && y >= r.top - 12 && y <= r.bottom + 12) return id;
+    const pad = id === 'chest' ? 10 : -4; // melting can't be undone by accident: be strict
+    if (x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad) return id;
   }
   return null;
 }
@@ -532,7 +544,7 @@ function initBoardInput() {
     lastAction = performance.now();
     hideHand();
     const ce = e.target.closest('.cell');
-    if (!ce || drag) return;
+    if (!ce || drag || flying) return;
     const i = Number(ce.dataset.i);
     e.preventDefault();
     drag = { id: e.pointerId, src: i, x0: e.clientX, y0: e.clientY, active: false, target: -1, station: null };
@@ -602,9 +614,12 @@ function onCellTap(i) {
       deselect();
       const from = cellCenter(a), to = cellCenter(i);
       cellEls[a].classList.add('hidden-blk');
+      flying = true;
       fly(A.boom ? iconURL('boom', 96) : tierURL(A.t, 96), from, to, cellSize * 0.75, 260, 'flyblock').then(() => {
+        flying = false;
         cellEls[a].classList.remove('hidden-blk');
         game.drop(a, i);
+        deselect();
         renderBoard();
       });
       return;
@@ -713,12 +728,12 @@ function onGameEvent(type, d) {
         // a quick banner instead of a pop-up for ordinary level-ups
         sound.play('levelup');
         toast(`Level ${d.level}!` + (d.newCells ? ' New square!' : ''), iconURL('star', 64));
-        speak('Level ' + d.level + '!');
+        if (!celOpen && !celQueue.length) speak('Level ' + d.level + '!');
         const c = elCenter($('lvl-badge'));
         burst(c.x, c.y, ['#9cff5e', '#ffd23f', '#fff'], 14, 90);
         coinsTo(c, 3, 'gold'); setTimeout(() => coinsTo(c, 1, 'gems'), 200);
       }
-      for (let i = 0; i < N_CELLS; i++) if (game.isOpen(i) && cellEls[i].classList.contains('unlock-anim')) burst(cellCenter(i).x, cellCenter(i).y, ['#fff6c9', '#ffd23f'], 10, 60);
+      for (const i of UNLOCK_ORDER.slice(openCells(d.level - 1), openCells(d.level))) { const c = cellCenter(i); burst(c.x, c.y, ['#fff6c9', '#ffd23f'], 10, 60); }
       break;
     }
     case 'chest': {
@@ -756,6 +771,11 @@ function onGameEvent(type, d) {
       }
       break;
     }
+    case 'unsmelt': {
+      sound.play('drop');
+      if (d.cell >= 0) { renderCell(d.cell); animCell(d.cell, 'land'); }
+      break;
+    }
     case 'smelted': {
       const c = elCenter(stationEls.furnace);
       sound.play('coin');
@@ -765,6 +785,7 @@ function onGameEvent(type, d) {
       break;
     }
     case 'pickaxe': {
+      renderBoard();
       celebrate({ title: 'NEW PICKAXE!', img: pickaxeURL(d.pick, 160), name: PICKAXES[d.pick].name,
         text: `Breaks a block in ${PICKAXES[d.pick].taps} tap${PICKAXES[d.pick].taps > 1 ? 's' : ''}!`, sound: 'levelup', say: 'New pickaxe! ' + PICKAXES[d.pick].name });
       break;
@@ -801,7 +822,7 @@ function onGameEvent(type, d) {
     }
     case 'deny': {
       sound.play('deny');
-      const msg = { cost: 'Not enough yet — keep mining!', gems: 'You need more gems 💜', full: 'Your board is full!', nopairs: 'No matching blocks right now', toobig: 'Boom Blocks only work on smaller blocks', furnace: 'The furnace is full — wait a moment!', rush: 'Merge more blocks to fill the jar!', max: 'That one is already the biggest!' }[d.reason];
+      const msg = { cost: 'Not enough yet — keep mining!', gems: 'You need more gems 💜', full: 'Your board is full!', nopairs: 'No matching blocks right now', toobig: 'Boom Blocks only work on smaller blocks', furnace: 'The furnace is full — wait a moment!', rush: 'Merge more blocks to fill the jar!', max: 'That one is already the biggest!', precious: 'That’s one of your best blocks — too special to melt!' }[d.reason];
       if (msg) hint(msg);
       if (d.i !== undefined) animCell(d.i, 'invalid');
       break;
@@ -838,13 +859,17 @@ function applyCave(animate) {
 
 // ------------------------------------------------------------------ panels
 let panelOpen = null, panelKey = '', panelTab = null;
+let uiOpenedAt = 0; // taps right after a panel/card opens are ignored (no double-tap accidents)
 const PANELS = {};
 
 function openPanel(id, tab) {
   sound.play('open');
   game.s.seenSt = game.s.seenSt || {};
   game.s.seenSt[id] = 1;
+  if (id === 'parent') gateOpen = false;
   panelOpen = id; panelTab = tab || null; panelKey = '';
+  uiOpenedAt = performance.now();
+  if (!game.s.seenSt[id + '_spoken'] && stationBlurb(id)) { game.s.seenSt[id + '_spoken'] = 1; speak(PANELS[id].title() + '! ' + stationBlurb(id)); }
   deselect();
   const p = PANELS[id];
   $('panel-title').textContent = p.title();
@@ -884,12 +909,22 @@ function row(icon, title, sub, button) {
   if (button) r.appendChild(button);
   return r;
 }
-function buyButton(label, icon, enabled, fn, cls = '') {
-  const b = el('button', 'buy ' + cls);
+function buyButton(label, icon, enabled, fn, cls = '', why = 'Not enough yet — keep mining!') {
+  const b = el('button', 'buy ' + cls + (enabled ? '' : ' off'));
   if (icon) b.appendChild(img(icon));
   b.appendChild(document.createTextNode(label));
-  b.disabled = !enabled;
-  b.addEventListener('click', () => { sound.resume(); fn(); refreshPanel(true); });
+  b.setAttribute('aria-disabled', String(!enabled));
+  b.addEventListener('click', () => {
+    sound.resume();
+    if (!enabled) {
+      // A grey button still answers: a wiggle, a buzz and a spoken reason.
+      if (cls.includes('max')) return;
+      sound.play('deny'); toast(why); speak(why);
+      b.classList.remove('nope'); void b.offsetWidth; b.classList.add('nope');
+      return;
+    }
+    fn(); refreshPanel(true);
+  });
   return b;
 }
 function needLabel(k) {
@@ -944,7 +979,7 @@ PANELS.workshop = {
       line.append(' ' + TIERS[cur].name);
       sub.appendChild(line);
       let btn;
-      if (lv >= u.max) btn = buyButton('Max!', null, false, () => {}, 'max');
+      if (game.depthMaxed()) btn = buyButton('Max!', null, false, () => {}, 'max');
       else if (!game.depthUseful()) {
         const need = depthNeed(lv);
         const tip = el('small'); tip.textContent = `Make ${TIERS[Math.min(MAX_TIER, need)].name} first!`;
@@ -993,11 +1028,14 @@ PANELS.furnace = {
       const sub = el('div');
       sub.appendChild(el('small', '', r.ingot ? `→ ${INGOTS[r.ingot].name.replace('Ingot', 'Bar')} + ${r.bricks} bricks` : `→ ${r.bricks} bricks`));
       const bar = el('div', 'bar'); const fill = el('i'); fill.style.width = Math.round((1 - f.left / f.total) * 100) + '%'; bar.appendChild(fill); sub.appendChild(bar);
-      const rr = row(tierURL(f.t, 96), TIERS[f.t].name, sub, el('b', 'left', fmtTime(f.left)));
+      sub.appendChild(el('small', 'left', fmtTime(f.left)));
+      const k = s.furnace.indexOf(f);
+      const out = buyButton('Take out', null, true, () => game.unsmelt(k), 'alt');
+      const rr = row(tierURL(f.t, 96), TIERS[f.t].name, sub, out);
       rr.classList.add('melting');
       body.appendChild(rr);
     });
-    for (let k = s.furnace.length; k < game.furnaceSlots(); k++) body.appendChild(row(null, 'Empty slot', 'Drop a block here!'));
+    for (let k = s.furnace.length; k < game.furnaceSlots(); k++) body.appendChild(row(iconURL('furnace', 64), 'Empty spot', 'Close this, then drag a block onto the Furnace button'));
     // what's good to melt
     body.appendChild(el('div', 'section', '✨ Shiny ores make bars'));
     const g = el('div', 'grid-items');
@@ -1011,7 +1049,7 @@ PANELS.furnace = {
     }
     body.appendChild(g);
     // melt from chest
-    const stored = Object.keys(s.store).filter((k) => k[0] === 'b').map((k) => Number(k.slice(1))).sort((a, b) => a - b);
+    const stored = game.storedTiers().filter((t) => game.canSmelt(t)).sort((a, b) => a - b);
     if (stored.length) {
       body.appendChild(el('div', 'section', '📦 Melt from your chest'));
       const g2 = el('div', 'grid-items');
@@ -1144,19 +1182,19 @@ PANELS.book = {
 // --- Storage chest
 PANELS.chest = {
   title: () => 'My Chest', icon: () => iconURL('chest', 96),
-  key() { return JSON.stringify(game.s.store) + (game.emptyCells().length > 0); },
+  key() { return JSON.stringify(game.s.store) + game.s.booms + (game.emptyCells().length > 0); },
   render(body) {
     const s = game.s;
     body.appendChild(el('div', 'note', 'Drag a block onto the Chest to keep it safe. Blocks in the chest don’t make gold. Tap one to put it back on your board!'));
-    const blocks = Object.keys(s.store).filter((k) => k[0] === 'b').map((k) => Number(k.slice(1))).sort((a, b) => b - a);
-    if (s.store.boom) blocks.unshift('boom');
+    const blocks = game.storedTiers().sort((a, b) => b - a);
+    if (s.booms) blocks.unshift('boom');
     if (!blocks.length) body.appendChild(el('div', 'note', 'Your chest is empty.'));
     else {
       const g = el('div', 'grid-items');
       for (const t of blocks) {
         const it = el('button', 'item');
         it.appendChild(img(t === 'boom' ? iconURL('boom', 64) : tierURL(t, 64)));
-        it.appendChild(el('span', 'count', String(t === 'boom' ? s.store.boom : s.store['b' + t])));
+        it.appendChild(el('span', 'count', String(t === 'boom' ? s.booms : s.store['b' + t])));
         it.appendChild(el('small', '', t === 'boom' ? 'Boom Block' : TIERS[t].name));
         it.addEventListener('click', () => { if (game.unstore(t) >= 0) refreshPanel(true); });
         g.appendChild(it);
@@ -1181,27 +1219,62 @@ PANELS.chest = {
 
 // --- Grown-ups corner (behind a press-and-hold gate)
 let gateOpen = false;
+const SUMS = [['seven plus five', 12], ['nine plus six', 15], ['eight plus seven', 15], ['six plus eight', 14], ['nine plus four', 13]];
+let gateStep = 0, gateSum = SUMS[0];
 PANELS.parent = {
   title: () => 'Grown-ups', icon: () => iconURL('gear', 96),
-  key() { return gateOpen + JSON.stringify(settings()); },
-  onClose() { gateOpen = false; },
+  key() { return gateOpen + ':' + gateStep + JSON.stringify(settings()); },
+  onClose() { gateOpen = false; gateStep = 0; },
   render(body) {
-    if (!gateOpen) {
+    if (!gateOpen && gateStep === 0) {
       const g = el('div', 'gate');
-      g.appendChild(el('div', 'note', 'For grown-ups: press and hold the circle for 3 seconds.'));
+      g.appendChild(el('div', 'note', 'For grown-ups: press and hold the circle with one finger for 3 seconds.'));
       const b = el('button', '', 'Hold');
-      let t0 = 0, raf = 0;
+      let t0 = 0, raf = 0, pid = null, fingers = 0;
+      const reset = () => { cancelAnimationFrame(raf); raf = 0; pid = null; b.style.setProperty('--p', '0%'); };
       const tick = () => {
         const p = Math.min(1, (performance.now() - t0) / 3000);
         b.style.setProperty('--p', p * 100 + '%');
-        if (p >= 1) { gateOpen = true; sound.play('done'); refreshPanel(true); return; }
+        if (p >= 1) { raf = 0; b.textContent = 'Let go'; return; }
         raf = requestAnimationFrame(tick);
       };
-      b.addEventListener('pointerdown', (e) => { e.preventDefault(); t0 = performance.now(); tick(); });
-      const stop = () => { cancelAnimationFrame(raf); b.style.setProperty('--p', '0%'); };
-      b.addEventListener('pointerup', stop); b.addEventListener('pointerleave', stop); b.addEventListener('pointercancel', stop);
+      b.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        fingers++;
+        if (pid !== null || fingers > 1) { reset(); return; } // two fingers = not a grown-up hold
+        pid = e.pointerId; t0 = performance.now(); tick();
+      });
+      const up = (e) => {
+        fingers = Math.max(0, fingers - 1);
+        if (e.pointerId !== pid) return;
+        const held = performance.now() - t0;
+        reset();
+        if (held >= 3000) { // open on release, so the lifting finger can't press anything
+          gateStep = 1; gateSum = SUMS[Math.floor(Math.random() * SUMS.length)];
+          uiOpenedAt = performance.now(); refreshPanel(true);
+        } else b.textContent = 'Hold';
+      };
+      b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
+      b.addEventListener('pointerleave', (e) => { if (e.pointerId === pid) reset(); });
       g.appendChild(b);
       body.appendChild(g);
+      return;
+    }
+    if (!gateOpen) {
+      const g = el('div', 'gate');
+      g.appendChild(el('div', 'section', `What is ${gateSum[0]}?`));
+      const inp = el('input'); inp.type = 'text'; inp.inputMode = 'numeric'; inp.maxLength = 3; inp.className = 'sum';
+      const go = el('button', 'buy', 'OK');
+      go.style.cssText = 'width:auto;height:58px;border-radius:16px;font-size:20px;background:linear-gradient(#8ef06a,#4fbf4a)';
+      const check = () => {
+        if (Number(inp.value.trim()) === gateSum[1]) { gateOpen = true; sound.play('done'); refreshPanel(true); }
+        else { sound.play('deny'); inp.value = ''; }
+      };
+      go.addEventListener('click', check);
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') check(); });
+      g.appendChild(inp); g.appendChild(go);
+      body.appendChild(g);
+      setTimeout(() => inp.focus(), 50);
       return;
     }
     const st = settings();
@@ -1218,20 +1291,33 @@ PANELS.parent = {
     toggle('Read words out loud', [['On', true], ['Off', false]], st.speak, (v) => { st.speak = v; });
     toggle('Numbers on blocks', [['On', true], ['Off', false]], st.nums, (v) => { st.nums = v; renderBoard(); });
     toggle('Break reminder', [['Off', 0], ['20 min', 20], ['30 min', 30], ['45 min', 45]], st.rest, (v) => { st.rest = v; restShown = false; });
-    body.appendChild(el('div', 'note', 'Ezra’s Mine has no ads, no purchases, no chat and no accounts. Everything is earned by playing and saved on this device. The break reminder shows a friendly “time for a break?” card — it never locks the game.'));
+    body.appendChild(el('div', 'note', 'Ezra’s Mine has no ads, no purchases, no chat and no accounts. Everything is earned by playing and saved in this browser on this device. The break reminder shows a friendly “time for a break?” card — it never locks the game.'));
+    const standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone;
+    if (!standalone) body.appendChild(el('div', 'note', '💡 On an iPad, tap Share → “Add to Home Screen” and play from that icon. Safari can clear saved games for websites that aren’t opened for a while; the home-screen app keeps them safe.'));
     const s = game.s;
     body.appendChild(el('div', 'note', `Play stats: level ${s.level}, ${Object.keys(s.seen).length} of ${MAX_TIER} blocks found, ${fmt(s.stats.merges)} merges, ${fmt(s.stats.mined)} blocks mined.`));
     // Reset (hidden behind a second hold)
     const rb = el('button', 'buy', 'Start over…');
     rb.style.background = 'linear-gradient(#ffb0a8,#e0403a)';
     rb.addEventListener('click', () => {
-      if (window.confirm('Start a brand new game? All of Ezra’s progress in the mine will be erased.')) {
-        try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ }
+      if (window.confirm('Start a brand new game? Ezra’s mine will start over (you can undo this once from this screen).')) {
+        try { save(); localStorage.setItem(SAVE_KEY + '.bak', localStorage.getItem(SAVE_KEY) || ''); localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ }
         skipSave = true;
         location.reload();
       }
     });
-    body.appendChild(row(null, 'Start a new game', 'Erases all progress', rb));
+    body.appendChild(row(null, 'Start a new game', 'Keeps one backup you can restore', rb));
+    let bak = null;
+    try { bak = localStorage.getItem(SAVE_KEY + '.bak'); } catch (e) { /* ignore */ }
+    if (bak) {
+      const rs = el('button', 'buy', 'Restore');
+      rs.addEventListener('click', () => {
+        if (!window.confirm('Go back to the game from before “Start over”?')) return;
+        try { localStorage.setItem(SAVE_KEY, bak); localStorage.removeItem(SAVE_KEY + '.bak'); } catch (e) { /* ignore */ }
+        skipSave = true; location.reload();
+      });
+      body.appendChild(row(null, 'Undo “Start over”', 'Brings back the earlier game', rs));
+    }
     const link = el('button', 'buy', 'Open');
     link.addEventListener('click', () => { save(); location.href = '../'; });
     body.appendChild(row(null, 'Ezra’s Blocks', 'The 3D building game', link));
@@ -1277,7 +1363,10 @@ function idleHints(now) {
   }
   // After 8 quiet seconds, gently wiggle a pair that could merge.
   if (now - lastAction > 8000 && s.stats.merges < 40) {
-    const pairs = game.mergeablePairs();
+    // don't nudge him to merge blocks the next pickaxe needs
+    const goal = game.activeQuests()[0], rec = PICK_RECIPES[s.pick + 1];
+    const keep = goal && goal.q.metric === 'pick' && rec ? Object.keys(rec.need).filter((k) => k[0] === 'b').map((k) => Number(k.slice(1))) : [];
+    const pairs = game.mergeablePairs().filter(([x]) => !keep.includes(s.board[x].t));
     if (pairs.length) {
       const [a, b] = pairs[0];
       cellEls[a].classList.add('hinted'); cellEls[b].classList.add('hinted');
@@ -1314,11 +1403,17 @@ function restCheck(dt) {
     title: 'Great mining today!', img: iconURL('mole', 160), name: 'Digby is getting sleepy…',
     text: 'Maybe it’s time for a little break? Your blocks keep making gold while you’re away.',
     say: 'Great mining today! Maybe it is time for a little break?',
-    buttons: [{ text: 'Keep digging' }, { text: 'Done for now', fn: () => { save(); sleepScreen(); } }],
+    noKeys: true,
+    buttons: [
+      { text: 'Done for now', fn: () => { save(); sleepScreen(); } },
+      // a snooze: ask again in 10 minutes
+      { text: 'Keep digging', fn: () => { restShown = false; playSecs = Math.max(0, settings().rest * 60 - 600); } },
+    ],
   });
 }
 function sleepScreen() {
-  celebrate({ title: 'See you next time!', img: iconURL('star', 160), name: 'Bye bye, miner!', text: 'Your mine is saved. Come back any time.', ok: 'Play again' });
+  celebrate({ title: 'See you next time!', img: iconURL('star', 160), name: 'Bye bye, miner!', text: 'Your mine is saved. Come back any time.', ok: 'Play again', noKeys: true,
+    buttons: [{ text: 'Play again', fn: () => { restShown = false; playSecs = 0; } }] });
 }
 
 // ------------------------------------------------------------------ main loop
@@ -1354,8 +1449,16 @@ function init() {
   applyCave(false);
   updateHud(1);
 
+  // Swallow taps that land within 0.4s of a panel/card opening (double taps).
+  for (const id of ['panel', 'celebrate']) {
+    $(id).addEventListener('click', (e) => {
+      if (performance.now() - uiOpenedAt < 400) { e.stopPropagation(); e.preventDefault(); }
+    }, true);
+  }
   $('panel-close').addEventListener('click', closePanel);
-  $('panel').addEventListener('click', (e) => { if (e.target === $('panel')) closePanel(); });
+  let downOnBackdrop = false;
+  $('panel').addEventListener('pointerdown', (e) => { downOnBackdrop = e.target === $('panel'); });
+  $('panel').addEventListener('click', (e) => { if (e.target === $('panel') && downOnBackdrop) closePanel(); downOnBackdrop = false; });
   $('btn-settings').addEventListener('click', () => { sound.resume(); openPanel('parent'); });
   $('btn-rush').addEventListener('click', () => { sound.resume(); if (game.s.boostLeft > 0) return; game.startRush(); });
   for (const [id, msg] of [['pill-gold', 'Gold comes from the blocks on your board!'], ['pill-bricks', 'Bricks come from the Furnace, chests and quests!'], ['pill-gems', 'Gems come from new blocks, level ups and quests!']]) {
@@ -1367,7 +1470,7 @@ function init() {
   window.addEventListener('keydown', (e) => {
     if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();
-      if (celOpen) { if (!e.repeat) { const ok = $('cel-ok'); if (ok) ok.click(); } return; }
+      if (celOpen) { if (!e.repeat && !(celCurrent && celCurrent.noKeys)) { const ok = $('cel-ok'); if (ok) ok.click(); } return; }
       if (panelOpen) return;
       const now = performance.now();
       if (e.repeat && now - lastKeyTap < 330) return;
@@ -1375,25 +1478,36 @@ function init() {
       const m = $('mine'); m.classList.remove('hit'); void m.offsetWidth;
       mineTap();
     } else if (e.key === 'Escape') {
-      if (celOpen) { const ok = $('cel-ok'); if (ok) ok.click(); } else closePanel();
+      if (celOpen) { if (!(celCurrent && celCurrent.noKeys)) { const ok = $('cel-ok'); if (ok) ok.click(); } } else closePanel();
     }
   });
   // No pinch / double-tap zoom on iPad.
   document.addEventListener('gesturestart', (e) => e.preventDefault());
   document.addEventListener('dblclick', (e) => e.preventDefault());
-  window.addEventListener('resize', () => { layout(); });
-  window.addEventListener('orientationchange', () => setTimeout(layout, 200));
+  window.addEventListener('resize', () => { hideHand(); layout(); });
+  window.addEventListener('orientationchange', () => { hideHand(); setTimeout(layout, 200); });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { if (!skipSave) save(); }
     else {
+      // Back after a real break (15+ min): the break-reminder clock starts fresh.
+      if (Date.now() - (game.s.lastSeen || Date.now()) > 15 * 60 * 1000) { playSecs = 0; restShown = false; }
       const g = game.applyOffline(Date.now());
       if (g > 0) celebrate({ title: 'Welcome back!', img: iconURL('chest', 160), name: 'Your mine made gold!', loot: [{ icon: COIN(), text: '+' + fmt(g) }], sound: 'chest', say: 'Welcome back!' });
       last = performance.now();
     }
   });
   window.addEventListener('pagehide', () => { if (!skipSave) save(); });
-  // First touch anywhere unlocks audio on iOS.
-  window.addEventListener('pointerdown', () => { if (!gotFirstTouch) { gotFirstTouch = true; sound.resume(); } }, { capture: true });
+  // iPad only lets sound start inside a real gesture (touchend/click, not
+  // pointerdown), so keep trying on those until audio is running.
+  const unlock = () => {
+    sound.resume();
+    if (!gotFirstTouch && 'speechSynthesis' in window) {
+      gotFirstTouch = true;
+      try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) { /* ignore */ }
+    }
+    if (sound.ctx && sound.ctx.state === 'running') for (const ev of ['pointerup', 'touchend', 'click', 'keydown']) window.removeEventListener(ev, unlock, true);
+  };
+  for (const ev of ['pointerup', 'touchend', 'click', 'keydown']) window.addEventListener(ev, unlock, true);
 
   // Gold earned while away.
   if (saved) {
@@ -1407,6 +1521,8 @@ function init() {
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('../sw.js', { scope: '../' }).catch(() => { });
   }
+  // Ask the browser not to clear the saved game when space runs low.
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => { }); } catch (e) { /* ignore */ }
 
   // Debug / support handle (also used by the automated tests).
   window.__mine = {
