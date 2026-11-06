@@ -1,0 +1,16 @@
+{
+  "name": "Ezra's Mine",
+  "short_name": "Ezra's Mine",
+  "description": "A cozy tap-and-merge mining game made for Ezra. No ads, no purchases — everything is earned by playing.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#2b1d2e",
+  "theme_color": "#2b1d2e",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

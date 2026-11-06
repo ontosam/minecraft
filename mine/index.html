@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>Ezra's Mine</title>
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#2b1d2e" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Ezra's Mine" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="mine.css" />
+</head>
+
+<body>
+  <div id="app">
+    <!-- Cave backdrop (changes with each new cave you unlock) -->
+    <div id="backdrop"></div>
+
+    <!-- Top bar: money, level -->
+    <header id="hud">
+      <div class="hud-row">
+        <button id="btn-settings" class="round" aria-label="Settings"></button>
+        <div class="pill gold" id="pill-gold"><img alt=""><b id="gold">0</b><small id="gps">+0/s</small></div>
+        <div class="pill bricks" id="pill-bricks"><img alt=""><b id="bricks">0</b></div>
+        <div class="pill gems" id="pill-gems"><img alt=""><b id="gems">0</b></div>
+        <button id="btn-rush" aria-label="Gold Rush"><span class="ring"></span><img alt=""><b>x2</b><small id="rush-time"></small></button>
+      </div>
+      <div class="hud-row level-row">
+        <div id="lvl-badge"><small>LVL</small><b id="lvl">1</b></div>
+        <div id="xpbar"><div id="xpfill"></div><span id="xptext">0 / 10</span></div>
+        <div id="cave-name"></div>
+      </div>
+    </header>
+
+    <!-- The merge board -->
+    <main id="board-wrap">
+      <div id="board"></div>
+      <div id="hint"></div>
+    </main>
+
+    <!-- Bottom dock: stations + the big mine block -->
+    <footer id="dock">
+      <div id="stations-a" class="stations"></div>
+      <div id="right-col">
+      <div id="mine-wrap">
+        <button id="mine" aria-label="Mine block">
+          <img id="mine-img" alt="">
+          <img id="mine-crack" alt="">
+          <span id="mine-taps"></span>
+          <img id="mine-pick" alt="">
+        </button>
+        <div id="spark" title="Spark bar: fills as you mine"><img alt=""><div id="sparkbar"><i></i></div></div>
+      </div>
+      <div id="stations-b" class="stations"></div>
+      </div>
+    </footer>
+
+    <!-- Effects layer (particles, flying coins, floating numbers) -->
+    <div id="fx"></div>
+    <div id="drag-ghost"><img alt=""></div>
+    <div id="hand">👆</div>
+    <div id="toast"></div>
+  </div>
+
+  <!-- Pop-up panel (shop, workshop, furnace, village, quests, book, chest) -->
+  <div id="panel" class="hidden" role="dialog">
+    <div class="panel-box">
+      <div class="panel-head">
+        <img id="panel-icon" alt="">
+        <span id="panel-title"></span>
+        <button id="panel-close" aria-label="Close">✕</button>
+      </div>
+      <div id="panel-tabs"></div>
+      <div id="panel-body"></div>
+    </div>
+  </div>
+
+  <!-- Big celebration pop-up (level up, new block discovered, chest opened) -->
+  <div id="celebrate" class="hidden">
+    <div class="cel-box">
+      <div id="cel-rays"></div>
+      <div id="cel-title"></div>
+      <img id="cel-img" alt="">
+      <div id="cel-name"></div>
+      <div id="cel-text"></div>
+      <div id="cel-extra"></div>
+      <div id="cel-buttons"><button id="cel-ok">Yay!</button></div>
+    </div>
+  </div>
+
+  <div id="error-overlay">
+    <div class="box">
+      <h2>Oops — something went wrong 😟</h2>
+      <p>Please take a screenshot of this and send it so it can be fixed:</p>
+      <pre class="msg"></pre>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+
+</html>

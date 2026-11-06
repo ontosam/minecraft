@@ -1,10 +1,17 @@
-// Offline service worker for Ezra's Blocks. Bump CACHE to push an update.
-const CACHE = 'ezrablocks-v1';
+// Offline service worker for Ezra's Blocks and Ezra's Mine (/mine/).
+// Bump CACHE to push an update.
+const CACHE = 'ezrablocks-v2';
 const CORE = [
   '', 'index.html', 'styles.css', 'manifest.webmanifest',
   'js/main.js', 'js/math.js', 'js/gfx.js', 'js/world.js',
   'js/player.js', 'js/input.js', 'js/audio.js', 'js/animals.js',
+  'js/character.js', 'js/goals.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
+  // Ezra's Mine
+  'mine/', 'mine/index.html', 'mine/mine.css', 'mine/manifest.webmanifest',
+  'mine/js/main.js', 'mine/js/game.js', 'mine/js/data.js', 'mine/js/art.js',
+  'mine/js/sound.js', 'mine/js/fmt.js',
+  'mine/icons/icon-192.png', 'mine/icons/icon-512.png', 'mine/icons/apple-touch-icon.png',
 ];
 
 self.addEventListener('install', (e) => {
@@ -33,9 +40,12 @@ self.addEventListener('fetch', (e) => {
         caches.open(CACHE).then((c) => c.put(req, copy));
       }
       return res;
-    }).catch(() => caches.match(req).then((hit) => {
+    }).catch(() => caches.match(req, { ignoreSearch: true }).then((hit) => {
       if (hit) return hit;
-      if (req.mode === 'navigate') return caches.match('index.html');
+      if (req.mode === 'navigate') {
+        // Offline and not cached: open whichever game the link was for.
+        return caches.match(new URL(req.url).pathname.includes('/mine/') ? 'mine/index.html' : 'index.html');
+      }
     }))
   );
 });
