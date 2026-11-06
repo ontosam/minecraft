@@ -103,6 +103,36 @@ export class Game {
     return n;
   }
   helperInterval() { return UPGRADES.helper.interval(this.s.up.helper); }
+
+  // Where a new block of tier t should land: the empty square closest to a
+  // twin (so little fingers only drag a short way), otherwise the one closest
+  // to the middle of the board. Returns -1 if the board is full.
+  placeFor(t) {
+    const empty = this.emptyCells();
+    if (!empty.length) return -1;
+    const xy = (i) => [i % COLS, Math.floor(i / COLS)];
+    const twins = [];
+    if (t) this.s.board.forEach((c, i) => { if (c && c.t === t) twins.push(xy(i)); });
+    const cx = (COLS - 1) / 2, cy = (ROWS - 1) / 2;
+    let best = -1, bestD = Infinity;
+    for (const i of empty) {
+      const [x, y] = xy(i);
+      let d = twins.length ? Math.min(...twins.map(([a, b]) => Math.abs(a - x) + Math.abs(b - y))) : Math.abs(x - cx) + Math.abs(y - cy);
+      d += UNLOCK_ORDER.indexOf(i) * 1e-3; // stable tie-break
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
+  }
+
+  // A leftover block with no twin on the board, smaller than what the mine
+  // drops — the mine sends it a buddy so it can merge up (lowest first).
+  lonelyTier() {
+    const count = {};
+    for (const c of this.s.board) if (c && c.t) count[c.t] = (count[c.t] || 0) + 1;
+    const d = this.dropTier();
+    for (let t = 1; t < d; t++) if (count[t] === 1) return t;
+    return 0;
+  }
   cave() { return caveFor(this.s.maxTier); }
 
   // ------------------------------------------------------------- the mine
@@ -129,6 +159,8 @@ export class Game {
     }
     const n = superSwing ? 2 : (this.rand() < this.pickaxe.double ? 2 : 1);
     for (let k = 0; k < n; k++) {
+      const buddy = !superSwing && k === 0 ? this.lonelyTier() : 0;
+      if (buddy) { tiers.push(buddy); continue; }
       let t = this.dropTier() + (superSwing ? 1 : 0);
       if (this.rand() < UPGRADES.lucky.chance(s.up.lucky)) t++;
       tiers.push(Math.min(t, s.maxTier));
@@ -138,7 +170,7 @@ export class Game {
       const empty = this.emptyCells();
       if (t === 'chest') {
         if (!empty.length) continue; // the chest just waits for next time
-        const cell = empty[Math.floor(this.rand() * empty.length)];
+        const cell = this.placeFor(0);
         s.board[cell] = { chest: 1 };
         drops.push({ cell, chest: true });
         continue;
@@ -149,7 +181,7 @@ export class Game {
         drops.push({ stored: true, t });
         continue;
       }
-      const cell = empty[Math.floor(this.rand() * empty.length)];
+      const cell = this.placeFor(t);
       s.board[cell] = { t };
       drops.push({ cell, t });
     }
@@ -248,7 +280,7 @@ export class Game {
         else { s.store.boom = (s.store.boom || 0) + 1; blocks.push({ stored: true, boom: true }); }
         continue;
       }
-      const cell = k === 0 ? i : empty[Math.floor(this.rand() * empty.length)];
+      const cell = k === 0 ? i : this.placeFor(isBoom ? 0 : t);
       if (isBoom) { s.board[cell] = { boom: 1 }; blocks.push({ cell, boom: true }); continue; }
       s.board[cell] = { t };
       blocks.push({ cell, t });
@@ -276,7 +308,7 @@ export class Game {
     if (!s.store[k]) return -1;
     const empty = this.emptyCells();
     if (!empty.length) { this.emit('deny', { reason: 'full' }); return -1; }
-    const cell = empty[Math.floor(this.rand() * empty.length)];
+    const cell = this.placeFor(t === 'boom' ? 0 : t);
     s.store[k]--; if (!s.store[k]) delete s.store[k];
     s.board[cell] = t === 'boom' ? { boom: 1 } : { t };
     this.emit('unstore', { cell, t });
@@ -394,7 +426,7 @@ export class Game {
     if (!empty.length) { this.emit('deny', { reason: 'full' }); return -1; }
     if (s.gold < price) { this.emit('deny', { reason: 'cost' }); return -1; }
     s.gold -= price;
-    const cell = empty[Math.floor(this.rand() * empty.length)];
+    const cell = this.placeFor(t);
     s.board[cell] = { t };
     this.emit('buy', { cell, t, price });
     return cell;
@@ -409,7 +441,7 @@ export class Game {
     if (id === 'magic') this.magicMerge();
     if (id === 'boom') {
       const e = this.emptyCells();
-      const cell = e[Math.floor(this.rand() * e.length)];
+      const cell = this.placeFor(0);
       s.board[cell] = { boom: 1 };
       this.emit('buy', { cell, boom: true });
     }

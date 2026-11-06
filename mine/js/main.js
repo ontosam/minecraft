@@ -248,7 +248,7 @@ function hint(text, ms = 2600) {
 
 // ------------------------------------------------------------------ celebrations
 const celQueue = [];
-let celOpen = false;
+let celOpen = false, celTimer = 0;
 function celebrate(opts) { celQueue.push(opts); if (!celOpen) nextCelebration(); }
 function nextCelebration() {
   const c = celQueue.shift();
@@ -268,12 +268,20 @@ function nextCelebration() {
   }
   const btns = $('cel-buttons'); btns.innerHTML = '';
   const buttons = c.buttons || [{ text: c.ok || 'Yay!' }];
+  clearTimeout(celTimer);
   buttons.forEach((b, k) => {
     const e = el('button', k ? 'alt' : '', b.text);
     e.id = k ? '' : 'cel-ok';
-    e.addEventListener('click', () => { sound.play('close'); if (b.fn) b.fn(); nextCelebration(); });
+    e.addEventListener('click', () => { clearTimeout(celTimer); sound.play('close'); if (b.fn) b.fn(); nextCelebration(); });
     btns.appendChild(e);
   });
+  // Small celebrations close by themselves so play isn't interrupted for long.
+  if (c.auto) {
+    const bar = el('span', 't');
+    $('cel-ok').appendChild(bar);
+    if (canAnimate) bar.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], { duration: c.auto, fill: 'forwards' });
+    celTimer = setTimeout(() => nextCelebration(), c.auto);
+  }
   $('celebrate').classList.remove('hidden');
   if (c.sound) sound.play(c.sound);
   if (c.say) speak(c.say);
@@ -317,12 +325,58 @@ function updateHud(dt) {
   rb.style.setProperty('--fill', Math.round((s.rush / RUSH_FULL) * 100) + '%');
   setText('rush-time', active ? fmtTime(s.boostLeft) : '');
   document.body.classList.toggle('rush', active);
+  // Counters appear once they matter (less to take in at the start).
+  $('pill-bricks').classList.toggle('later', !(s.bricks > 0 || s.level >= 4));
+  $('pill-gems').classList.toggle('later', !(s.gems > 0));
+  rb.classList.toggle('later', !(s.level >= 3 || s.rush > 0 || active));
+  updateGoal();
   // Spark bar
   const sp = Math.min(1, s.spark / SPARK_FULL);
   $('sparkbar').firstElementChild.style.width = sp * 100 + '%';
   $('spark').classList.toggle('full', s.spark >= SPARK_FULL);
   updateMine();
   updateStations();
+}
+
+// ------------------------------------------------------------------ goal card
+let goalKey = '';
+function questIcon(q) {
+  switch (q.metric) {
+    case 'tier': return tierURL(Math.min(MAX_TIER, q.n), 64);
+    case 'taps': case 'mined': return pickaxeURL(game.s.pick, 64);
+    case 'merges': return iconURL('sparkle', 64);
+    case 'level': return iconURL('star', 64);
+    case 'pick': return pickaxeURL(Math.min(7, q.n), 64);
+    case 'helper': return iconURL('mole', 64);
+    case 'build': case 'castle': return iconURL('house', 64);
+    case 'chests': return iconURL('chest', 64);
+    case 'smelts': return iconURL('furnace', 64);
+    default: return iconURL('book', 64);
+  }
+}
+function updateGoal() {
+  const a = game.activeQuests()[0];
+  const g = $('goal');
+  if (!a) { g.classList.add('empty'); return; }
+  const key = a.i + '|' + a.have + '|' + a.ready;
+  if (key === goalKey) return;
+  goalKey = key;
+  g.classList.remove('empty');
+  g.classList.toggle('ready', a.ready);
+  $('goal-img').src = questIcon(a.q);
+  $('goal-text').textContent = a.q.text;
+  $('goal-prog').firstElementChild.style.width = Math.round((a.have / a.q.n) * 100) + '%';
+  g.dataset.i = a.i;
+}
+function initGoal() {
+  $('goal').addEventListener('click', () => {
+    sound.resume();
+    const a = game.activeQuests()[0];
+    if (!a) return;
+    if (a.ready) { game.claimQuest(a.i); goalKey = ''; return; }
+    speak(a.q.text);
+    hint(`${a.q.text} (${fmt(a.have)} / ${fmt(a.q.n)})`);
+  });
 }
 
 // ------------------------------------------------------------------ mine block
@@ -636,7 +690,7 @@ function onGameEvent(type, d) {
         title: 'NEW BLOCK!', img: tierURL(d.t, 160), name: t.name,
         text: `Makes ${fmt(t.gps)} gold every second!`,
         loot: d.gem ? [{ icon: GEM(), text: '+1' }] : [],
-        say: 'New block! ' + t.name,
+        say: 'New block! ' + t.name, auto: 4500,
       });
       break;
     }
@@ -647,14 +701,24 @@ function onGameEvent(type, d) {
     }
     case 'levelup': {
       renderBoard();
-      celebrate({
-        title: 'LEVEL UP!', img: iconURL('star', 160), name: 'Level ' + d.level,
-        text: d.newCells ? `A new square on your board!` : 'Great mining!',
-        loot: [{ icon: COIN(), text: '+' + fmt(d.reward) }, { icon: GEM(), text: '+' + d.gems }],
-        sound: 'levelup', say: 'Level ' + d.level + '!',
-      });
       const unl = STATIONS.find((st) => st.unlock === d.level);
-      if (unl) celebrate({ title: 'NEW!', img: unl.icon(), name: unl.name, text: stationBlurb(unl.id), say: 'You unlocked the ' + unl.name + '!' });
+      if (unl) {
+        celebrate({
+          title: 'LEVEL ' + d.level + '!', img: unl.icon(), name: 'New: ' + unl.name,
+          text: stationBlurb(unl.id),
+          loot: [{ icon: COIN(), text: '+' + fmt(d.reward) }, { icon: GEM(), text: '+' + d.gems }],
+          sound: 'levelup', say: 'Level ' + d.level + '! You unlocked the ' + unl.name + '!',
+        });
+      } else {
+        // a quick banner instead of a pop-up for ordinary level-ups
+        sound.play('levelup');
+        toast(`Level ${d.level}!` + (d.newCells ? ' New square!' : ''), iconURL('star', 64));
+        speak('Level ' + d.level + '!');
+        const c = elCenter($('lvl-badge'));
+        burst(c.x, c.y, ['#9cff5e', '#ffd23f', '#fff'], 14, 90);
+        coinsTo(c, 3, 'gold'); setTimeout(() => coinsTo(c, 1, 'gems'), 200);
+      }
+      for (let i = 0; i < N_CELLS; i++) if (game.isOpen(i) && cellEls[i].classList.contains('unlock-anim')) burst(cellCenter(i).x, cellCenter(i).y, ['#fff6c9', '#ffd23f'], 10, 60);
       break;
     }
     case 'chest': {
@@ -669,7 +733,7 @@ function onGameEvent(type, d) {
       const loot = [{ icon: COIN(), text: '+' + fmt(d.gold) }, { icon: BRICK(), text: '+' + d.bricks }];
       if (d.gems) loot.push({ icon: GEM(), text: '+' + d.gems });
       for (const b of d.blocks) loot.push({ icon: b.boom ? iconURL('boom', 64) : tierURL(b.t, 64), text: '' });
-      celebrate({ title: 'TREASURE!', img: iconURL('chest', 160), name: 'You opened a chest!', loot, say: 'Treasure!' });
+      celebrate({ title: 'TREASURE!', img: iconURL('chest', 160), name: 'You opened a chest!', loot, say: 'Treasure!', auto: 3500 });
       break;
     }
     case 'store': {
@@ -728,7 +792,8 @@ function onGameEvent(type, d) {
     case 'rush': sound.play('levelup'); toast('Gold Rush! Double gold!', iconURL('bolt', 64)); speak('Gold rush!'); break;
     case 'quest': {
       sound.play('done');
-      const r = d.reward, c = elCenter(stationEls.quests);
+      const r = d.reward, c = panelOpen === 'quests' ? elCenter(stationEls.quests) : elCenter($('goal'));
+      floatText(c.x, c.y - 30, 'Quest done!', 'big');
       if (r.gold) coinsTo(c, 3, 'gold');
       if (r.bricks) setTimeout(() => coinsTo(c, 2, 'bricks'), 150);
       if (r.gems) setTimeout(() => coinsTo(c, r.gems, 'gems'), 300);
@@ -1296,6 +1361,26 @@ function init() {
   for (const [id, msg] of [['pill-gold', 'Gold comes from the blocks on your board!'], ['pill-bricks', 'Bricks come from the Furnace, chests and quests!'], ['pill-gems', 'Gems come from new blocks, level ups and quests!']]) {
     $(id).addEventListener('click', () => { hint(msg); speak(msg); });
   }
+  initGoal();
+  // Keyboard (laptop): Space/Enter mines (held = slow repeat), Esc closes things.
+  let lastKeyTap = 0;
+  window.addEventListener('keydown', (e) => {
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      if (celOpen) { if (!e.repeat) { const ok = $('cel-ok'); if (ok) ok.click(); } return; }
+      if (panelOpen) return;
+      const now = performance.now();
+      if (e.repeat && now - lastKeyTap < 330) return;
+      lastKeyTap = now;
+      const m = $('mine'); m.classList.remove('hit'); void m.offsetWidth;
+      mineTap();
+    } else if (e.key === 'Escape') {
+      if (celOpen) { const ok = $('cel-ok'); if (ok) ok.click(); } else closePanel();
+    }
+  });
+  // No pinch / double-tap zoom on iPad.
+  document.addEventListener('gesturestart', (e) => e.preventDefault());
+  document.addEventListener('dblclick', (e) => e.preventDefault());
   window.addEventListener('resize', () => { layout(); });
   window.addEventListener('orientationchange', () => setTimeout(layout, 200));
   document.addEventListener('visibilitychange', () => {
