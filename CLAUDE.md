@@ -1854,6 +1854,21 @@ smelting Diamond Ore (tier 12, hours in) and no shop sold them. Shipped on
   `grant()` adds `m:diamond`, a "DIAMONDS!" card after checkout closes.
 - e2e +6 checks (tab exists, sells diamonds + pack, buy spends 4 emeralds, no
   spend when short, pack adds 5, Diamond Sword recipe shows).
+- **Follow-up (dad sent a photo of MineTap's shop — what Ezra calls "the
+  diamonds"):** its **PREMIUM SHOP** has a crafting tab of cards bought with
+  **emeralds** (Craftsman Chest, TNT, **Diamond ×5**, gold/iron bars). So the
+  Mine's store is now titled **"Premium Shop"** with a **"💎 Crafting" tab**
+  (`CRAFT_PACKS` in data.js, `game.buyPack(id)`, event `buyPack`,
+  `renderCraftPacks` in main.js, `.packs`/`.pack` CSS): golden cards with a big
+  picture, a ×N badge, a "?" (tap = read what's inside) and a green emerald
+  button — **Craftsman Chest 40💚** (3 diamonds, 3 gold, 5 iron, 3 string, 8
+  planks, 4 sticks), **Diamond ×5 20💚**, Gold Bar ×5 10💚, Iron Bar ×5 6💚,
+  String ×5 4💚, Stick ×5 2💚. The real-money "Pack of Diamonds" was **removed**
+  (MineTap sells diamonds for emeralds, not money); the Shop station's 💎
+  Diamonds tab links to these cards. (No TNT: the Mine has no TNT block.)
+  **sw v51→v52.** HEIC photos from the dad's iPhone: `convert`/ffmpeg 6 can't read
+  them and installing pillow-heif was blocked — a tiny stdlib HEIF-grid parser
+  feeding the HEVC tiles to ffmpeg works (see the session transcript).
 
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world

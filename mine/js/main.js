@@ -7,7 +7,7 @@ import { Game, SAVE_KEY, N_CELLS, UNLOCK_ORDER, validateCard } from './game.js';
 import {
   TIERS, MAX_TIER, COLS, ROWS, caveFor, xpNeeded, openCells, MATERIALS, GEAR, SLOTS, SLOT_NAME, gearName,
   RECIPES, SMELT, FUEL_TIER, MONSTERS, BOOSTERS, BUILDINGS, VILLAGE_MERGES, shaftNeed, TASKS, ACHIEVEMENTS, HUNT,
-  SKINS, STORE, STORE_TABS, storeItem, ENERGY, CARD_DIGITS, SWORD_ATK, PICK_TAPS, BOW_ATK, armorPoints, MAT_SHOP,
+  SKINS, STORE, STORE_TABS, storeItem, ENERGY, CARD_DIGITS, SWORD_ATK, PICK_TAPS, BOW_ATK, armorPoints, MAT_SHOP, CRAFT_PACKS,
 } from './data.js';
 import {
   tileURL, iconURL, tileColors, crackURL, buildingURL,
@@ -888,6 +888,14 @@ function onGameEvent(type, d) {
     case 'booster': sound.play('levelup'); toast(`${BOOSTERS[d.id].name}! (${fmtTime(d.secs)})`, iconURL(d.id === 'damage' ? 'sword' : d.id === 'gold' ? 'coin' : 'uparrow', 64)); break;
     case 'build': sound.play('buy'); toast(`${BUILDINGS.find((b) => b.id === d.id).name} is now level ${d.lv}!`, iconURL('house', 64)); tutorialPoke(); break;
     case 'buy': sound.play('buy'); renderCell(d.cell); animCell(d.cell, 'land'); break;
+    case 'buyPack': {
+      sound.play('chest');
+      const p = d.pack, k0 = Object.keys(p.items)[0];
+      if (p.big) celebrate({ title: 'CRAFTSMAN CHEST!', img: chestURL('gold', 160), name: 'Look what was inside!', loot: Object.keys(p.items).map((k) => ({ icon: invURL(k, 64), text: '+' + p.items[k] })), sound: 'chest', say: 'Treasure!', auto: 4000 });
+      else toast(`+${p.items[k0]} ${invName(k0)}${p.items[k0] > 1 ? 's' : ''}! They’re in your Chest.`, invURL(k0, 64));
+      fly(p.big ? chestURL('gold', 96) : invURL(k0, 96), { x: innerWidth / 2, y: innerHeight / 2 }, elCenter(stationEls.chest), 46, 450, 'flyblock').then(() => stationPulse('chest'));
+      break;
+    }
     case 'buyMat': {
       sound.play('buy');
       toast(`You got ${/^[aeiou]/i.test(invName(d.k)) ? 'an' : 'a'} ${invName(d.k)}! It’s in your Chest.`, invURL(d.k, 64));
@@ -968,7 +976,6 @@ function storeIcon(it, size = 96) {
   if (it.bricks) return iconURL('brick', size);
   if (it.refill || it.unlimited) return iconURL('bolt', size);
   if (it.rush) return iconURL('coin', size);
-  if (it.diamonds) return itemURL('diamond', size);
   if (it.chest === 'mega') return iconURL('chest', size, { t: 0xf6c935, b: 0xd99a1e, B: 0x8a5a10 });
   if (it.chest) return iconURL('chest', size);
   if (it.pass) return iconURL('star', size);
@@ -980,7 +987,6 @@ function storeWhat(it) {
   if (it.refill) return 'Fill your energy right up';
   if (it.unlimited) return 'Mine forever — never run out';
   if (it.rush) return `Double gold for ${Math.round(it.rush / 60)} minutes`;
-  if (it.diamonds) return `+${it.diamonds} diamonds to craft shiny gear`;
   if (it.chest === 'mega') return '6 big blocks, iron, string, 25 emeralds + lots of gold';
   if (it.chest) return '3 surprise blocks + emeralds + gold';
   if (it.pass) return 'Double gold forever, more energy, faster refills, +10 emeralds';
@@ -1014,9 +1020,6 @@ function onPurchased(it, got) {
   if (got.gold) setTimeout(() => coinsTo(from, 5, 'gold'), 250);
   if (it.rush) toast(`Gold Rush x2 for ${Math.round(it.rush / 60)} minutes!`, iconURL('coin', 64));
   if (it.refill) toast('Energy full! ⚡', iconURL('bolt', 64));
-  if (got.diamonds) {
-    celebrate({ title: 'DIAMONDS!', img: itemURL('diamond', 160), name: `+${got.diamonds} Diamonds`, text: 'They’re in your Chest. Make something shiny at the Workbench!', sound: 'chest', say: 'Diamonds!' });
-  }
   if (it.chest) {
     renderBoard();
     for (const b of got.blocks) if (b.cell !== undefined) animCell(b.cell, 'land');
@@ -1219,9 +1222,13 @@ const aff = (ok) => (ok ? '1' : '0');
 
 // --- Store (pretend money)
 PANELS.store = {
-  title: () => 'Emerald Store', icon: () => emeraldURL(96),
+  title: () => 'Premium Shop', icon: () => emeraldURL(96),
   // (energy only matters on the Energy tab — rebuilding on every break would eat taps)
-  key() { const s = game.s; return [panelTab, s.iap.pass, s.iap.unlimited, s.gems >= ENERGY.gemRefill, (panelTab === 'energy') ? game.refillUseful() + ':' + Math.floor(s.energy / 10) : ''].join('|'); },
+  key() {
+    const s = game.s;
+    const craft = panelTab === 'craft' ? CRAFT_PACKS.map((p) => s.gems >= p.gems).join(',') + ':' + s.gems : '';
+    return [panelTab, s.iap.pass, s.iap.unlimited, s.gems >= ENERGY.gemRefill, (panelTab === 'energy') ? game.refillUseful() + ':' + Math.floor(s.energy / 10) : '', craft].join('|');
+  },
   render(body) {
     const s = game.s;
     const tab = panelTab || 'gems';
@@ -1231,6 +1238,7 @@ PANELS.store = {
       b.addEventListener('click', () => { panelTab = t.id; sound.play('pick'); refreshPanel(true); });
       tabs.appendChild(b);
     }
+    if (tab === 'craft') { renderCraftPacks(body); return; }
     if (tab === 'energy') {
       body.appendChild(el('div', 'note', game.energyOn()
         ? `⚡ Energy: ${Math.floor(s.energy)} / ${energyCapShown()}. Every block you break uses 1. You get +1 every ${regenText()} seconds.`
@@ -1259,6 +1267,34 @@ PANELS.store = {
     }
   },
 };
+
+// The Premium Shop's "💎 Crafting" cards: diamonds, bars and a Craftsman Chest
+// for emeralds. Tap the picture (or "?") to hear what's inside.
+function packWhat(p) {
+  return Object.keys(p.items).map((k) => `${p.items[k]} ${invName(k)}${p.items[k] > 1 && !/s$/.test(invName(k)) ? 's' : ''}`).join(', ');
+}
+function renderCraftPacks(body) {
+  const s = game.s;
+  body.appendChild(el('div', 'note', 'Diamonds and bars for crafting the best gear. Everything goes in your Chest.'));
+  const grid = el('div', 'packs');
+  for (const p of CRAFT_PACKS) {
+    const card = el('div', 'pack' + (p.big ? ' big' : ''));
+    card.dataset.pack = p.id;
+    const k0 = Object.keys(p.items)[0], n0 = p.items[k0];
+    const pic = el('button', 'pack-pic');
+    pic.appendChild(img(p.big ? chestURL('gold', 128) : invURL(k0, 128)));
+    if (!p.big && n0 > 1) pic.appendChild(el('span', 'pack-n', '×' + n0));
+    pic.appendChild(el('span', 'pack-q', '?'));
+    pic.addEventListener('click', () => { const t = `${p.name}: ${packWhat(p)}`; hint(t, 3500); speak(t); });
+    card.appendChild(pic);
+    card.appendChild(el('b', 'pack-name', p.name));
+    if (p.big) card.appendChild(el('small', 'pack-what', packWhat(p)));
+    const btn = buyButton(String(p.gems), GEM(), s.gems >= p.gems, () => game.buyPack(p.id), 'pack-buy', 'You need more emeralds 💚');
+    card.appendChild(btn);
+    grid.appendChild(card);
+  }
+  body.appendChild(grid);
+}
 
 // --- dragging items inside panels (workbench grid, hero slots) ---------------
 // Tap an item = quick action; drag it = drop it on a grid square or gear slot.
@@ -1525,7 +1561,7 @@ PANELS.shop = {
       b.addEventListener('click', () => { panelTab = id; sound.play('pick'); refreshPanel(true); });
       tabs.appendChild(b);
     }
-    body.appendChild(row(GEM(), 'Emerald Store', 'Emeralds, energy, chests & the Super Miner Pass', buyButton('Open', null, true, () => openPanel('store'), 'price')));
+    body.appendChild(row(GEM(), 'Premium Shop', 'Diamonds, emeralds, energy, chests & the Super Miner Pass', buyButton('Open', null, true, () => openPanel('store', tab === 'mats' ? 'craft' : undefined), 'price')));
     if (tab === 'boost') {
       const price = game.boosterPrice();
       for (const id in BOOSTERS) {
@@ -1551,10 +1587,8 @@ PANELS.shop = {
         r.dataset.mat = m.k;
         body.appendChild(r);
       }
-      const pack = storeItem('diamonds5');
-      const r = row(storeIcon(pack), pack.name, storeWhat(pack), buyButton(money(pack.price), null, true, () => openCheckout(pack.id), 'price'));
-      r.classList.add('store-row');
-      r.appendChild(el('span', 'ribbon', pack.tag));
+      const r = row(itemURL('diamond', 96), 'Diamond ×5 & more', 'In the Premium Shop’s 💎 Crafting cards', buyButton('Open', null, true, () => openPanel('store', 'craft'), 'price'));
+      r.dataset.mat = 'more';
       body.appendChild(r);
       return;
     }

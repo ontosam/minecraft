@@ -272,6 +272,7 @@ export const ENERGY = { max: 60, regenSecs: 12, passMax: 90, passRegenSecs: 8, g
 
 export const STORE_TABS = [
   { id: 'gems', name: 'Emeralds' },
+  { id: 'craft', name: '💎 Crafting' },
   { id: 'energy', name: 'Energy' },
   { id: 'boost', name: 'Boosts' },
   { id: 'chests', name: 'Chests' },
@@ -289,10 +290,21 @@ export const STORE = [
   { id: 'rush30', tab: 'boost', name: 'Mega Gold x2', rush: 1800, price: 2.99, tag: '30 MIN' },
   { id: 'mystery', tab: 'chests', name: 'Mystery Chest', chest: 'small', price: 0.99 },
   { id: 'mega', tab: 'chests', name: 'Mega Chest', chest: 'mega', price: 4.99, tag: 'RARE' },
-  { id: 'diamonds5', tab: 'chests', name: 'Pack of Diamonds', diamonds: 5, price: 2.99, tag: 'SHINY' },
   { id: 'pass', tab: 'pass', name: 'Super Miner Pass', pass: true, price: 4.99, once: true },
 ];
 export function storeItem(id) { return STORE.find((x) => x.id === id); }
+
+// --- Premium Shop "💎 Crafting" tab: material packs bought with EMERALDS -----
+// (Like the genre game: diamonds come in a ×5 card, plus bars and a big chest.)
+export const CRAFT_PACKS = [
+  { id: 'craftsman', name: 'Craftsman Chest', gems: 40, big: true,
+    items: { 'm:diamond': 3, 'm:gold': 3, 'm:iron': 5, 'm:string': 3, 'm:planks': 8, 'm:stick': 4 } },
+  { id: 'diamond5', name: 'Diamond', gems: 20, items: { 'm:diamond': 5 } },
+  { id: 'gold5', name: 'Gold Bar', gems: 10, items: { 'm:gold': 5 } },
+  { id: 'iron5', name: 'Iron Bar', gems: 6, items: { 'm:iron': 5 } },
+  { id: 'string5', name: 'String', gems: 4, items: { 'm:string': 5 } },
+  { id: 'stick5', name: 'Stick', gems: 2, items: { 'm:stick': 5 } },
+];
 
 // --- Shop: crafting materials (the "💎 Diamonds" tab) ----------------------
 // Diamonds make the best gear, so they cost emeralds; bars and string cost coins.
