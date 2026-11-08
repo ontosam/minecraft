@@ -35,6 +35,7 @@
         <div id="lvl-badge"><small>LVL</small><b id="lvl">1</b></div>
         <div id="xpbar"><div id="xpfill"></div><span id="xptext">0 / 10</span></div>
         <div id="cave-name"></div>
+        <div id="grin-timer" class="hidden"></div>
         <button id="btn-pass" aria-label="Super Miner Pass"></button>
       </div>
       <button id="goal" aria-label="Next goal"><img id="goal-img" alt=""><span id="goal-text"></span><span id="goal-prog"><i></i></span><b id="goal-claim">Collect!</b></button>
@@ -60,6 +61,7 @@
           <div id="mine-hp"><i></i><span></span></div>
         </button>
         <div id="energy"><img alt=""><div id="energybar"><i></i><span id="energy-num"></span></div><button id="energy-plus" aria-label="Get energy">+</button></div>
+        <button id="btn-tnt" class="hidden" aria-label="TNT"><img alt=""><b id="tnt-n">0</b></button>
       </div>
       <div id="stations-b" class="stations"></div>
       </div>
@@ -70,6 +72,9 @@
     <div id="drag-ghost"><img alt=""></div>
     <div id="hand">👆</div>
     <!-- The guide (tutorial speech bubble) -->
+    <!-- The Grinner: the spooky visitor (dark screen + a grinning peek) -->
+    <div id="spook"></div>
+    <div id="grinner"><div class="say" id="grinner-say"></div><img id="grinner-img" alt=""></div>
     <div id="guide" class="hidden"><img id="guide-img" alt=""><div class="bubble"><span id="guide-text"></span><button id="guide-ok">OK!</button></div><button id="guide-skip">Skip</button></div>
     <div id="toast"></div>
   </div>

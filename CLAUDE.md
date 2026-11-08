@@ -1870,6 +1870,41 @@ smelting Diamond Ore (tier 12, hours in) and no shop sold them. Shipped on
   them and installing pillow-heif was blocked — a tiny stdlib HEIF-grid parser
   feeding the HEVC tiles to ffmpeg works (see the session transcript).
 
+## Status (session 48e) — 💥 TNT + 👻 the Grinner (Ezra's asks)
+Ezra (via the dad): "why don't I have TNT?" and he's obsessed with **Verity** (a
+viral Minecraft horror ARG character by YouTuber **ThatMob** — a yellow grinning
+ball that warns "something is coming"). The dad: "could make it scary for him."
+Verity belongs to its creator, so — like MineTap — **no copy of its name/look**:
+an **original spooky visitor, "the Grinner"** in the same spirit, with a
+grown-ups switch. **sw v52→v53.**
+- **💥 TNT** (`m:tnt`, `MATERIALS.tnt`, art `tnt` = a bundle of red sticks with a
+  lit fuse): a round red **TNT button by the mine block** (shows with a count
+  while you have any). Tap → fuse wiggle + hiss (0.75 s) → `game.useTNT()`:
+  **BOOM** — digs `TNT_BLOCKS`=6 blocks at once (6 chests land, no energy), or
+  blasts a monster for `TNT_MONSTER`=½ its health (≥8 hits' worth). Screen quake
+  + big burst. Get it: Premium Shop 💎 Crafting **TNT ×3 = 15💚** (card with a "?"
+  that explains it), sometimes in golden treasure chests (level 9+), 2 in a Mega
+  Chest, 1 from beating the Grinner. `stats.tnt` counts uses.
+- **👻 the Grinner** (`MONSTERS.grinner`, `unlock: 999` so never random; art
+  `grinner` = a shadowy floating blob with glowing mint eyes + a wide toothy
+  grin; `GRINNER` timings in data.js; flow in main.js `grinnerTick/Warn/Arrive/
+  End/Beaten`, state `s.grin {t,n,phase,left}`): after ~8 min of play (level 3+,
+  never during Pip's lessons or a pop-up), then every ~18 min: **the screen goes
+  dark + flickers** (`body.spooky`, `#spook` vignette; HUD/mine/stations stay
+  bright), **three slow knocks**, a creepy hum + giggle, and the Grinner **peeks
+  in** (portrait: from the right; landscape: from the left; click-through) —
+  "Knock… knock… Something is coming!" read in a slow low voice. A **countdown
+  pill** ("🌑 It comes in 2:00") → it **comes INTO the mine block** as a boss
+  (glowing, `#mine.boss`, replaces any regular monster). **Chase it off within 3
+  min** → "YOU BEAT THE GRINNER!" + coins, **+5 emeralds, 2 diamonds, 1 TNT**
+  (+ a Monster Hunt quest "Chase off the Grinner"). Not in time → "it got bored
+  and floated away… 👻" (nothing lost). No jump-scares, no loss — spooky, not
+  harmful. **Grown-ups corner: "Spooky visitor (the Grinner)" On/Off** (default
+  On; switching Off ends a visit at once). Debug: `__mine.grinner()/grinnerWarn()/
+  grinnerArrive()/grinnerEnd()/grinnerSoon(secs)/lightTNT()`.
+- Sounds: `fuse`, `knock`, `creepy` (sound.js); `speak(text,'spooky')` = slow,
+  low voice.
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept

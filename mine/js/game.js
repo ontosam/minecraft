@@ -13,7 +13,7 @@ import {
   RECIPES, SMELT, FUEL_TIER, MONSTERS, monsterHp, monsterCoins, MONSTER_EVERY,
   BOOSTERS, boosterPrice, VILLAGE_MERGES, DROP_GAP, shaftNeed, BUILDINGS, wellEvery,
   treasureEvery, TASKS, ACHIEVEMENTS, HUNT, OFFLINE_RATE, offlineCapSecs, caveFor,
-  SKINS, ENERGY, CARD_PREFIX, CARD_DIGITS, storeItem, blockValue, MAT_SHOP, CRAFT_PACKS,
+  SKINS, ENERGY, CARD_PREFIX, CARD_DIGITS, storeItem, blockValue, MAT_SHOP, CRAFT_PACKS, TNT_BLOCKS, TNT_MONSTER,
 } from './data.js';
 
 export const SAVE_KEY = 'ezramine.save.v1';
@@ -53,7 +53,7 @@ export function freshState() {
     furnace: [],                        // queue of { t, left, total }
     maxTier: 1,
     seen: { 1: 1 },
-    stats: { taps: 0, merges: 0, mined: 0, opened: 0, kills: 0, smelts: 0, builds: 0, crafts: 0, armorCrafted: 0,
+    stats: { taps: 0, merges: 0, mined: 0, opened: 0, kills: 0, smelts: 0, builds: 0, crafts: 0, armorCrafted: 0, tnt: 0,
       killBy: {}, craftBy: {}, equipBy: {} },
     claimed: { t: {}, a: {}, h: {} },
     boosts: { damage: 0, gold: 0, block: 0 },
@@ -289,9 +289,9 @@ export class Game {
     const bricks = 3 + s.level;
     const gems = this.rand() < 0.3 ? 1 : 0;
     s.gold += gold; s.bricks += bricks; s.gems += gems;
-    const mats = ['m:planks', 'm:stick', 'm:string', 'm:iron'];
+    const mats = ['m:planks', 'm:stick', 'm:string', 'm:iron', 'm:tnt'];
     const mat = mats[Math.floor(this.rand() * Math.min(mats.length, 2 + Math.floor(s.level / 3)))];
-    const nMat = mat === 'm:planks' ? 4 : mat === 'm:iron' ? 1 : 2;
+    const nMat = mat === 'm:planks' ? 4 : mat === 'm:iron' || mat === 'm:tnt' ? 1 : 2;
     this.addInv(mat, nMat);
     const t = Math.min(s.maxTier, this.dropTier() + 1);
     s.board[i] = { t };
@@ -303,6 +303,7 @@ export class Game {
   // ------------------------------------------------------------- monsters
   spawnMonster(id) {
     const s = this.s;
+    if (s.monster && id === 'grinner' && s.monster.id !== 'grinner') s.monster = null; // the others run off
     if (s.monster) return false;
     if (!id) {
       const open = Object.keys(MONSTERS).filter((k) => MONSTERS[k].unlock <= s.level);
@@ -341,9 +342,45 @@ export class Game {
     if (m.id === 'webby') give('m:string', 2);
     if (m.id === 'rocky') { give('m:iron'); if (this.rand() < 0.5) give('m:gold'); }
     if (m.id === 'magma') { give('m:gold', 2); if (this.rand() < 0.3) give('m:diamond'); s.gems += 2; loot.push({ k: 'gems', n: 2 }); }
+    if (m.id === 'grinner') { give('m:diamond', 2); give('m:tnt', 1); s.gems += 5; loot.push({ k: 'gems', n: 5 }); }
     this.emit('kill', { id: m.id, coins, loot, first });
     this.addXP(def.xp);
     return { killed: true, coins, loot };
+  }
+
+  // A monster that wasn't chased off in time just leaves (nothing is lost).
+  monsterLeave() {
+    const s = this.s;
+    if (!s.monster) return false;
+    const id = s.monster.id;
+    s.monster = null;
+    this.emit('monsterLeft', { id });
+    return true;
+  }
+  // TNT from the Chest: BOOM! Digs TNT_BLOCKS blocks at once (no energy), or
+  // blasts a monster for half its health.
+  useTNT() {
+    const s = this.s;
+    if (!this.takeInv('m:tnt')) { this.emit('deny', { reason: 'notnt' }); return null; }
+    s.stats.tnt = (s.stats.tnt || 0) + 1;
+    if (s.monster) {
+      const m = s.monster, dmg = Math.max(Math.ceil(m.max * TNT_MONSTER), this.attack() * 8);
+      m.hp = Math.max(0, m.hp - dmg);
+      this.emit('tnt', { monster: m.id, dmg, hp: m.hp, drops: [] });
+      if (m.hp <= 0) this.defeatMonster();
+      return { dmg };
+    }
+    const drops = [];
+    for (let k = 0; k < TNT_BLOCKS; k++) {
+      s.stats.mined++;
+      const t = Math.min(s.maxTier, this.dropTier() + (s.boosts.block > 0 ? 2 : 0));
+      const cell = this.randomEmpty();
+      if (cell >= 0) { s.board[cell] = { chest: 'wood', t }; drops.push({ cell, chest: 'wood', t }); }
+      else { this.addInv('b' + t); drops.push({ stored: true, t }); this.discover(t); }
+    }
+    s.mineHp = this.tapsPerBlock();
+    this.emit('tnt', { drops });
+    return { drops };
   }
 
   // ------------------------------------------------------------ the board
@@ -759,7 +796,7 @@ export class Game {
       s.board[cell] = { t };
       blocks.push({ cell, t });
     }
-    if (mega) { this.addInv('m:iron', 2); this.addInv('m:string', 3); }
+    if (mega) { this.addInv('m:iron', 2); this.addInv('m:string', 3); this.addInv('m:tnt', 2); }
     return { gold, gems, bricks, blocks };
   }
 

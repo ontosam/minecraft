@@ -72,6 +72,7 @@ export const MATERIALS = {
   iron: { name: 'Iron Bar' },
   gold: { name: 'Gold Bar' },
   diamond: { name: 'Diamond' },
+  tnt: { name: 'TNT' },
 };
 export const MATS = ['wood', 'stone', 'iron', 'gold', 'diamond'];
 export const MAT_NAME = { wood: 'Wooden', stone: 'Stone', iron: 'Iron', gold: 'Gold', diamond: 'Diamond' };
@@ -142,7 +143,15 @@ export const MONSTERS = {
   webby: { name: 'Webby', hp: 80, coins: 4000, xp: 8, unlock: 3 },
   rocky: { name: 'Rocky', hp: 160, coins: 8000, xp: 12, unlock: 6 },
   magma: { name: 'Magma Max', hp: 400, coins: 20000, xp: 25, unlock: 10 },
+  // The spooky visitor: never random — it only comes after its knock-knock warning.
+  grinner: { name: 'the Grinner', hp: 350, coins: 30000, xp: 30, unlock: 999, boss: true },
 };
+// TNT: one tap blows up this many blocks at once (no energy), or blasts a monster.
+export const TNT_BLOCKS = 6;
+export const TNT_MONSTER = 0.5; // ...for half its health (at least 8 hits' worth)
+// The Grinner: first knocks after ~8 min of play (level 3+), then every ~18 min.
+// After the warning it comes into the mine; chase it off in time or it floats away.
+export const GRINNER = { firstAfter: 8 * 60, every: 18 * 60, warnSecs: 120, staySecs: 180, minLevel: 3 };
 export function monsterHp(id, level) { return Math.round(MONSTERS[id].hp * (1 + 0.25 * (level - 1))); }
 export function monsterCoins(id, level) { return Math.round(MONSTERS[id].coins * (1 + 0.35 * (level - 1))); }
 // A monster wanders into the mine every so many broken blocks.
@@ -245,6 +254,7 @@ export const HUNT = [
   { text: 'Meet Webby', metric: 'kill:webby', n: 1, reward: { gold: 5000 } },
   { text: 'Meet Rocky', metric: 'kill:rocky', n: 1, reward: { gold: 15000 } },
   { text: 'Beat Magma Max', metric: 'kill:magma', n: 1, reward: { gold: 50000, gems: 3 } },
+  { text: 'Chase off the Grinner', metric: 'kill:grinner', n: 1, reward: { gold: 60000, gems: 5 } },
 ];
 
 // Offline earnings: blocks keep earning (half speed) while away, up to 12 h.
@@ -299,6 +309,7 @@ export function storeItem(id) { return STORE.find((x) => x.id === id); }
 export const CRAFT_PACKS = [
   { id: 'craftsman', name: 'Craftsman Chest', gems: 40, big: true,
     items: { 'm:diamond': 3, 'm:gold': 3, 'm:iron': 5, 'm:string': 3, 'm:planks': 8, 'm:stick': 4 } },
+  { id: 'tnt3', name: 'TNT', gems: 15, items: { 'm:tnt': 3 }, what: 'Tap TNT by your mine block: BOOM! It digs 6 blocks at once, or blasts a monster.' },
   { id: 'diamond5', name: 'Diamond', gems: 20, items: { 'm:diamond': 5 } },
   { id: 'gold5', name: 'Gold Bar', gems: 10, items: { 'm:gold': 5 } },
   { id: 'iron5', name: 'Iron Bar', gems: 6, items: { 'm:iron': 5 } },

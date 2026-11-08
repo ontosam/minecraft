@@ -874,3 +874,60 @@ html.small .row .info small { font-size: 13px; }
 html.small .packs { grid-template-columns: repeat(2, 1fr); gap: 8px; }
 html.small .pack-pic { width: 76px; height: 76px; }
 html.small .pack-name { font-size: 15px; }
+
+/* TNT button (shows while you have TNT in your Chest) */
+#mine-wrap { position: relative; }
+#btn-tnt {
+  position: absolute; left: -6px; bottom: 36px; z-index: 3; width: 52px; height: 52px; border-radius: 50%;
+  border: 3px solid var(--ink); background: radial-gradient(circle at 45% 35%, #ff8a6a, #e0403a 60%, #a82626);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, .35); display: flex; align-items: center; justify-content: center;
+  animation: bump 1.6s ease-in-out infinite;
+}
+#btn-tnt img { width: 36px; height: 36px; pointer-events: none; }
+#btn-tnt b {
+  position: absolute; right: -6px; bottom: -6px; min-width: 24px; height: 24px; border-radius: 12px; padding: 0 5px;
+  background: var(--ink); color: #fff; font-size: 14px; font-weight: 900; display: flex; align-items: center; justify-content: center;
+}
+#btn-tnt.lit { animation: tntfuse .12s linear infinite; }
+#mine.lit { animation: tntfuse .12s linear infinite; }
+@keyframes tntfuse { 0% { transform: translate(-2px, 1px) rotate(-3deg); } 50% { transform: translate(2px, -1px) rotate(3deg); } 100% { transform: translate(-2px, 1px) rotate(-3deg); } }
+#app.quake { animation: quake .55s ease-out; }
+@keyframes quake { 10% { transform: translate(-9px, 5px); } 25% { transform: translate(8px, -6px); } 40% { transform: translate(-6px, -4px); } 55% { transform: translate(5px, 4px); } 75% { transform: translate(-3px, 2px); } }
+html.small #btn-tnt { width: 42px; height: 42px; left: -4px; bottom: 28px; }
+html.small #btn-tnt img { width: 30px; height: 30px; }
+
+/* The Grinner: dark, flickery screen + a grinning shadow that peeks in */
+#spook {
+  position: fixed; inset: 0; pointer-events: none; z-index: 40; opacity: 0; transition: opacity 2.5s;
+  background: radial-gradient(ellipse at 50% 55%, rgba(20, 0, 40, .15) 25%, rgba(8, 0, 20, .82) 100%);
+}
+body.spooky #spook { opacity: 1; animation: spookflicker 5s steps(1) infinite; }
+@keyframes spookflicker { 0%, 100% { filter: none; } 47% { filter: brightness(1.4); } 48% { filter: none; } 81% { filter: brightness(1.25); } 82% { filter: none; } }
+body.spooky #backdrop { filter: brightness(.5) saturate(.5) hue-rotate(200deg); transition: filter 2.5s; }
+#grinner {
+  position: fixed; right: -260px; top: 34%; z-index: 59; display: flex; align-items: center; gap: 6px;
+  transition: right .9s cubic-bezier(.2, .9, .3, 1.2); pointer-events: none;
+}
+#grinner.peek { right: -28px; }
+/* landscape: the mine is on the right, so the Grinner peeks in from the left */
+body.landscape #grinner { right: auto; left: -260px; flex-direction: row-reverse; transition: left .9s cubic-bezier(.2, .9, .3, 1.2); }
+body.landscape #grinner.peek { left: -28px; }
+#grinner img { width: 190px; height: 190px; image-rendering: pixelated; filter: drop-shadow(0 0 22px rgba(125, 255, 200, .8)); animation: grinbob 2.4s ease-in-out infinite; }
+@keyframes grinbob { 50% { transform: translateY(-10px) rotate(-4deg); } }
+#grinner .say {
+  max-width: 230px; padding: 12px 14px; border-radius: 18px; border: 3px solid #7dffc8; background: rgba(20, 10, 35, .92);
+  color: #c9fff0; font-weight: 900; font-size: 20px; line-height: 1.2; text-shadow: 0 0 8px rgba(125, 255, 200, .7);
+}
+#grin-timer {
+  padding: 4px 12px; border-radius: 14px; border: 3px solid #7dffc8; background: #1c1030; color: #c9fff0;
+  font-weight: 900; font-size: 16px; white-space: nowrap; box-shadow: 0 0 12px rgba(125, 255, 200, .6);
+}
+#grin-timer.boss { animation: bump 1s ease-in-out infinite; }
+#mine.boss { box-shadow: 0 6px 0 rgba(0, 0, 0, .45), 0 0 26px 8px rgba(125, 255, 200, .75); }
+#mine.boss #mine-monster { animation: monbob .6s ease-in-out infinite; }
+html.small #grinner img { width: 130px; height: 130px; }
+html.small #grinner .say { font-size: 16px; max-width: 170px; }
+html.small #grin-timer { font-size: 12px; padding: 2px 8px; }
+/* keep the money bar, the mine block and the stations bright above the dark */
+body.spooky #hud, body.spooky #dock, body.spooky #stations-a, body.spooky #right-col { z-index: 41; }
+body.spooky #hud { position: relative; }

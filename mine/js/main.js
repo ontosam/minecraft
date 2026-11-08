@@ -4,6 +4,7 @@
 // file only draws them and turns taps/drags into game actions.
 
 import { Game, SAVE_KEY, N_CELLS, UNLOCK_ORDER, validateCard } from './game.js';
+import { GRINNER } from './data.js';
 import {
   TIERS, MAX_TIER, COLS, ROWS, caveFor, xpNeeded, openCells, MATERIALS, GEAR, SLOTS, SLOT_NAME, gearName,
   RECIPES, SMELT, FUEL_TIER, MONSTERS, BOOSTERS, BUILDINGS, VILLAGE_MERGES, shaftNeed, TASKS, ACHIEVEMENTS, HUNT,
@@ -41,7 +42,7 @@ let gotFirstTouch = false;
 let lastAction = performance.now();
 let playSecs = 0;           // this session's visible play time (for the rest reminder)
 let restShown = false;
-const SETTINGS_DEFAULT = { sound: true, speak: true, nums: true, rest: 30, energy: true, cardLimit: 0 };
+const SETTINGS_DEFAULT = { sound: true, speak: true, nums: true, rest: 30, energy: true, cardLimit: 0, spooky: true };
 
 function loadSave() {
   try {
@@ -66,12 +67,13 @@ function settings() {
 }
 
 // ------------------------------------------------------------------ speech
-function speak(text) {
+function speak(text, voice) {
   if (!settings().speak || !('speechSynthesis' in window)) return;
   try {
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 0.95; u.pitch = 1.1;
+    if (voice === 'spooky') { u.rate = 0.7; u.pitch = 0.4; }
     speechSynthesis.speak(u);
   } catch (e) { /* no voice available */ }
 }
@@ -331,6 +333,8 @@ function initHud() {
   $('pill-gems').querySelector('img').src = GEM();
   $('btn-settings').appendChild(img(iconURL('gear', 64)));
   $('btn-rush').querySelector('img').src = iconURL('bolt', 64);
+  $('btn-tnt').querySelector('img').src = itemURL('tnt', 64);
+  $('grinner-img').src = monsterURL('grinner', 192);
   $('energy').querySelector('img').src = iconURL('bolt', 64);
   goldShown = game.s.gold;
   for (const id of ['gold', 'gps', 'bricks', 'gems', 'lvl', 'xptext', 'cave-name', 'rush-time']) hud[id] = $(id);
@@ -378,6 +382,9 @@ function updateHud(dt) {
   const pb = $('btn-pass'), pt = s.iap.pass ? '⭐ SUPER MINER' : '⭐ PASS';
   if (pb.textContent !== pt) pb.textContent = pt;
   pb.classList.toggle('owned', !!s.iap.pass);
+  const tn = game.have('m:tnt'), tb = $('btn-tnt');
+  tb.classList.toggle('hidden', !tn);
+  if (tn) { const t = String(tn); if ($('tnt-n').textContent !== t) $('tnt-n').textContent = t; }
   updateMine();
   updateStations();
 }
@@ -440,6 +447,7 @@ function updateMine() {
   if (key !== mineKey) {
     mineKey = key;
     $('mine').classList.toggle('monster', !!m);
+    $('mine').classList.toggle('boss', !!(m && m.id === 'grinner'));
     if (m) $('mine-monster').src = monsterURL(m.id, 160);
     else {
       $('mine-img').src = tierURL(game.dropTier(), 128);
@@ -791,10 +799,35 @@ function onGameEvent(type, d) {
       updateMine();
       const loot = [{ icon: COIN(), text: '+' + fmt(d.coins) }];
       for (const l of d.loot) loot.push({ icon: l.k === 'gems' ? GEM() : invURL(l.k, 64), text: (l.n > 1 ? '+' + l.n : '') });
+      if (d.id === 'grinner') { grinnerBeaten(loot); tutorialPoke(); break; }
       celebrate({ title: 'YOU WON!', img: monsterURL(d.id, 160), name: `${MONSTERS[d.id].name} ran away!`, text: d.first ? 'It dropped a Stone Pickaxe! Put it on in your Hero.' : '', loot, say: d.first ? 'You won! It dropped a stone pickaxe!' : 'You won!', auto: d.first ? 0 : 3500 });
       tutorialPoke();
       break;
     }
+    case 'tnt': {
+      sound.play('boom');
+      const m = $('mine'), c = elCenter(m);
+      quake();
+      burst(c.x, c.y, ['#ff6b3d', '#ffd23f', '#fff6c9', '#3a3a42'], 30, 190);
+      floatText(c.x, c.y - 50, 'BOOM!', 'big');
+      if (d.monster) {
+        floatText(c.x, c.y - 10, '-' + d.dmg, 'dmg');
+        updateMine();
+      } else {
+        d.drops.forEach((dr, k) => setTimeout(() => {
+          if (dr.stored) { fly(tierURL(dr.t, 96), c, elCenter(stationEls.chest), 46, 450, 'flyblock'); return; }
+          const e = cellEls[dr.cell];
+          e.classList.add('hidden-blk');
+          fly(chestURL(dr.chest, 96), c, cellCenter(dr.cell), cellSize * 0.75, 380, 'flyblock').then(() => {
+            e.classList.remove('hidden-blk'); renderCell(dr.cell); animCell(dr.cell, 'land'); sound.play('drop');
+          });
+        }, k * 90));
+        speak('Boom!');
+      }
+      tutorialPoke();
+      break;
+    }
+    case 'monsterLeft': updateMine(); break;
     case 'move': case 'swap': sound.play('swap'); break;
     case 'merge': {
       renderCell(d.a); renderCell(d.b);
@@ -892,6 +925,7 @@ function onGameEvent(type, d) {
       sound.play('chest');
       const p = d.pack, k0 = Object.keys(p.items)[0];
       if (p.big) celebrate({ title: 'CRAFTSMAN CHEST!', img: chestURL('gold', 160), name: 'Look what was inside!', loot: Object.keys(p.items).map((k) => ({ icon: invURL(k, 64), text: '+' + p.items[k] })), sound: 'chest', say: 'Treasure!', auto: 4000 });
+      else if (k0 === 'm:tnt') { toast(`+${p.items[k0]} TNT! Tap the TNT by your mine block to BOOM!`, invURL(k0, 64)); speak('TNT! Tap the TNT next to your mine block to go boom!'); }
       else toast(`+${p.items[k0]} ${invName(k0)}${p.items[k0] > 1 ? 's' : ''}! They’re in your Chest.`, invURL(k0, 64));
       fly(p.big ? chestURL('gold', 96) : invURL(k0, 96), { x: innerWidth / 2, y: innerHeight / 2 }, elCenter(stationEls.chest), 46, 450, 'flyblock').then(() => stationPulse('chest'));
       break;
@@ -928,7 +962,7 @@ function onGameEvent(type, d) {
         furnace: 'The furnace is full — wait a moment!', max: 'That one is already the biggest!',
         energyfull: 'Your energy is already full! ⚡', notore: 'Only Iron, Gold and Diamond ore melt in the furnace',
         nofuel: 'The furnace needs Coal to burn! 🔥', norecipe: 'That doesn’t make anything yet — try a recipe!',
-        notmaterial: 'Gear goes on your Hero, not the workbench',
+        notmaterial: 'Gear goes on your Hero, not the workbench', notnt: 'No TNT left — get more in the Premium Shop!',
       }[d.reason];
       if (msg) { hint(msg); if (d.reason === 'nofuel' || d.reason === 'notore') speak(msg); }
       if (d.i !== undefined) animCell(d.i, 'invalid');
@@ -1285,7 +1319,7 @@ function renderCraftPacks(body) {
     pic.appendChild(img(p.big ? chestURL('gold', 128) : invURL(k0, 128)));
     if (!p.big && n0 > 1) pic.appendChild(el('span', 'pack-n', '×' + n0));
     pic.appendChild(el('span', 'pack-q', '?'));
-    pic.addEventListener('click', () => { const t = `${p.name}: ${packWhat(p)}`; hint(t, 3500); speak(t); });
+    pic.addEventListener('click', () => { const t = `${p.name}: ${p.what || packWhat(p)}`; hint(t, 3500); speak(t); });
     card.appendChild(pic);
     card.appendChild(el('b', 'pack-name', p.name));
     if (p.big) card.appendChild(el('small', 'pack-what', packWhat(p)));
@@ -1845,6 +1879,7 @@ PANELS.parent = {
     toggle('Numbers on blocks', [['On', true], ['Off', false]], st.nums, (v) => { st.nums = v; renderBoard(); });
     toggle('Break reminder', [['Off', 0], ['20 min', 20], ['30 min', 30], ['45 min', 45]], st.rest, (v) => { st.rest = v; restShown = false; });
     toggle('Energy limit', [['On', true], ['Off', false]], st.energy, (v) => { st.energy = v; });
+    toggle('Spooky visitor (the Grinner)', [['On', true], ['Off', false]], st.spooky, (v) => { st.spooky = v; if (!v) grinnerEnd(false); });
     toggle('Pretend card limit', [['None', 0], ['$10', 10], ['$25', 25], ['$50', 50]], st.cardLimit, (v) => { st.cardLimit = v; });
     body.appendChild(el('div', 'note', 'The store is pretend: checkout only accepts a game-card number starting 0000 (any other number is “declined”). No real money is involved, and the card number is never saved or sent anywhere — only its last 4 digits appear in the history below. Ezra’s Mine has no ads, chat or accounts; progress is saved in this browser on this device. The break reminder is a friendly card that never locks the game.'));
     const s0 = game.s;
@@ -2172,6 +2207,97 @@ function idleHints(now) {
   setTimeout(() => { for (const i of cells) cellEls[i].classList.remove('hinted'); }, 2400);
 }
 
+// ------------------------------------------------------------------ TNT
+function quake() { const a = $('app'); a.classList.remove('quake'); void a.offsetWidth; a.classList.add('quake'); setTimeout(() => a.classList.remove('quake'), 600); }
+let tntLit = false;
+function lightTNT() {
+  sound.resume();
+  if (tntLit || !game.have('m:tnt') || celOpen || panelOpen) return;
+  tntLit = true;
+  lastAction = performance.now();
+  sound.play('fuse');
+  $('btn-tnt').classList.add('lit'); $('mine').classList.add('lit');
+  setTimeout(() => {
+    $('btn-tnt').classList.remove('lit'); $('mine').classList.remove('lit');
+    tntLit = false;
+    game.useTNT();
+  }, 750);
+}
+
+// ------------------------------------------------------------------ the Grinner (spooky visitor)
+// Every so often (grown-ups can switch it off) the screen goes dark, three slow
+// knocks sound and a grinning shadow peeks in: "Something is coming…". After a
+// countdown it comes INTO the mine block. Chase it off in time for a big prize —
+// if not, it gets bored and floats away. Nothing is ever lost.
+function grin() { const s = game.s; if (!s.grin || typeof s.grin !== 'object') s.grin = { t: 0, n: 0, phase: 'idle', left: 0 }; return s.grin; }
+function fmtClock(secs) { const m = Math.floor(secs / 60), x = Math.floor(secs % 60); return m + ':' + String(x).padStart(2, '0'); }
+function grinnerPeek(text, ms = 4500) {
+  const g = $('grinner');
+  $('grinner-say').textContent = text;
+  g.classList.add('peek');
+  speak(text, 'spooky');
+  clearTimeout(grinnerPeek.t);
+  grinnerPeek.t = setTimeout(() => g.classList.remove('peek'), ms);
+}
+function grinnerWarn() {
+  const g = grin();
+  g.phase = 'warn'; g.left = GRINNER.warnSecs;
+  document.body.classList.add('spooky');
+  sound.play('knock');
+  setTimeout(() => { sound.play('creepy'); grinnerPeek('Knock… knock… Something is coming!'); }, 1700);
+  save();
+}
+function grinnerArrive() {
+  const g = grin();
+  g.phase = 'boss'; g.left = GRINNER.staySecs;
+  document.body.classList.add('spooky');
+  game.spawnMonster('grinner');
+  sound.play('creepy');
+  quake();
+  grinnerPeek('Hee hee… I’m HERE! Tap me to chase me away!', 3500);
+  save();
+}
+function grinnerEnd(gone) {
+  const g = grin();
+  const wasBoss = g.phase === 'boss';
+  g.phase = 'idle'; g.left = 0; g.t = 0; g.n = (g.n || 0) + 1;
+  document.body.classList.remove('spooky');
+  $('grinner').classList.remove('peek');
+  if (wasBoss && game.s.monster && game.s.monster.id === 'grinner') {
+    game.monsterLeave();
+    if (gone) { toast('The Grinner got bored and floated away… 👻', monsterURL('grinner', 64)); speak('The Grinner got bored and floated away.'); }
+  }
+  save();
+}
+function grinnerBeaten(loot) {
+  grinnerEnd(false);
+  celebrate({ title: 'YOU BEAT THE GRINNER!', img: monsterURL('grinner', 160), name: 'It ran back into the dark!', text: 'You were so brave! Here’s its treasure.', loot, sound: 'levelup', say: 'You beat the Grinner! You were so brave!' });
+}
+function grinnerTick(dt) {
+  const s = game.s, g = grin(), el = $('grin-timer');
+  const on = settings().spooky && s.level >= GRINNER.minLevel;
+  if (!on) { if (g.phase !== 'idle') grinnerEnd(false); el.classList.add('hidden'); return; }
+  if (document.hidden) return;
+  if (g.phase === 'idle') {
+    el.classList.add('hidden');
+    if (tutorialActive() || celOpen || coOpen()) return; // never during lessons or pop-ups
+    g.t += dt;
+    if (g.t >= (g.n ? GRINNER.every : GRINNER.firstAfter)) grinnerWarn();
+    return;
+  }
+  document.body.classList.add('spooky');
+  if (!celOpen && !coOpen()) g.left -= dt;
+  el.classList.remove('hidden');
+  const txt = (g.phase === 'warn' ? '🌑 It comes in ' : '👻 ') + fmtClock(Math.max(0, g.left));
+  if (el.textContent !== txt) el.textContent = txt;
+  el.classList.toggle('boss', g.phase === 'boss');
+  if (g.phase === 'warn' && g.left <= 0) grinnerArrive();
+  else if (g.phase === 'boss') {
+    if (!s.monster || s.monster.id !== 'grinner') grinnerEnd(false); // beaten (or gone)
+    else if (g.left <= 0) grinnerEnd(true);
+  }
+}
+
 // ------------------------------------------------------------------ gold "pops" from blocks
 let popT = 0;
 function goldPops(dt) {
@@ -2223,6 +2349,7 @@ function frame(now) {
   goldPops(rdt);
   idleHints(now);
   tutUpdate(false);
+  grinnerTick(dt);
   restCheck(rdt);
   saveT += rdt; panelT += rdt;
   if (saveT > 5) { saveT = 0; if (!skipSave) save(); }
@@ -2268,6 +2395,7 @@ function init() {
   });
   $('btn-settings').addEventListener('click', () => { sound.resume(); openPanel('parent'); });
   $('btn-rush').addEventListener('click', () => { sound.resume(); openPanel('shop', 'boost'); });
+  $('btn-tnt').addEventListener('click', lightTNT);
   initCheckout();
   for (const id of ['pill-gems', 'pill-bricks']) $(id).addEventListener('click', () => { sound.resume(); openPanel('store', 'gems'); });
   $('energy').addEventListener('click', () => { sound.resume(); openPanel('store', 'energy'); });
@@ -2370,6 +2498,9 @@ function init() {
     tut: () => game.s.tut, skipTut: finishTutorial, tutText: () => $('guide').classList.contains('hidden') ? '' : $('guide-text').textContent,
     tutNext: () => { if (tut.ok) tut.ok(); },
     hand: () => handEl.className,
+    grinner: () => Object.assign({}, grin(), { spooky: document.body.classList.contains('spooky') }),
+    grinnerWarn, grinnerArrive, grinnerEnd, lightTNT,
+    grinnerSoon: (secs) => { const g = grin(); g.left = secs; },
     craftSel: (id) => { if (id !== undefined) { craftSel = id; refreshPanel(true); } return craftSel; },
   };
   requestAnimationFrame((t) => { last = t; requestAnimationFrame(frame); });

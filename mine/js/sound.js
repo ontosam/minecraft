@@ -127,6 +127,17 @@ export class Sound {
         this.tone(2637, 0.3, 'sine', 0.08, 0, 0.16);
         break;
       case 'empty': this.tone(330, 0.12, 'triangle', 0.1, 200); this.tone(220, 0.2, 'triangle', 0.08, 140, 0.1); break;
+      case 'fuse': // a hissing, sparking fuse
+        for (let i = 0; i < 6; i++) this.crunch(0.07, 3000 + Math.random() * 2000, 0.07, i * 0.11);
+        break;
+      case 'knock': // three slow knocks on a wooden door
+        [0, 0.55, 1.1].forEach((d) => { this.crunch(0.09, 180, 0.4, d); this.tone(95, 0.12, 'sine', 0.22, 70, d); });
+        break;
+      case 'creepy': // a low wobbly hum and a little giggle
+        this.tone(110, 1.6, 'sine', 0.09, 98);
+        this.tone(116, 1.6, 'sine', 0.07, 104);
+        [0, 0.12, 0.24, 0.36].forEach((d, i) => this.tone(880 - i * 70, 0.09, 'triangle', 0.05, 0, 0.9 + d));
+        break;
     }
   }
 }

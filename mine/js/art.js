@@ -1082,7 +1082,7 @@ export function itemURL(id, size = 96) {
     case 'planks': return tileURL('planks', size);
     case 'iron': return barURL('iron', size);
     case 'gold': return barURL('gold', size);
-    case 'stick': case 'string': case 'bow': case 'orb': case 'diamond': return iconURL(id, size);
+    case 'stick': case 'string': case 'bow': case 'orb': case 'diamond': case 'tnt': return iconURL(id, size);
     default: return tileURL('mystery', size);
   }
 }
@@ -1090,7 +1090,7 @@ export function itemURL(id, size = 96) {
 // Bright green emeralds: the game's special currency.
 export function emeraldURL(size = 96) { return iconURL('gem', size, { c: 0x2fd06a, C: 0x1a8a44, w: 0xc8ffd8 }); }
 
-const MONSTERS = ['gloop', 'grumble', 'webby', 'rocky', 'magma'];
+const MONSTERS = ['gloop', 'grumble', 'webby', 'rocky', 'magma', 'grinner'];
 // The five friendly-goofy monsters.
 export function monsterURL(id, size = 96) { return MONSTERS.includes(id) ? iconURL(id, size) : tileURL('mystery', size); }
 
@@ -1292,3 +1292,53 @@ export function heroURL(gear = {}, size = 192) {
   cache.set(key, out.toDataURL());
   return cache.get(key);
 }
+
+// ---------------------------------------------------------------------------
+// TNT (a bundle of red sticks with a lit fuse) and the Grinner (the spooky
+// visitor: a shadowy floating thing with glowing eyes and a wide grin).
+// Original sprites, same chunky outlined style.
+// ---------------------------------------------------------------------------
+Object.assign(PAL, {
+  d: 0x3a2a55, // deep shadow purple
+  E: 0x140e1e, // near-black mouth
+  K: 0xfffbe0, // glowing eye / teeth
+  T: 0x7dffc8, // eerie mint glow
+});
+Object.assign(ICONS, {
+  tnt: [
+    '.........F......',
+    '........FfF.....',
+    '........k.......',
+    '.......k........',
+    '..kkkkkkkkkkkkk.',
+    '..kprRkprRkprRk.',
+    '..kprRkprRkprRk.',
+    '..kprRkprRkprRk.',
+    '..kWWWWWWWWWWWk.',
+    '..kWnWnWnWnWnWk.',
+    '..kWWWWWWWWWWWk.',
+    '..kprRkprRkprRk.',
+    '..kprRkprRkprRk.',
+    '..kRRRkRRRkRRRk.',
+    '..kkkkkkkkkkkkk.',
+    '................',
+  ],
+  grinner: [
+    '....kkkkkkkk....',
+    '..kkddddddddkk..',
+    '.kddVddddddVddk.',
+    'kddddddddddddddk',
+    'kdTTTddddddTTTdk',
+    'kdTKKTddddTKKTdk',
+    'kdTKETddddTEKTdk',
+    'kddTTddddddTTddk',
+    'kddddddddddddddk',
+    'kdKEddddddddEKdk',
+    'kddKEEEEEEEEKddk',
+    'kddEKKKKKKKKEddk',
+    'kdddEEEEEEEEdddk',
+    '.kddddddddddddk.',
+    '..kdkddkkddkdk..',
+    '...k..k..k..k...',
+  ],
+});
