@@ -243,11 +243,14 @@ function fly(src, from, to, size = 40, ms = 550, cls = 'flycoin') {
     fxEl.appendChild(f);
     const dx = to.x - from.x, dy = to.y - from.y;
     const lift = -Math.min(160, 60 + Math.abs(dx) * 0.3);
+    let done = false;
+    const finish = () => { if (done) return; done = true; f.remove(); resolve(); };
     f.animate([
       { transform: 'translate(0,0) scale(.7)' },
       { transform: `translate(${dx * 0.5}px, ${dy * 0.5 + lift}px) scale(1.1)`, offset: 0.5 },
       { transform: `translate(${dx}px, ${dy}px) scale(.9)` },
-    ], { duration: ms, easing: 'ease-in-out' }).onfinish = () => { f.remove(); resolve(); };
+    ], { duration: ms, easing: 'ease-in-out' }).onfinish = finish;
+    setTimeout(finish, ms + 400); // never leave a flight (or the board) hanging
   });
 }
 function bumpPill(id) { const p = $(id); p.classList.remove('bump'); void p.offsetWidth; p.classList.add('bump'); }
@@ -625,7 +628,8 @@ function initBoardInput() {
     lastAction = performance.now();
     hideHand();
     const ce = e.target.closest('.cell');
-    if (!ce || drag || flying) return;
+    if (drag) cancelDrag(); // a fresh touch always wins over a stale drag
+    if (!ce || flying) return;
     const i = Number(ce.dataset.i);
     e.preventDefault();
     drag = { id: e.pointerId, src: i, x0: e.clientX, y0: e.clientY, active: false, target: -1, station: null };
@@ -663,6 +667,7 @@ function initBoardInput() {
   const end = (e, cancelled) => {
     if (!drag || e.pointerId !== drag.id) return;
     const d = drag; drag = null;
+    try { if (boardEl.hasPointerCapture && boardEl.hasPointerCapture(e.pointerId)) boardEl.releasePointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     ghost.style.display = 'none';
     clearMarks();
     if (cancelled) { renderBoard(); return; }
@@ -680,6 +685,27 @@ function initBoardInput() {
   };
   boardEl.addEventListener('pointerup', (e) => end(e, false));
   boardEl.addEventListener('pointercancel', (e) => end(e, true));
+  // Self-healing: the iPad sometimes loses the "finger lifted" event (system
+  // gestures, a second finger, a pop-up). Never let a drag get stuck:
+  // 1) catch the lift anywhere on the page, 2) a lost capture = a cancelled drag,
+  // 3) any NEW touch clears a stale drag, 4) leaving the app clears it too.
+  window.addEventListener('pointerup', (e) => end(e, false), true);
+  window.addEventListener('pointercancel', (e) => end(e, true), true);
+  boardEl.addEventListener('lostpointercapture', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    setTimeout(() => { if (drag && drag.id === e.pointerId) cancelDrag(); }, 80);
+  });
+  window.addEventListener('pointerdown', (e) => { if (drag && e.pointerId !== drag.id) cancelDrag(); }, true);
+  window.addEventListener('blur', cancelDrag);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) cancelDrag(); });
+}
+// Drop a stuck/abandoned drag: the block goes back where it was.
+function cancelDrag() {
+  if (!drag) return;
+  drag = null;
+  ghost.style.display = 'none';
+  clearMarks();
+  renderBoard();
 }
 
 function onCellTap(i) {
@@ -1374,6 +1400,10 @@ function initPanelDrag() {
   };
   window.addEventListener('pointerup', end);
   window.addEventListener('pointercancel', (e) => { if (pDrag && e.pointerId === pDrag.pid) { pDrag = null; ghost.style.display = 'none'; } });
+  // a new touch while an old item-drag is still "held" (its lift got lost): drop the old one
+  window.addEventListener('pointerdown', (e) => {
+    if (pDrag && e.pointerId !== pDrag.pid) { pDrag = null; ghost.style.display = 'none'; ghost.style.zIndex = ''; for (const x of document.querySelectorAll('.drop-hover')) x.classList.remove('drop-hover'); }
+  }, true);
 }
 function dropTargetAt(x, y) {
   const els = document.elementsFromPoint(x, y);
@@ -2498,6 +2528,7 @@ function init() {
     tut: () => game.s.tut, skipTut: finishTutorial, tutText: () => $('guide').classList.contains('hidden') ? '' : $('guide-text').textContent,
     tutNext: () => { if (tut.ok) tut.ok(); },
     hand: () => handEl.className,
+    dragging: () => !!drag, ghostShown: () => ghost.style.display === 'block',
     grinner: () => Object.assign({}, grin(), { spooky: document.body.classList.contains('spooky') }),
     grinnerWarn, grinnerArrive, grinnerEnd, lightTNT,
     grinnerSoon: (secs) => { const g = grin(); g.left = secs; },

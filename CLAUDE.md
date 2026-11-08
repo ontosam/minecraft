@@ -1904,6 +1904,18 @@ grown-ups switch. **sw v52→v53.**
   grinnerArrive()/grinnerEnd()/grinnerSoon(secs)/lightTNT()`.
 - Sounds: `fuse`, `knock`, `creepy` (sound.js); `speak(text,'spooky')` = slow,
   low voice.
+- **Glitch fix (dad's iPad photo: a Dirt block "stuck in the middle of the screen,
+  can't be removed"):** a board drag whose finger-lift event got lost stayed
+  "held" forever — the ghost block floated, the source square stayed faded, and
+  every new touch on the board was ignored (`if (drag) return`). Now drags
+  self-heal (`initBoardInput`, `cancelDrag`): the lift is also caught on
+  `window` (capture), `lostpointercapture` → cancel, **any new touch cancels a
+  stale drag** (window capture + the board's own pointerdown), and blur /
+  hiding the app cancels too; the block always goes back to its square. Panel
+  item drags (`pDrag`) get the same new-touch reset, and `fly()` always resolves
+  (a timeout backs up `onfinish`) so a tap-tap flight can't freeze the board.
+  e2e "3b" recreates it with real touches (touchStart+moves, no lift, then a
+  second finger). **sw v53→v54.**
 
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world

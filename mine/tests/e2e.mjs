@@ -142,6 +142,27 @@ st = await S();
 ok(st.board[o[1]] && st.board[o[1]].t === 4, 'second tap on its twin merges them');
 await dismiss();
 
+console.log('3b. A stuck drag never freezes the board (Ezra’s glitch)');
+await setBoard([{ t: 1 }, { t: 1 }, { t: 2 }]);
+o = await openIdx();
+a = await cell(o[0]); b = await cell(o[1]);
+await p.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: a.x, y: a.y, id: 1 }] });
+for (let k = 1; k <= 6; k++) { await p.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: a.x + (b.x - a.x) * k / 6, y: a.y + (b.y - a.y) * k / 6, id: 1 }] }); await p.sleep(16); }
+ok(await E(`__mine.dragging() && __mine.ghostShown()`), 'mid-drag: the block is floating (the lift never arrives)');
+await p.shot(SHOTS + '/03b-stuck-drag.png');
+const c2 = await cell(o[2]);
+await p.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: a.x + (b.x - a.x), y: a.y + (b.y - a.y), id: 1 }, { x: c2.x, y: c2.y, id: 2 }] });
+await p.sleep(100);
+ok(await E(`!__mine.ghostShown() && !document.querySelector('.cell.dragging')`), 'a new touch clears the stuck block (no floating block left)');
+await p.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+await p.sleep(300);
+st = await S();
+ok(st.board[o[0]] && st.board[o[0]].t === 1 && st.board[o[1]] && st.board[o[1]].t === 1, 'the blocks are safe where they were');
+a = await cell(o[0]); b = await cell(o[1]);
+await p.drag(a.x, a.y, b.x, b.y); await p.sleep(700);
+ok((await J(`__mine.game.s.board[${o[1]}]`)).t === 2 && !(await E(`__mine.dragging()`)), 'and the board works again right away (merge)');
+await dismiss();
+
 console.log('4. Chest: store a block, tap it back');
 await setBoard([{ t: 1 }]);
 a = await cell(o[0]);
