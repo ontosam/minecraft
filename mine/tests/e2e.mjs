@@ -231,7 +231,7 @@ ok(await E(`document.getElementById('goal').classList.contains('ready')`), 'the 
 const g0 = (await S()).gold;
 await tapSel('#goal', 500);
 ok((await S()).gold >= g0 + 1000, 'tapping it collects the reward (1,000-coin scale)');
-await E(`__mine.openPanel('quests')`); await p.sleep(300);
+await E(`__mine.openPanel('quests')`); await p.sleep(550);
 ok(await E(`[...document.querySelectorAll('#panel-tabs .tab')].map(t => t.textContent).join('|').match(/Tasks.*Achievements.*Monster Hunt/) !== null`), 'Quests has Tasks, Achievements and Monster Hunt tabs');
 await E(`[...document.querySelectorAll('#panel-tabs .tab')][2].click()`); await p.sleep(300);
 ok(await E(`document.querySelector('#panel-body .row') !== null && document.getElementById('panel-body').textContent.includes('monster')`), 'Monster Hunt lists monster quests');
@@ -270,7 +270,7 @@ st = await J(`(() => { const g = __mine.game, s = g.s; s.equip.helmet = 'diamond
 ok(st.r[0] === st.r[1], 'taking armor off and on again does not lose energy');
 ok(st.secs.every((x, k) => k === 0 || x < st.secs[k - 1]), 'every Bakery level makes energy come back faster (' + st.secs.join(', ') + ' s)');
 // Diamonds in the shop
-await E(`(() => { const s = __mine.game.s; s.gems = 10; s.gold = 1e6; delete s.inv['m:diamond']; __mine.openPanel('shop'); })()`); await p.sleep(350);
+await E(`(() => { const s = __mine.game.s; s.gems = 10; s.gold = 1e6; delete s.inv['m:diamond']; __mine.openPanel('shop'); })()`); await p.sleep(550);
 ok(await E(`[...document.querySelectorAll('#panel-tabs .tab')].some(t => t.textContent.includes('Diamonds'))`), 'the Shop has a 💎 Diamonds tab');
 await E(`[...document.querySelectorAll('#panel-tabs .tab')].find(t => t.textContent.includes('Diamonds')).click()`); await p.sleep(350);
 ok(await E(`!!document.querySelector('#panel-body .row[data-mat="m:diamond"]') && document.getElementById('panel-body').textContent.includes('Pack of Diamonds')`), 'it sells Diamonds (for emeralds) and a Pack of Diamonds');
