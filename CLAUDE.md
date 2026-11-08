@@ -1838,6 +1838,23 @@ upgrade" tour (chest → Workbench planks/sticks → monster → done).
   gate, pretend store/card/limit/energy, Start over keeps settings, all panels,
   9 screen sizes) + a 4-dimension review workflow with skeptic verification.
 
+## Status (session 48d) — 💎 Diamonds in the Mine's Shop
+Dad: "Ezra absolutely loves it… he said he can't find the diamonds in the shop."
+The MineTap web pages aren't reachable from the sandbox; search hints say its
+paid currency is emeralds and players chase diamond ore / diamond gear, so he
+most likely means **diamonds to craft with** — in v2 those only came from
+smelting Diamond Ore (tier 12, hours in) and no shop sold them. Shipped on
+**`claude/tender-mayer-550bb0`** → `main`. **sw v50→v51.**
+- **Shop → new "💎 Diamonds" tab** (`MAT_SHOP` in data.js, `game.buyMaterial(k)`,
+  event `buyMat`): **Diamond for 4 emeralds**, Gold Bar / Iron Bar / String for
+  coins (≈1.5× the ore's block value). Bought items fly into the storage Chest;
+  buying one makes the diamond recipes appear at the Workbench (`everHad`).
+- **Pretend store:** a **Pack of Diamonds** (5 diamonds, $2.99, Chests tab, and
+  linked from the Diamonds tab) — same toy-card checkout + parent limits;
+  `grant()` adds `m:diamond`, a "DIAMONDS!" card after checkout closes.
+- e2e +6 checks (tab exists, sells diamonds + pack, buy spends 4 emeralds, no
+  spend when short, pack adds 5, Diamond Sword recipe shows).
+
 ## (SUPERSEDED in session 26) — old plan: Lego World = the Fun Hub ("Vegas")
 **This plan was replaced** (see session 26): Lego World stayed a *build* world
 and the fun hub became the separate **Secret World** (`js/secretworld.js`). Kept

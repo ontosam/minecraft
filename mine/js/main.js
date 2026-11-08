@@ -7,7 +7,7 @@ import { Game, SAVE_KEY, N_CELLS, UNLOCK_ORDER, validateCard } from './game.js';
 import {
   TIERS, MAX_TIER, COLS, ROWS, caveFor, xpNeeded, openCells, MATERIALS, GEAR, SLOTS, SLOT_NAME, gearName,
   RECIPES, SMELT, FUEL_TIER, MONSTERS, BOOSTERS, BUILDINGS, VILLAGE_MERGES, shaftNeed, TASKS, ACHIEVEMENTS, HUNT,
-  SKINS, STORE, STORE_TABS, storeItem, ENERGY, CARD_DIGITS, SWORD_ATK, PICK_TAPS, BOW_ATK, armorPoints,
+  SKINS, STORE, STORE_TABS, storeItem, ENERGY, CARD_DIGITS, SWORD_ATK, PICK_TAPS, BOW_ATK, armorPoints, MAT_SHOP,
 } from './data.js';
 import {
   tileURL, iconURL, tileColors, crackURL, buildingURL,
@@ -888,6 +888,12 @@ function onGameEvent(type, d) {
     case 'booster': sound.play('levelup'); toast(`${BOOSTERS[d.id].name}! (${fmtTime(d.secs)})`, iconURL(d.id === 'damage' ? 'sword' : d.id === 'gold' ? 'coin' : 'uparrow', 64)); break;
     case 'build': sound.play('buy'); toast(`${BUILDINGS.find((b) => b.id === d.id).name} is now level ${d.lv}!`, iconURL('house', 64)); tutorialPoke(); break;
     case 'buy': sound.play('buy'); renderCell(d.cell); animCell(d.cell, 'land'); break;
+    case 'buyMat': {
+      sound.play('buy');
+      toast(`You got ${/^[aeiou]/i.test(invName(d.k)) ? 'an' : 'a'} ${invName(d.k)}! It’s in your Chest.`, invURL(d.k, 64));
+      fly(invURL(d.k, 96), { x: innerWidth / 2, y: innerHeight / 2 }, elCenter(stationEls.chest), 46, 450, 'flyblock').then(() => stationPulse('chest'));
+      break;
+    }
     case 'quest': {
       sound.play('done');
       const r = d.reward, c = panelOpen === 'quests' ? elCenter(stationEls.quests) : elCenter($('goal'));
@@ -962,6 +968,7 @@ function storeIcon(it, size = 96) {
   if (it.bricks) return iconURL('brick', size);
   if (it.refill || it.unlimited) return iconURL('bolt', size);
   if (it.rush) return iconURL('coin', size);
+  if (it.diamonds) return itemURL('diamond', size);
   if (it.chest === 'mega') return iconURL('chest', size, { t: 0xf6c935, b: 0xd99a1e, B: 0x8a5a10 });
   if (it.chest) return iconURL('chest', size);
   if (it.pass) return iconURL('star', size);
@@ -973,6 +980,7 @@ function storeWhat(it) {
   if (it.refill) return 'Fill your energy right up';
   if (it.unlimited) return 'Mine forever — never run out';
   if (it.rush) return `Double gold for ${Math.round(it.rush / 60)} minutes`;
+  if (it.diamonds) return `+${it.diamonds} diamonds to craft shiny gear`;
   if (it.chest === 'mega') return '6 big blocks, iron, string, 25 emeralds + lots of gold';
   if (it.chest) return '3 surprise blocks + emeralds + gold';
   if (it.pass) return 'Double gold forever, more energy, faster refills, +10 emeralds';
@@ -1006,6 +1014,9 @@ function onPurchased(it, got) {
   if (got.gold) setTimeout(() => coinsTo(from, 5, 'gold'), 250);
   if (it.rush) toast(`Gold Rush x2 for ${Math.round(it.rush / 60)} minutes!`, iconURL('coin', 64));
   if (it.refill) toast('Energy full! ⚡', iconURL('bolt', 64));
+  if (got.diamonds) {
+    celebrate({ title: 'DIAMONDS!', img: itemURL('diamond', 160), name: `+${got.diamonds} Diamonds`, text: 'They’re in your Chest. Make something shiny at the Workbench!', sound: 'chest', say: 'Diamonds!' });
+  }
   if (it.chest) {
     renderBoard();
     for (const b of got.blocks) if (b.cell !== undefined) animCell(b.cell, 'land');
@@ -1503,12 +1514,13 @@ PANELS.shop = {
   key() {
     const s = game.s;
     const can = game.shopTiers().filter((t) => s.gold >= game.shopPrice(t)).length;
-    return [panelTab, s.maxTier, game.emptyCells().length > 0, can, s.gold >= game.boosterPrice(), s.boosts.damage > 0, s.boosts.gold > 0, s.boosts.block > 0].join('|');
+    const mats = MAT_SHOP.map((m) => (m.gems ? s.gems >= m.gems : s.gold >= m.gold) + ':' + game.have(m.k)).join(',');
+    return [panelTab, s.maxTier, game.emptyCells().length > 0, can, s.gold >= game.boosterPrice(), s.boosts.damage > 0, s.boosts.gold > 0, s.boosts.block > 0, mats].join('|');
   },
   render(body) {
     const s = game.s, tab = panelTab || 'boost';
     const tabs = $('panel-tabs');
-    for (const [id, name] of [['boost', 'Boosters'], ['blocks', 'Blocks']]) {
+    for (const [id, name] of [['boost', 'Boosters'], ['blocks', 'Blocks'], ['mats', '💎 Diamonds']]) {
       const b = el('button', 'tab' + (id === tab ? ' on' : ''), name);
       b.addEventListener('click', () => { panelTab = id; sound.play('pick'); refreshPanel(true); });
       tabs.appendChild(b);
@@ -1524,6 +1536,26 @@ PANELS.shop = {
         body.appendChild(row(iconURL(id === 'damage' ? 'sword' : id === 'gold' ? 'coin' : 'uparrow', 96), b.name + ` (${Math.round(b.secs / 60)} min)`, sub,
           buyButton(fmt(price), COIN(), s.gold >= price, () => game.buyBooster(id))));
       }
+      return;
+    }
+    if (tab === 'mats') {
+      body.appendChild(el('div', 'note', 'Diamonds make the best swords, pickaxes and armor! They go in your Chest — then craft at the Workbench.'));
+      for (const m of MAT_SHOP) {
+        const sub = el('div');
+        sub.appendChild(el('small', '', m.k === 'm:diamond' ? 'The shiniest material of all' : m.k === 'm:string' ? 'For making a bow' : 'For metal gear'));
+        sub.appendChild(el('small', '', `You have ${game.have(m.k)}`));
+        const btn = m.gems
+          ? buyButton(String(m.gems), GEM(), s.gems >= m.gems, () => game.buyMaterial(m.k), '', 'You need more emeralds 💚')
+          : buyButton(fmt(m.gold), COIN(), s.gold >= m.gold, () => game.buyMaterial(m.k));
+        const r = row(invURL(m.k, 96), invName(m.k), sub, btn);
+        r.dataset.mat = m.k;
+        body.appendChild(r);
+      }
+      const pack = storeItem('diamonds5');
+      const r = row(storeIcon(pack), pack.name, storeWhat(pack), buyButton(money(pack.price), null, true, () => openCheckout(pack.id), 'price'));
+      r.classList.add('store-row');
+      r.appendChild(el('span', 'ribbon', pack.tag));
+      body.appendChild(r);
       return;
     }
     if (!game.emptyCells().length) body.appendChild(el('div', 'note', 'Your board is full — merge some blocks first!'));

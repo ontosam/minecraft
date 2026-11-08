@@ -13,7 +13,7 @@ import {
   RECIPES, SMELT, FUEL_TIER, MONSTERS, monsterHp, monsterCoins, MONSTER_EVERY,
   BOOSTERS, boosterPrice, VILLAGE_MERGES, DROP_GAP, shaftNeed, BUILDINGS, wellEvery,
   treasureEvery, TASKS, ACHIEVEMENTS, HUNT, OFFLINE_RATE, offlineCapSecs, caveFor,
-  SKINS, ENERGY, CARD_PREFIX, CARD_DIGITS, storeItem, blockValue,
+  SKINS, ENERGY, CARD_PREFIX, CARD_DIGITS, storeItem, blockValue, MAT_SHOP,
 } from './data.js';
 
 export const SAVE_KEY = 'ezramine.save.v1';
@@ -587,6 +587,21 @@ export class Game {
     this.emit('booster', { id, secs: s.boosts[id], price });
     return true;
   }
+  // The Shop's "💎 Diamonds" tab: crafting materials for emeralds or coins.
+  buyMaterial(k) {
+    const s = this.s, it = MAT_SHOP.find((x) => x.k === k);
+    if (!it) return false;
+    if (it.gems) {
+      if (s.gems < it.gems) { this.emit('deny', { reason: 'gems' }); return false; }
+      s.gems -= it.gems;
+    } else {
+      if (s.gold < it.gold) { this.emit('deny', { reason: 'cost' }); return false; }
+      s.gold -= it.gold;
+    }
+    this.addInv(k);
+    this.emit('buyMat', { k, gems: it.gems || 0, gold: it.gold || 0 });
+    return true;
+  }
   shopTiers() { const out = []; for (let t = 1; t <= Math.max(1, this.s.maxTier - DROP_GAP); t++) out.push(t); return out; }
   shopPrice(t) { return blockValue(t); }
   buyBlock(t) {
@@ -717,6 +732,7 @@ export class Game {
     if (it.rush) s.boosts.gold += it.rush;
     if (it.pass) { s.iap.pass = 1; s.gems += 10; got.gems = 10; s.energy = Math.max(s.energy, this.energyMax()); }
     if (it.chest) Object.assign(got, this.storeChest(it.chest));
+    if (it.diamonds) { this.addInv('m:diamond', it.diamonds); got.diamonds = it.diamonds; }
     this.emit('purchased', { item: it, got });
     for (const b of got.blocks) if (b.t) this.discover(b.t);
     return got;

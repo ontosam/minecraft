@@ -289,6 +289,16 @@ export const STORE = [
   { id: 'rush30', tab: 'boost', name: 'Mega Gold x2', rush: 1800, price: 2.99, tag: '30 MIN' },
   { id: 'mystery', tab: 'chests', name: 'Mystery Chest', chest: 'small', price: 0.99 },
   { id: 'mega', tab: 'chests', name: 'Mega Chest', chest: 'mega', price: 4.99, tag: 'RARE' },
+  { id: 'diamonds5', tab: 'chests', name: 'Pack of Diamonds', diamonds: 5, price: 2.99, tag: 'SHINY' },
   { id: 'pass', tab: 'pass', name: 'Super Miner Pass', pass: true, price: 4.99, once: true },
 ];
 export function storeItem(id) { return STORE.find((x) => x.id === id); }
+
+// --- Shop: crafting materials (the "💎 Diamonds" tab) ----------------------
+// Diamonds make the best gear, so they cost emeralds; bars and string cost coins.
+export const MAT_SHOP = [
+  { k: 'm:diamond', gems: 4 },
+  { k: 'm:gold', gold: Math.round(blockValue(7) * 1.5) },
+  { k: 'm:iron', gold: Math.round(blockValue(6) * 1.5) },
+  { k: 'm:string', gold: blockValue(5) },
+];

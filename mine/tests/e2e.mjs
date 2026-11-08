@@ -269,6 +269,24 @@ await E(`__mine.closePanel()`); await p.sleep(550);
 st = await J(`(() => { const g = __mine.game, s = g.s; s.equip.helmet = 'diamond_helmet'; s.equip.chest = 'diamond_chest'; s.energy = g.energyMax(); const e0 = s.energy; g.unequip('chest'); g.equip('diamond_chest'); const r = [e0, s.energy]; s.village.bakery = 0; const secs = []; for (let lv = 0; lv <= 6; lv++) { s.village.bakery = lv; secs.push(g.energyRegenSecs()); } s.village.bakery = 0; s.equip.helmet = null; s.equip.chest = null; return { r, secs }; })()`);
 ok(st.r[0] === st.r[1], 'taking armor off and on again does not lose energy');
 ok(st.secs.every((x, k) => k === 0 || x < st.secs[k - 1]), 'every Bakery level makes energy come back faster (' + st.secs.join(', ') + ' s)');
+// Diamonds in the shop
+await E(`(() => { const s = __mine.game.s; s.gems = 10; s.gold = 1e6; delete s.inv['m:diamond']; __mine.openPanel('shop'); })()`); await p.sleep(350);
+ok(await E(`[...document.querySelectorAll('#panel-tabs .tab')].some(t => t.textContent.includes('Diamonds'))`), 'the Shop has a 💎 Diamonds tab');
+await E(`[...document.querySelectorAll('#panel-tabs .tab')].find(t => t.textContent.includes('Diamonds')).click()`); await p.sleep(350);
+ok(await E(`!!document.querySelector('#panel-body .row[data-mat="m:diamond"]') && document.getElementById('panel-body').textContent.includes('Pack of Diamonds')`), 'it sells Diamonds (for emeralds) and a Pack of Diamonds');
+await p.shot(SHOTS + '/09-diamonds.png');
+await tapSel('#panel-body .row[data-mat="m:diamond"] .buy', 400);
+st = await S();
+ok(st.inv['m:diamond'] === 1 && st.gems === 6, 'tapping buys a Diamond for 4 emeralds, into the Chest');
+await E(`(() => { __mine.game.s.gems = 2; })()`); await p.sleep(600);
+await tapSel('#panel-body .row[data-mat="m:diamond"] .buy', 400);
+ok((await S()).inv['m:diamond'] === 1 && (await S()).gems === 2, 'not enough emeralds: nothing is spent');
+await E(`(() => { const g = __mine.game; g.s.inv['m:diamond'] = 1; g.s.settings.cardLimit = 0; g.grant('diamonds5', '0003', Date.now()); __mine.dismiss(); })()`); await p.sleep(300);
+ok((await S()).inv['m:diamond'] === 6, 'the pretend Pack of Diamonds adds 5 diamonds');
+await E(`__mine.closePanel()`); await p.sleep(550);
+await E(`(() => { const s = __mine.game.s; s.inv['m:stick'] = 2; __mine.openPanel('craft'); })()`); await p.sleep(350);
+ok(await E(`[...document.querySelectorAll('#panel-body .rchip')].some(c => c.textContent.includes('Diamond Sword'))`), 'with diamonds, the Diamond Sword recipe shows at the Workbench');
+await E(`__mine.closePanel()`); await p.sleep(550);
 
 console.log('10. Gold comes from later blocks; full board → chest; treasure chests');
 await E(`(() => { const g = __mine.game, s = g.s; s.boosts = { damage: 0, gold: 0, block: 0 }; s.village = {}; s.iap = {}; })()`);
